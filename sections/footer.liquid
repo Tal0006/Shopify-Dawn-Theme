@@ -1,126 +1,81 @@
-<!-- footer-area -->
-<div class="footer-area">
-  <div class="footer-top">
-    <div class="footer-wrap">
-      <h3>{{ section.settings.follow_title }}</h3>
-      <ul>
-        {% if section.settings.instagram != blank %}
-          <li>
-            <a href="{{section.settings.instagram}}"
-              ><img src="{{ 'instagram.png' | asset_url }}" width="" height="" alt=""
-            ></a>
-          </li>
-        {% endif %}
-        {% if section.settings.tiktok != blank %}
-          <li>
-            <a href="{{section.settings.tiktok}}"
-              ><img src="{{ 'tiktok.png' | asset_url }}" width="" height="" alt=""
-            ></a>
-          </li>
-        {% endif %}
-      </ul>
-      <div class="newslatter-area">
-        <h4>{{ section.settings.newsletter_title }}</h4>
-        {% form 'customer' %}
-          <input
-            type="hidden"
-            name="contact[tags]"
-            value="newsletter"
-          >
-          <input type="text" name="contact[email]" placeholder="{{section.settings.newsletter_email}}">
-          <button type="submit">{{ section.settings.newsletter_button }}</button>
-          {{ form.errors | default_errors }}
-          {% if form.posted_successfully? %}
-            <p class="text-center mt-2">{{ section.settings.newsletter_success }}</p>
-          {% endif %}
-        {%- endform -%}
-      </div>
-      <div class="shape1"><img src="{{ 'footer1.png' | asset_url }}" width="" height="" alt=""></div>
-      <div class="shape2"><img src="{{ 'footer2.png' | asset_url }}" width="" height="" alt=""></div>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    <ul>
-      {% for link in section.settings.footer_link.links %}
-        <li>
-          <a href="{{ link.url }}">{{ link.title }}</a>
-        </li>
-      {% endfor %}
-    </ul>
-    <ul class="paymets">
-      <li>
-        <a href="#"><img src="{{ 'payment1.svg' | asset_url }}" width="" height="" alt=""></a>
-      </li>
-      <li>
-        <a href="#"><img src="{{ 'payment2.svg' | asset_url }}" width="" height="" alt=""></a>
-      </li>
-      <li>
-        <a href="#"><img src="{{ 'payment3.svg' | asset_url }}" width="" height="" alt=""></a>
-      </li>
-      <li>
-        <a href="#"><img src="{{ 'payment4.svg' | asset_url }}" width="" height="" alt=""></a>
-      </li>
-      <li>
-        <a href="#"><img src="{{ 'payment5.svg' | asset_url }}" width="" height="" alt=""></a>
-      </li>
-    </ul>
+<footer class="footer-area storefront-footer">
+<div class="container storefront-footer-grid"><div class="storefront-footer-brand"><a class="storefront-logo-text" href="{{ routes.root_url }}">{{ shop.name | escape }}</a>
+  <h3>{% if section.settings.follow_title != blank %}{{ section.settings.follow_title | escape }}{% else %}{{ 'storefront.follow' | t }}{% endif %}</h3>
+  <ul>
+    {% if section.settings.instagram != blank %}<li><a href="{{ section.settings.instagram | escape }}">{{ 'storefront.instagram' | t }}</a></li>{% endif %}
+    {% if section.settings.facebook != blank %}<li><a href="{{ section.settings.facebook | escape }}">{{ 'storefront.facebook' | t }}</a></li>{% endif %}
+    {% if section.settings.whatsapp != blank %}<li><a href="{{ section.settings.whatsapp | escape }}">{{ 'storefront.whatsapp' | t }}</a></li>{% endif %}
+    {% if section.settings.tiktok != blank %}<li><a href="{{ section.settings.tiktok | escape }}">{{ 'storefront.tiktok' | t }}</a></li>{% endif %}
+  </ul>
+</div><div class="storefront-footer-links">
+  {% if section.settings.footer_link != blank %}<nav aria-label="{{ 'sections.header.menu' | t }}"><h3>{{ 'sections.header.menu' | t }}</h3><ul>{% for link in section.settings.footer_link.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}
+  {% if section.settings.service_menu != blank %}<nav aria-label="{{ 'storefront.customer_service' | t }}"><h3>{{ 'storefront.customer_service' | t }}</h3><ul>{% for link in section.settings.service_menu.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}
+  {% if section.settings.show_policies %}<nav aria-label="{{ 'storefront.policies' | t }}"><h3>{{ 'storefront.policies' | t }}</h3><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}</ul></nav>{% endif %}
+</div>
+  <div class="newslatter-area"><h4>{% if section.settings.newsletter_title != blank %}{{ section.settings.newsletter_title | escape }}{% else %}{{ 'storefront.newsletter_title' | t }}{% endif %}</h4>
+    {% assign newsletter_form_id = 'FooterNewsletter-' | append: section.id %}
+    {% form 'customer', id: newsletter_form_id, class: 'storefront-validated-form' %}
+      <input type="hidden" name="contact[tags]" value="newsletter">
+      <label for="FooterEmail-{{ section.id }}">{{ 'newsletter.label' | t }}</label>
+      <input id="FooterEmail-{{ section.id }}" type="email" name="contact[email]" placeholder="{{ 'newsletter.label' | t }}" autocomplete="email" required {% if form.errors %}aria-invalid="true" aria-describedby="FooterErrors-{{ section.id }}"{% endif %}>
+      <button type="submit">{{ 'newsletter.button_label' | t }}</button>
+      {% if form.errors %}<div class="storefront-form-errors" id="FooterErrors-{{ section.id }}">{{ form.errors | default_errors }}</div>{% endif %}
+      {% if form.posted_successfully? %}<p role="status">{{ 'newsletter.success' | t }}</p>{% endif %}
+    {% endform %}
   </div>
 </div>
-
+<div class="footer-bottom"><div class="container storefront-footer-bottom">{% if shop.enabled_payment_types != blank %}<ul class="paymets" aria-label="{{ 'sections.footer.payment' | t }}">{% for type in shop.enabled_payment_types %}<li>{{ type | payment_type_svg_tag }}</li>{% endfor %}</ul>{% endif %}<p>© {{ 'now' | date: '%Y' }} {{ shop.name | escape }}</p></div></div>
+</footer>
 {% schema %}
 {
-  "name": "Footer Section",
+  "name": "t:storefront_editor.footer",
   "settings": [
     {
       "type": "text",
       "id": "follow_title",
-      "label": "Follow Title",
-      "default": "FOLLOW US ON SOCIAL"
+      "label": "t:storefront_editor.follow_title"
     },
     {
       "type": "url",
       "id": "instagram",
-      "label": "Instagram Link"
+      "label": "t:storefront_editor.instagram"
+    },
+    {
+      "type": "url",
+      "id": "facebook",
+      "label": "t:storefront_editor.facebook"
+    },
+    {
+      "type": "url",
+      "id": "whatsapp",
+      "label": "t:storefront_editor.whatsapp"
     },
     {
       "type": "url",
       "id": "tiktok",
-      "label": "Tiktok Link"
+      "label": "t:storefront_editor.tiktok"
     },
     {
       "type": "text",
       "id": "newsletter_title",
-      "label": "Newsletter Title",
-      "default": "JOIN THE SUPER COMMUNITY AND GET 15% OFF FIRST ORDER"
-    },
-    {
-      "type": "text",
-      "id": "newsletter_button",
-      "label": "Newsletter Button",
-      "default": "JOIN"
-    },
-    {
-      "type": "text",
-      "id": "newsletter_email",
-      "label": "Newsletter Email Placeholder",
-      "default": "Enter your email address"
-    },
-    {
-      "type": "text",
-      "id": "newsletter_success",
-      "label": "Newsletter Success Message",
-      "default": "Thank you for signing up!"
+      "label": "t:storefront_editor.newsletter_title"
     },
     {
       "type": "link_list",
       "id": "footer_link",
-      "label": "Footer Link"
-    }
-  ],
-
-  "presets": [
+      "label": "t:storefront_editor.footer_menu",
+      "default": "footer"
+    },
     {
-      "name": "Footer Section"
+      "type": "link_list",
+      "id": "service_menu",
+      "label": "t:storefront_editor.service_menu"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_policies",
+      "label": "t:storefront_editor.show_policies",
+      "default": true
     }
   ]
 }

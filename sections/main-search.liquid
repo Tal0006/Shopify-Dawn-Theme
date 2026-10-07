@@ -1,0 +1,40 @@
+<section class="catalog-section container">
+  <h1>{{ 'templates.search.title' | t }}</h1>
+  <form method="get" action="{{ routes.search_url }}" role="search" class="catalog-search">
+    <label for="Search-{{ section.id }}" class="sr-only">{{ 'general.search.search' | t }}</label>
+    <input type="search" name="q" id="Search-{{ section.id }}" value="{{ search.terms | escape }}" placeholder="{{ 'storefront.search_placeholder' | t }}">
+    <input type="hidden" name="type" value="product"><input type="hidden" name="options[prefix]" value="last">
+    <button class="theme-btn" type="submit">{{ 'general.search.search' | t }}</button>
+  </form>
+  {% if search.performed %}
+    {% assign encoded_terms = search.terms | url_encode %}
+    {% assign reset_url = routes.search_url | append: '?type=product&q=' | append: encoded_terms %}
+    {% render 'storefront-filters', results: search, is_search: true, filter_url: routes.search_url, reset_url: reset_url %}
+    <p>{{ 'templates.search.results_with_count_and_term' | t: count: search.results_count, terms: search.terms }}</p>
+    {% paginate search.results by section.settings.product_limit %}
+      <div class="catalog-grid">
+        {% for result in search.results %}
+          {% if result.object_type == 'product' %}{% render 'product-card', card_product: result %}
+          {% else %}<article class="catalog-card"><a href="{{ result.url }}">{{ result.title | escape }}</a></article>{% endif %}
+        {% else %}<p>{{ 'templates.search.no_results' | t: terms: search.terms }}</p>{% endfor %}
+      </div>
+      {% render 'catalog-pagination', paginate: paginate %}
+    {% endpaginate %}
+  {% endif %}
+</section>
+{% schema %}
+{
+  "name": "t:storefront_editor.search",
+  "settings": [
+    {
+      "type": "range",
+      "id": "product_limit",
+      "label": "t:storefront_editor.product_limit",
+      "min": 8,
+      "max": 48,
+      "step": 4,
+      "default": 24
+    }
+  ]
+}
+{% endschema %}

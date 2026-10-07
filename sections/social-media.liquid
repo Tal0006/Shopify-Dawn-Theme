@@ -1,7 +1,7 @@
 <!-- social-area -->
 <div class="social-area">
   <div class="title">
-    <h3>{{ section.settings.title }}</h3>
+    <h3>{% if section.settings.title != blank %}{{ section.settings.title }}{% else %}{{ 'storefront.follow' | t }}{% endif %}</h3>
   </div>
   <div class="container">
     <div class="social-wrap">
@@ -14,8 +14,8 @@
               {{ section.settings.social }}
 
               <div class="social-item">
-                <a href="{{ block.settings.url }}" class="social-img">
-                  <img src="{{ block.settings.image | image_url: width: 800 }}" width="" height="" alt="">
+                <a href="{{ block.settings.url | default: routes.root_url | escape }}" class="social-img">
+                  {% if block.settings.image != blank and block.settings.image.width != blank %}<img src="{{ block.settings.image | image_url: width: 800 }}" width="" height="" alt="">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
                 </a>
               </div>
             </div>
@@ -28,42 +28,40 @@
 
 {% schema %}
 {
-  "name": "Social Media",
+  "name": "t:storefront_editor.social",
   "settings": [
     {
       "type": "text",
       "id": "title",
-      "label": "Title",
-      "default": "SOCIAL"
+      "label": "t:storefront_editor.heading"
     },
     {
       "type": "liquid",
       "id": "social",
-      "label": "Social Media",
-      "default": "<script src='https://static.elfsight.com/platform/platform.js' async></script><div class='elfsight-app-64616117-e487-4070-9e7f-69652258ed73' data-elfsight-app-lazy></div>"
+      "label": "t:storefront_editor.text"
     }
   ],
   "blocks": [
     {
-      "name": "Slider",
+      "name": "t:storefront_editor.category",
       "type": "block",
       "settings": [
         {
           "type": "image_picker",
           "id": "image",
-          "label": "Social Image"
+          "label": "t:storefront_editor.image"
         },
         {
           "type": "url",
           "id": "url",
-          "label": "Social Profile Link"
+          "label": "t:storefront_editor.link"
         }
       ]
     }
   ],
   "presets": [
     {
-      "name": "Social Media",
+      "name": "t:storefront_editor.social",
       "blocks": [
         {
           "type": "block"

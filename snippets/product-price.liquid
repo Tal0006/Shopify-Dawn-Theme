@@ -1,0 +1,21 @@
+{%- liquid
+  assign price_object = variant | default: card_product
+  assign current_price = price_object.price
+  assign original_price = price_object.compare_at_price
+-%}
+<div class="catalog-price">
+  <span class="sr-only">{{ 'products.product.price.regular_price' | t }}</span>
+  {% if variant == blank and card_product.price_varies %}
+    {% assign formatted_price = current_price | money %}
+    <bdi>{{ 'products.product.price.from_price_html' | t: price: formatted_price }}</bdi>
+  {% else %}
+    <bdi>{{ current_price | money }}</bdi>
+  {% endif %}
+  {% if original_price > current_price %}
+    <span class="sr-only">{{ 'products.product.price.regular_price' | t }}</span>
+    <s><bdi>{{ original_price | money }}</bdi></s>
+  {% endif %}
+  {% if price_object.unit_price_measurement %}
+    <small><bdi>{{ price_object.unit_price | money }} / {% if price_object.unit_price_measurement.reference_value != 1 %}{{ price_object.unit_price_measurement.reference_value }}{% endif %}{{ price_object.unit_price_measurement.reference_unit }}</bdi></small>
+  {% endif %}
+</div>

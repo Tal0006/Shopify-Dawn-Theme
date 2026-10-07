@@ -1,218 +1,57 @@
-<header id="header">
-  <div class="site-header header-style-1">
-    <nav class="navigation navbar navbar-expand-lg navbar-light">
-      <div class="container-fluid">
-        <div class="row align-items-center">
-          <div class="col-lg-2 col-md-6 col-6 d-lg-none d-block">
-            <div class="navbar-header">
-              {% if section.settings.logo != blank %}
-                <a class="navbar-brand" href="/"
-                  ><img src="{{ section.settings.logo | image_url: width: 600  }}" width="" height="" alt="logo"
-                ></a>
-              {% else %}
-                <a class="navbar-brand" href="/"
-                  ><img src="{{ 'logo.png' | asset_url }}" width="" height="" alt="logo"
-                ></a>
-              {% endif %}
-            </div>
-          </div>
-          <div class="col-lg-12 col-md-1 col-1">
-            <div id="navbar" class="collapse navbar-collapse navigation-holder">
-              <button class="menu-close"><i class="ti-close"></i></button>
-              <ul class="nav navbar-nav mb-2 mb-lg-0">
-                <li>
-                  <a href="/">{{ section.settings.home_text }}</a>
-                </li>
-                <li>
-                  <a href="{{section.settings.shop_url}}">{{ section.settings.shop_text }}</a>
-                </li>
-                <li class="middle-logo">
-                  {% if section.settings.logo != blank %}
-                    <a href="/"
-                      ><img
-                        src="{{ section.settings.logo | image_url: width: 600  }}"
-                        width=""
-                        height=""
-                        alt="logo"
-                    ></a>
-                  {% else %}
-                    <a href="/"
-                      ><img
-                        src="{{ 'logo.png' | asset_url }}"
-                        width=""
-                        height=""
-                        alt="logo"
-                    ></a>
-                  {% endif %}
-                </li>
-                <li>
-                  <a href="{{section.settings.about_url}}">{{ section.settings.about_text }}</a>
-                </li>
-                <li>
-                  <a href="{{section.settings.contact_url}}">{{ section.settings.contact_text }}</a>
-                </li>
-              </ul>
-            </div>
-            <!-- end of nav-collapse -->
-          </div>
-          <div class="col-lg-3 col-md-5 col-5 d-lg-none dl-block">
-            <div class="mobail-menu">
-              <button type="button" class="navbar-toggler open-btn">
-                <span class="sr-only">Toggle navigation</span>
-                <span class="icon-bar first-angle"></span>
-                <span class="icon-bar middle-angle"></span>
-                <span class="icon-bar last-angle"></span>
-              </button>
-            </div>
-          </div>
-
-          <div class="mini-cart">
-            <button class="cart-toggle-btn">
-              <i><img src="{{ 'shopping-cart.png' | asset_url }}" width="" height="" alt=""></i>
-              <span
-                class="cart-count"
-              >
-                {{- cart.item_count -}}
-              </span>
-            </button>
-            <div class="mini-cart-content">
-              <div class="title"></div>
-              <button class="mini-cart-close"><i class="ti-close"></i></button>
-              <div class="mini-cart-items">
-                <p class="top-p">Your Cart ({{ cart.item_count }})</p>
-                {% for item in cart.items %}
-                  <div class="mini-cart-item clearfix">
-                    <div class="mini-cart-item-image">
-                      <a href="{{ item.url }}"
-                        ><img
-                          src="{{ item.image |  image_url: width: 300  }}"
-                          width=""
-                          height=""
-                          alt
-                      ></a>
-                    </div>
-                    <div class="mini-cart-item-des">
-                      <h4>
-                        <a href="{{ item.url }}">{{ item.title }}</a>
-                      </h4>
-                      <ul class="product-text-sub">
-                        <li>
-                          {{ item.variant.title }}
-                        </li>
-                      </ul>
-                      <a
-                        href="#"
-                        onclick="removeItem({{ forloop.index }}, 0)"
-                        class="dlt-btn"
-                      >
-                        <i class="ti-trash"></i>
-                      </a>
-                    </div>
-                    <div class="pro-single-btn">
-                      <span class="price">{{ item.price | money }}</span>
-                      <div class="quantity cart-plus-minus">
-                        <input
-                          type="text"
-                          value="{{ item.quantity }}"
-                          onkeyup="updateQty({{ forloop.index }})"
-                        >
-                        <div
-                          class="dec qtybutton"
-                          onclick="updateQty({{ forloop.index }}, {{ item.quantity | minus: 1 }})"
-                        ></div>
-                        <div
-                          class="inc qtybutton"
-                          onclick="updateQty({{ forloop.index }}, {{ item.quantity | plus: 1 }})"
-                        ></div>
-                        <div
-                          class="dec qtybutton"
-                          onclick="updateQty({{ forloop.index }}, {{ item.quantity | minus: 1 }})"
-                        >
-                          -
-                        </div>
-                        <div
-                          class="inc qtybutton"
-                          onclick="updateQty({{ forloop.index }}, {{ item.quantity | plus: 1 }})"
-                        >
-                          +
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-              <div class="mini-cart-action clearfix">
-                <ul>
-                  <li>Subtotal ({{ cart.item_count }} items)</li>
-                  <li>
-                    <strong> {{ cart.items_subtotal_price | money }}</strong>
-                  </li>
-                </ul>
-                <div class="mini-btn">
-                  <a href="/checkout" class="theme-btn">CONTINUE TO CHECKOUT</a>
-                </div>
-              </div>
-            </div>
-          </div>
+<header id="header" class="storefront-header">
+<div class="site-header header-style-1"><nav class="navigation navbar navbar-expand-lg navbar-light"><div class="container-fluid"><div class="row">
+  <a class="navbar-brand storefront-menu-logo" href="{{ routes.root_url }}">
+    {% assign header_logo = section.settings.logo | default: settings.logo %}
+    {% if header_logo != blank %}{{ header_logo | image_url: width: 400 | image_tag: widths: '100, 200, 400', alt: shop.name }}{% else %}<span class="storefront-logo-text">{{ shop.name | escape }}</span>{% endif %}
+  </a>
+  <div class="mobail-menu d-lg-none"><button type="button" class="navbar-toggler open-btn" aria-label="{{ 'sections.header.menu' | t }}"><span class="icon-bar first-angle"></span><span class="icon-bar middle-angle"></span><span class="icon-bar last-angle"></span></button></div>
+  <div id="navbar" class="collapse navbar-collapse navigation-holder">
+    <button type="button" class="menu-close" aria-label="{{ 'accessibility.close' | t }}"><i class="ti-close" aria-hidden="true"></i></button>
+    <ul class="nav navbar-nav mb-2 mb-lg-0">
+      {% if section.settings.menu != blank %}{% render 'navigation-links', menu: section.settings.menu %}
+      {% else %}<li><a href="{{ routes.root_url }}">{{ 'storefront.home' | t }}</a></li><li><a href="{{ settings.catalog_collection.url | default: routes.all_products_collection_url }}">{{ 'storefront.all_products' | t }}</a></li><li><a href="{{ routes.collections_url }}">{{ 'storefront.all_categories' | t }}</a></li>{% endif %}
+    </ul>
+  </div>
+  <div class="storefront-header-tools">
+    <form method="get" action="{{ routes.search_url }}" role="search">
+      <label class="sr-only" for="HeaderSearch-{{ section.id }}">{{ 'general.search.search' | t }}</label>
+      <input type="search" id="HeaderSearch-{{ section.id }}" name="q" placeholder="{{ 'storefront.search_placeholder' | t }}" value="{{ search.terms | escape }}"><input type="hidden" name="type" value="product"><input type="hidden" name="options[prefix]" value="last">
+      <button type="submit" aria-label="{{ 'general.search.search' | t }}"><i class="ti-search" aria-hidden="true"></i></button>
+    </form>
+    {% if shop.customer_accounts_enabled %}<a class="storefront-account" href="{{ routes.account_url }}" aria-label="{{ 'customer.account.title' | t }}"><i class="ti-user" aria-hidden="true"></i></a>{% endif %}
+    <div class="mini-cart">
+      <button type="button" class="cart-toggle-btn" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><img src="{{ 'shopping-cart.png' | asset_url }}" width="24" height="24" alt=""></i><span class="cart-count">{{ cart.item_count }}</span></button>
+      <div class="mini-cart-content">
+        <button type="button" class="mini-cart-close" aria-label="{{ 'accessibility.close' | t }}"><i class="ti-close" aria-hidden="true"></i></button>
+        <div class="mini-cart-items"><p class="top-p">{{ 'sections.cart.title' | t }} ({{ cart.item_count }})</p>
+          {% if cart.empty? %}<p>{{ 'sections.cart.empty' | t }}</p><a class="theme-btn" href="{{ settings.catalog_collection.url | default: routes.all_products_collection_url }}">{{ 'general.continue_shopping' | t }}</a>
+          {% else %}<form action="{{ routes.cart_url }}" method="post">
+            {% for item in cart.items %}<div class="mini-cart-item clearfix">
+              <div class="mini-cart-item-image"><a href="{{ item.url }}">{% if item.image != blank %}{{ item.image | image_url: width: 160 | image_tag: loading: 'lazy', alt: item.image.alt }}{% endif %}</a></div>
+              <div class="mini-cart-item-des"><h4><a href="{{ item.url }}">{{ item.product.title | escape }}</a></h4>{% unless item.product.has_only_default_variant %}<small>{{ item.variant.title | escape }}</small>{% endunless %}{% if item.selling_plan_allocation %}<small>{{ item.selling_plan_allocation.selling_plan.name | escape }}</small>{% endif %}<p><bdi>{{ item.final_line_price | money }}</bdi></p><a href="{{ item.url_to_remove }}" class="dlt-btn" aria-label="{{ 'sections.cart.remove_title' | t: title: item.product.title }}">{{ 'storefront.remove' | t }}</a></div>
+              <label for="MiniQty-{{ forloop.index }}">{{ 'products.product.quantity.label' | t }}</label><input type="number" id="MiniQty-{{ forloop.index }}" name="updates[]" min="0" step="{{ item.variant.quantity_rule.increment | default: 1 }}" value="{{ item.quantity }}" {% if item.variant.quantity_rule.max != blank %}max="{{ item.variant.quantity_rule.max }}"{% endif %}>
+            </div>{% endfor %}
+            <div class="mini-cart-action clearfix"><p>{{ 'storefront.subtotal' | t }}: <bdi>{{ cart.total_price | money }}</bdi></p><button type="submit" name="update" class="theme-btn">{{ 'sections.cart.update' | t }}</button><a href="{{ routes.cart_url }}">{{ 'storefront.view_cart' | t }}</a><button type="submit" name="checkout" class="theme-btn">{{ 'sections.cart.checkout' | t }}</button></div>
+          </form>{% endif %}
         </div>
       </div>
-      <!-- end of container -->
-    </nav>
+    </div>
   </div>
-</header>
-
+</div></div></nav></div></header>
 {% schema %}
 {
-  "name": "Header Section",
+  "name": "t:storefront_editor.header",
   "settings": [
     {
       "type": "image_picker",
       "id": "logo",
-      "label": "Logo"
+      "label": "t:storefront_editor.logo"
     },
     {
-      "type": "url",
-      "id": "shop_url",
-      "label": "Shop URL"
-    },
-    {
-      "type": "url",
-      "id": "about_url",
-      "label": "About URL"
-    },
-    {
-      "type": "url",
-      "id": "contact_url",
-      "label": "Contact URL"
-    },
-    {
-      "type": "text",
-      "id": "home_text",
-      "label": "Home Text",
-      "default": "HOME"
-    },
-    {
-      "type": "text",
-      "id": "shop_text",
-      "label": "Shop Text",
-      "default": "Shop"
-    },
-    {
-      "type": "text",
-      "id": "about_text",
-      "label": "About Text",
-      "default": "About Us"
-    },
-    {
-      "type": "text",
-      "id": "contact_text",
-      "label": "Contact Text",
-      "default": "Contact Us"
-    }
-  ],
-  "presets": [
-    {
-      "name": "Header Section"
+      "type": "link_list",
+      "id": "menu",
+      "label": "t:storefront_editor.menu",
+      "default": "main-menu"
     }
   ]
 }

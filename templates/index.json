@@ -1,99 +1,102 @@
-/*
- * ------------------------------------------------------------
- * IMPORTANT: The contents of this file are auto-generated.
- *
- * This file may be updated by the Shopify admin theme editor
- * or related systems. Please exercise caution as any changes
- * made to this file may be overwritten.
- * ------------------------------------------------------------
- */
 {
   "sections": {
-    "main": {
-      "type": "404",
-      "disabled": true,
+    "hero": {
+      "type": "hero-section",
       "settings": {}
     },
-    "hero_section_nPxPwU": {
-      "type": "hero-section",
-      "settings": {
-        "left_image": "shopify://shop_images/hero_home_f30be8f0-c72b-47ca-951c-ad6dd5355514.png",
-        "title": "Good Shot",
-        "subtitle": "From Nature",
-        "button_url": "shopify://products/ginger-shot",
-        "button_text": "Shop Now",
-        "image": "shopify://shop_images/homerights.png"
-      }
-    },
-    "feature_section_yr9MjE": {
-      "type": "feature-section",
+    "categories": {
+      "type": "category-navigation",
+      "settings": {},
       "blocks": {
-        "block_d3TkrW": {
-          "type": "block",
+        "toiletries": {
+          "type": "category",
           "settings": {
-            "image": "shopify://shop_images/features1.png",
-            "feature_title": "GINGER",
-            "description": "A natural energy booster also known for its antioxidant and anti-inflammatory properties."
+            "collection": "טואלטיקה"
           }
         },
-        "block_phzkpK": {
-          "type": "block",
+        "laundry": {
+          "type": "category",
           "settings": {
-            "image": "shopify://shop_images/features2.png",
-            "feature_title": "ACEROLA CHERRY",
-            "description": "One of natures most powerful super food and is one of the richest known natural sources of Vitamin C"
+            "collection": "כביסה"
           }
         },
-        "block_knXVFV": {
-          "type": "block",
+        "cleaning": {
+          "type": "category",
           "settings": {
-            "image": "shopify://shop_images/features3.png",
-            "feature_title": "LIME",
-            "description": "Known to be a good source of Vitamin C, antioxidants, and other nutrients."
+            "collection": "ניקיון-כללי"
+          }
+        },
+        "disinfection": {
+          "type": "category",
+          "settings": {}
+        },
+        "disposables": {
+          "type": "category",
+          "settings": {
+            "collection": "חד-פעמי-1"
           }
         }
       },
       "block_order": [
-        "block_d3TkrW",
-        "block_phzkpK",
-        "block_knXVFV"
-      ],
+        "toiletries",
+        "laundry",
+        "cleaning",
+        "disinfection",
+        "disposables"
+      ]
+    },
+    "laundry": {
+      "type": "featured-collection",
       "settings": {
-        "title": "IMMUNITY SUPPORT - GINGER SHOT"
+        "heading": "כביסה",
+        "product_limit": 8,
+        "show_view_all": true,
+        "collection": "כביסה"
       }
     },
-    "shop_now_TxPmHU": {
-      "type": "shop-now",
+    "cleaning": {
+      "type": "featured-collection",
       "settings": {
-        "image": "shopify://shop_images/Super_Nature_Ginger_Shot.png",
-        "button_url": "shopify://products/ginger-shot",
-        "button_text": "Shop Now",
-        "title": "NATURAL GINGER SHOT",
-        "subtitle": "THE",
-        "subtitle2": "SUPER GOOD SHOT",
-        "subtitle3": "FROM NATURE",
-        "textList": "<ul><li><span>NO</span> ADDED SUGAR</li><li><span>NO</span> ADDED PRESERVATIVES</li></ul>",
-        "ingredients": "<p><strong>INGREDIENTS:</strong> Apple juice from concentrated juice, ginger juice NFC (35%), lime juice from concentrated juice (6%), acerola extract (0.3%) with natural vitamin C.</p>",
-        "small2": "FRUIT JUICE BASED DRINK WITH GINGER ROOT JUICE.",
-        "vitamin": "VITAMIN C CONTRIBUTES TO THE NORMAL FUNCTION OF THE IMMUNE SYSTEM",
-        "small": "Enjoyed as part of a healthy lifestyle and balance diet.",
-        "nutrition1": "Nutrition per 100 ml:",
-        "nutrition": "Energy 182 kJ/44kcal, Fat 0.3g of which Saturates 0g, Carbohydrate 9.3g of which Sugars 8.9g, Fibre 0.4g, Protein 0.3g, Salt 0.01g, Vitamin C 80MG (100% RI)*"
+        "heading": "ניקיון כללי",
+        "product_limit": 8,
+        "show_view_all": true,
+        "collection": "ניקיון-כללי"
       }
     },
-    "social_media_6e3G9z": {
-      "type": "social-media",
+    "toiletries": {
+      "type": "featured-collection",
       "settings": {
-        "title": "SOCIAL",
-        "social": "<script src='https://static.elfsight.com/platform/platform.js' async></script><div class='elfsight-app-64616117-e487-4070-9e7f-69652258ed73' data-elfsight-app-lazy></div>"
+        "heading": "טואלטיקה",
+        "product_limit": 8,
+        "show_view_all": true,
+        "collection": "טואלטיקה"
+      }
+    },
+    "disinfection": {
+      "type": "featured-collection",
+      "settings": {
+        "heading": "חיטוי",
+        "product_limit": 8,
+        "show_view_all": true
+      }
+    },
+    "disposables": {
+      "type": "featured-collection",
+      "settings": {
+        "heading": "חד־פעמי",
+        "product_limit": 8,
+        "show_view_all": true,
+        "collection": "חד-פעמי-1"
       }
     }
   },
   "order": [
-    "main",
-    "hero_section_nPxPwU",
-    "feature_section_yr9MjE",
-    "shop_now_TxPmHU",
-    "social_media_6e3G9z"
+    "hero",
+    "categories",
+    "laundry",
+    "cleaning",
+    "toiletries",
+    "disinfection",
+    "disposables"
   ]
 }

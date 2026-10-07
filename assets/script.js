@@ -143,7 +143,7 @@
   /*------------------------------------------
         = BACK TO TOP BTN SETTING
     -------------------------------------------*/
-  $('body').append("<a href='#' class='back-to-top'><i class='ti-arrow-up'></i></a>");
+  $('<a>', {href: '#', class: 'back-to-top', 'aria-label': window.themeStrings.backToTop}).append('<i class="ti-arrow-up" aria-hidden="true"></i>').appendTo('body');
 
   function toggleBackToTopBtn() {
     var amountScrolled = 1000;
@@ -196,10 +196,11 @@
 
       $sync1
         .owlCarousel({
+          rtl: document.documentElement.dir === 'rtl',
           items: 1,
           margin: 0,
           nav: true,
-          navText: ['<i class="ti-arrow-left"></i>', '<i class="ti-arrow-right"></i>'],
+          navText: ['<span class="sr-only">' + window.themeStrings.previousSlide + '</span><i class="ti-arrow-left" aria-hidden="true"></i>', '<span class="sr-only">' + window.themeStrings.nextSlide + '</span><i class="ti-arrow-right" aria-hidden="true"></i>'],
           dots: false,
         })
         .on('changed.owl.carousel', function (e) {
@@ -306,41 +307,6 @@
     );
   });
 
-  // Add to Cart functionality
-  $('.addToCart').on('click', function (e) {
-    e.preventDefault();
-
-    var productId = $('#variantId').val();
-    var quantity = $('#quantity').val();
-
-    $.ajax({
-      type: 'POST',
-      url: '/cart/add',
-      dataType: 'json',
-      data: {
-        id: productId,
-        quantity: quantity,
-      },
-      success: function (data) {
-        console.log('Item added to cart:', data);
-        var current_url = window.location.href;
-        window.location.href = current_url;
-        // Update cart count
-        // fetch(window.Shopify.routes.root + 'cart.js')
-        //   .then((response) => response.json())
-        //   .then((cartData) => {
-        //     $('.cartCount').text(cartData.item_count);
-        //     console.log('Updated cart data:', cartData);
-        //     updateCartDisplay(cartData);
-        //   });
-        // $('.mini-cart-content').addClass('mini-cart-content-toggle');
-      },
-      error: function (error) {
-        console.error('Error adding item to cart:', error);
-      },
-    });
-  });
-
   /*------------------------------------------
         = Header shopping cart toggle
     -------------------------------------------*/
@@ -374,33 +340,3 @@
       });
   }
 })(window.jQuery);
-function updateQty(id, qty) {
-  $.ajax({
-    type: 'POST',
-    url: '/cart/change',
-    dataType: 'json',
-    data: {
-      line: id,
-      quantity: qty,
-    },
-    success: function (data) {
-      console.log('success', data);
-      window.location.reload();
-    },
-  });
-}
-function removeItem(id, qty) {
-  $.ajax({
-    type: 'POST',
-    url: '/cart/change',
-    dataType: 'json',
-    data: {
-      line: id,
-      quantity: qty,
-    },
-    success: function (data) {
-      console.log('success', data);
-      window.location.reload();
-    },
-  });
-}

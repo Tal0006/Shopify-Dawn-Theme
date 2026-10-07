@@ -3,22 +3,22 @@
   <div class="container">
     <div class="features-wrap">
       <div class="title">
-        <h2>{{ section.settings.title }}</h2>
+        <h2>{% if section.settings.title != blank %}{{ section.settings.title }}{% else %}{{ 'storefront.feature_title' | t }}{% endif %}</h2>
       </div>
       <div class="row">
         {% for block in section.blocks %}
           <div class="col-lg-4 col-md-6 col-12">
             <div class="features-item">
               <div class="features-img">
-                <img src="{{ block.settings.image |  image_url: width: 500  }}" width="" height="" alt="">
+                {% if block.settings.image != blank and block.settings.image.width != blank %}<img src="{{ block.settings.image |  image_url: width: 500  }}" width="" height="" alt="">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
               </div>
               <div class="features-text">
                 <h3>
                   <span><img src="{{ 'shape1.png' | asset_url }}" width="" height="" alt=""></span>
-                  {{- block.settings.feature_title }}
+                  {% if block.settings.feature_title != blank %}{{ block.settings.feature_title | escape }}{% else %}{{ 'storefront.feature_title' | t }}{% endif %}
                 </h3>
                 <p>
-                  {{ block.settings.description }}
+                  {% if block.settings.description != blank %}{{ block.settings.description | escape }}{% else %}{{ 'storefront.feature_description' | t }}{% endif %}
                 </p>
               </div>
             </div>
@@ -48,43 +48,40 @@
 
 {% schema %}
 {
-  "name": "Feature Section",
+  "name": "t:storefront_editor.features",
   "settings": [
     {
       "type": "text",
       "id": "title",
-      "label": "Title",
-      "default": "IMMUNITY SUPPORT - GINGER SHOT"
+      "label": "t:storefront_editor.heading"
     }
   ],
   "blocks": [
     {
-      "name": "Slider",
+      "name": "t:storefront_editor.category",
       "type": "block",
       "settings": [
         {
           "type": "image_picker",
           "id": "image",
-          "label": "Image"
+          "label": "t:storefront_editor.image"
         },
         {
           "type": "text",
           "id": "feature_title",
-          "label": "Feature Title",
-          "default": "GINGER"
+          "label": "t:storefront_editor.heading"
         },
         {
           "type": "text",
           "id": "description",
-          "label": "Description",
-          "default": "Know for its antioxidant and anti-inflammatory properties. A natural energy booster and with digestion."
+          "label": "t:storefront_editor.text"
         }
       ]
     }
   ],
   "presets": [
     {
-      "name": "Feature Section",
+      "name": "t:storefront_editor.features",
       "blocks": [
         {
           "type": "block"

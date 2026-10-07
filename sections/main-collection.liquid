@@ -1,0 +1,26 @@
+<section class="catalog-section container">
+  <h1>{{ collection.title | escape }}</h1>
+  {% if collection.description != blank %}<div class="catalog-description">{{ collection.description }}</div>{% endif %}
+  {% render 'storefront-filters', results: collection, filter_url: collection.url, reset_url: collection.url %}
+  <p>{{ 'products.facets.product_count' | t: product_count: collection.products_count, count: collection.all_products_count }}</p>
+  {% paginate collection.products by section.settings.product_limit %}
+    <div class="catalog-grid">{% for card_product in collection.products %}{% render 'product-card', card_product: card_product %}{% else %}<p>{{ 'sections.collection_template.empty' | t }}</p>{% endfor %}</div>
+    {% render 'catalog-pagination', paginate: paginate %}
+  {% endpaginate %}
+</section>
+{% schema %}
+{
+  "name": "t:storefront_editor.collection_page",
+  "settings": [
+    {
+      "type": "range",
+      "id": "product_limit",
+      "label": "t:storefront_editor.product_limit",
+      "min": 8,
+      "max": 48,
+      "step": 4,
+      "default": 24
+    }
+  ]
+}
+{% endschema %}

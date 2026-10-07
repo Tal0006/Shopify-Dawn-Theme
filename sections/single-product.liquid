@@ -1,102 +1,62 @@
-<script>
-  window.product = {{ product | json }} || {}
-</script>
-<script type="application/json">
-  {{ product.variants | json }}
-</script>
-<section class="shop-single-section product-details section-padding">
-  <div class="container">
-    <div class="row">
-      <div class="col col-lg-6 col-12">
-        <div class="product-single-img">
-          <div class="product-active owl-carousel">
-            {% for image in product.images %}
-              <div class="item">
-                <img src="{{ image.src | image_url: width: 1024 }}" width="" height="" alt="">
-              </div>
-            {% endfor %}
-          </div>
-          <div class="product-thumbnil-active  owl-carousel">
-            {% for image in product.images %}
-              <div class="item">
-                <img src="{{ image.src | image_url: width: 400 }}" width="" height="" alt="">
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-      <div class="col col-lg-6 col-12">
-        <div class="product-details">
-          <h2>
-            {{ product.title }}
-          </h2>
-          <div class="pro-single-btn">
-            <h3>{{ product.price | money }}</h3>
-            <div class="quantity cart-plus-minus quantitys">
-              <input type="text" value="1">
-              <div class="dec qtybutton qtybuttons"></div>
-              <div class="inc qtybutton qtybuttons"></div>
-            </div>
-            <span>QUANTITY</span>
-
-            <input
-              type="hidden"
-              name="id"
-              id="variantId"
-              value="{{ product.variants.first.id }}"
-            >
-            <input
-              type="hidden"
-              name="quantity"
-              id="quantity"
-              value="1"
-              min="1"
-            >
-            <input
-              type="hidden"
-              name="handle"
-              id="handle"
-              value="{{ product.handle }}"
-            >
-
-            <input
-              type="hidden"
-              name="currency"
-              id="currency"
-              value="{{cart.currency.symbol}}"
-            >
-
-            <div class="buy-btn">
-              <a href="#" class="theme-btn addToCart"
-                >Add To Cart
-                <i
-                  class="fa fa-shopping-cart"
-                  aria-hidden="true"
-                ></i
-              ></a>
-            </div>
-          </div>
-        </div>
-        <!-- end product details -->
-      </div>
-      <!-- end col -->
+{%- liquid
+  assign selected_variant = product.selected_variant
+  if product.has_only_default_variant
+    assign selected_variant = product.selected_or_first_available_variant
+  endif
+  assign form_id = 'ProductForm-' | append: section.id
+-%}
+<section class="shop-single-section product-details section-padding"><div class="container"><div class="row">
+<div class="col col-lg-6 col-12"><div class="product-single-img"><div class="product-active owl-carousel">
+  {% for image in product.images %}<div class="item">{{ image | image_url: width: 1200 | image_tag: widths: '400, 800, 1200', sizes: '(min-width: 992px) 50vw, 100vw', alt: image.alt }}</div>{% endfor %}
+</div><div class="product-thumbnil-active owl-carousel">{% for image in product.images %}<div class="item">{{ image | image_url: width: 300 | image_tag: loading: 'lazy', alt: image.alt }}</div>{% endfor %}</div></div></div>
+<div class="col col-lg-6 col-12"><div class="product-details"><h1>{{ product.title | escape }}</h1>
+  {% if section.settings.show_vendor %}<p>{{ product.vendor | escape }}</p>{% endif %}
+  <p>{{ 'storefront.price' | t }}</p>{% render 'product-price', card_product: product, variant: selected_variant %}
+  <p>{% if selected_variant != blank %}{% if selected_variant.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}{% elsif product.available %}{{ 'products.product.choose_options' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</p>
+  {% form 'product', product, id: form_id, class: 'catalog-product-form storefront-validated-form' %}
+    {% if product.has_only_default_variant %}<input type="hidden" name="id" value="{{ selected_variant.id }}">
+    {% else %}<label for="Variant-{{ section.id }}">{{ 'storefront.options' | t }}<select name="id" id="Variant-{{ section.id }}" data-variant-select required><option value="" {% if selected_variant == blank %}selected{% endif %}>{{ 'storefront.select_variant' | t }}</option>{% for variant in product.variants %}<option value="{{ variant.id }}" {% if variant.id == selected_variant.id %}selected{% endif %}>{{ variant.title | escape }} — {{ variant.price | money }}{% unless variant.available %} — {{ 'products.product.sold_out' | t }}{% endunless %}</option>{% endfor %}</select></label>{% endif %}
+    {% if product.selling_plan_groups != blank %}<label for="Plan-{{ section.id }}">{{ 'storefront.selling_plan' | t }}<select name="selling_plan" id="Plan-{{ section.id }}" {% if product.requires_selling_plan %}required{% endif %}><option value="">{% if product.requires_selling_plan %}{{ 'storefront.select_variant' | t }}{% else %}{{ 'storefront.one_time_purchase' | t }}{% endif %}</option>{% for group in product.selling_plan_groups %}<optgroup label="{{ group.name | escape }}">{% for plan in group.selling_plans %}<option value="{{ plan.id }}">{{ plan.name | escape }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>{% endif %}
+    <label for="Quantity-{{ section.id }}">{{ 'products.product.quantity.label' | t }}</label><div class="catalog-quantity" data-quantity-controls>
+      <button type="button" data-quantity-change="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: product.title }}">−</button>
+      <input id="Quantity-{{ section.id }}" name="quantity" type="number" min="{{ selected_variant.quantity_rule.min | default: 1 }}" step="{{ selected_variant.quantity_rule.increment | default: 1 }}" value="{{ selected_variant.quantity_rule.min | default: 1 }}" {% if selected_variant.quantity_rule.max != blank %}max="{{ selected_variant.quantity_rule.max }}"{% endif %} required>
+      <button type="button" data-quantity-change="1" aria-label="{{ 'products.product.quantity.increase' | t: product: product.title }}">+</button>
     </div>
-    <!-- end row -->
-  </div>
-  <!-- end of container -->
-</section>
-<div class="details-note">
-  {{ product.description }}
-</div>
-
+    {% if selected_variant.quantity_rule.min > 1 %}<small>{{ 'products.product.quantity.minimum_of' | t: quantity: selected_variant.quantity_rule.min }}</small>{% endif %}
+    <button class="theme-btn" type="submit" name="add" {% if product.available == false or selected_variant.available == false %}disabled{% endif %}>{% if product.available == false or selected_variant.available == false %}{{ 'products.product.sold_out' | t }}{% elsif selected_variant == blank %}{{ 'products.product.choose_options' | t }}{% else %}{{ 'products.product.add_to_cart' | t }}{% endif %}</button>
+    {% if form.errors %}<div role="alert" class="storefront-form-errors">{{ form.errors | default_errors }}</div>{% endif %}
+    {% if section.settings.show_dynamic_checkout and selected_variant.available %}{{ form | payment_button }}{% endif %}
+  {% endform %}
+  {% if product.description != blank %}<details open><summary>{{ 'products.product.description' | t }}</summary><div class="details-note">{{ product.description }}</div></details>{% endif %}
+  <details><summary>{{ 'storefront.shipping' | t }}</summary>{% if section.settings.shipping_text != blank %}{{ section.settings.shipping_text }}{% elsif shop.shipping_policy.body != blank %}{{ 'products.product.shipping_policy_html' | t: link: shop.shipping_policy.url }}{% else %}<p>{{ 'storefront.shipping_note' | t }}</p>{% endif %}</details>
+  {% assign pickup_locations = selected_variant.store_availabilities | where: 'pick_up_enabled', true %}
+  {% if pickup_locations.size > 0 or section.settings.pickup_text != blank %}<details><summary>{{ 'storefront.pickup' | t }}</summary>{{ section.settings.pickup_text }}{% for availability in pickup_locations %}<p>{% if availability.available %}{{ 'products.product.pickup_availability.pick_up_available_at_html' | t: location_name: availability.location.name }} — {{ availability.pick_up_time }}{% else %}{{ 'products.product.pickup_availability.pick_up_unavailable_at_html' | t: location_name: availability.location.name }}{% endif %}</p>{% if availability.location.address %}{{ availability.location.address | format_address }}{% endif %}{% endfor %}</details>{% endif %}
+</div></div></div></div></section>
 {% schema %}
 {
-  "name": "Single Product",
-  "settings": [],
-
-  "presets": [
+  "name": "t:storefront_editor.product",
+  "settings": [
     {
-      "name": "Single Product"
+      "type": "checkbox",
+      "id": "show_vendor",
+      "label": "t:storefront_editor.show_vendor",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_dynamic_checkout",
+      "label": "t:storefront_editor.show_dynamic_checkout",
+      "default": false
+    },
+    {
+      "type": "richtext",
+      "id": "shipping_text",
+      "label": "t:storefront_editor.shipping_text"
+    },
+    {
+      "type": "richtext",
+      "id": "pickup_text",
+      "label": "t:storefront_editor.pickup_text"
     }
   ]
 }

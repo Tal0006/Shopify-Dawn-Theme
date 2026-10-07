@@ -1,69 +1,11 @@
-/*
- * ------------------------------------------------------------
- * IMPORTANT: The contents of this file are auto-generated.
- *
- * This file may be updated by the Shopify admin theme editor
- * or related systems. Please exercise caution as any changes
- * made to this file may be overwritten.
- * ------------------------------------------------------------
- */
 {
   "sections": {
     "main": {
-      "type": "404",
-      "disabled": true,
-      "settings": {}
-    },
-    "about_us_UebmLR": {
       "type": "about-us",
-      "settings": {
-        "title": "ABOUT US",
-        "subtitle": "SHOTS SO GOOD WE CALL IT",
-        "heading": "THE SUPER GOOD SHOT FROM NATURE!",
-        "description": "<p>After getting frustrated with most of the ginger shots on the market where they: Only contain between 17% to 25% ginger juice, Contain lab-made Vitamin C known as ascorbic acid, Cost an arm and a leg (😆) for a tiny 60ml shot bottle which finishes in one second.</p><p>We decided it was time to take matters into our own hands and create a nutrient-rich super ginger shot with:</p><ul><li>35% ginger juice,</li><li>100% natural Vitamin C from plants,</li><li>Comes in a super 100ml glass bottle (not plastic), which you can enjoy in multiple sips.</li></ul><p>Super Nature is a 100% natural superfood shot that aims to support wellness from nature’s superfood without additives and preservatives.</p>"
-      }
-    },
-    "feature_section_jjpXTA": {
-      "type": "feature-section",
-      "blocks": {
-        "block_UjDQag": {
-          "type": "block",
-          "settings": {
-            "image": "shopify://shop_images/features1.png",
-            "feature_title": "GINGER",
-            "description": "A natural energy booster also known for its antioxidant and anti-inflammatory properties."
-          }
-        },
-        "block_TCWbte": {
-          "type": "block",
-          "settings": {
-            "image": "shopify://shop_images/features2.png",
-            "feature_title": "ACEROLA CHERRY",
-            "description": "One of natures most powerful super food which and is one of the richest known natural sources of Vitamin C"
-          }
-        },
-        "block_Lpez4B": {
-          "type": "block",
-          "settings": {
-            "image": "shopify://shop_images/features3.png",
-            "feature_title": "LIME",
-            "description": "Known to be a good source of Vitamin C, antioxidants, and other nutrients."
-          }
-        }
-      },
-      "block_order": [
-        "block_UjDQag",
-        "block_TCWbte",
-        "block_Lpez4B"
-      ],
-      "settings": {
-        "title": "IMMUNITY SUPPORT - GINGER SHOT"
-      }
+      "settings": {}
     }
   },
   "order": [
-    "main",
-    "about_us_UebmLR",
-    "feature_section_jjpXTA"
+    "main"
   ]
 }

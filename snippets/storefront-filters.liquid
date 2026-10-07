@@ -1,0 +1,39 @@
+{% assign current_sort = results.sort_by | default: results.default_sort_by %}
+<form class="catalog-filters" method="get" action="{{ filter_url }}">
+  {% if is_search %}<input type="hidden" name="q" value="{{ search.terms | escape }}"><input type="hidden" name="type" value="product"><input type="hidden" name="options[prefix]" value="last">{% endif %}
+  <div class="catalog-sort">
+    <label for="Sort-{{ section.id }}">{{ 'products.facets.sort_by_label' | t }}</label>
+    <select name="sort_by" id="Sort-{{ section.id }}">
+      {% for option in results.sort_options %}
+        {% assign sort_key = 'storefront.sort.' | append: option.value %}
+        <option value="{{ option.value | escape }}" {% if option.value == current_sort %}selected{% endif %}>{% assign known_sorts = 'manual,best-selling,title-ascending,title-descending,price-ascending,price-descending,created-ascending,created-descending,relevance,most-relevant' | split: ',' %}{% if known_sorts contains option.value %}{{ sort_key | t }}{% else %}{{ option.name | escape }}{% endif %}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% for filter in results.filters %}
+    <details class="catalog-filter" {% if filter.active_values.size > 0 or filter.min_value.value != blank or filter.max_value.value != blank %}open{% endif %}>
+      <summary>{% if filter.type == 'price_range' %}{{ 'storefront.price' | t }}{% elsif filter.param_name == 'filter.v.availability' %}{{ 'storefront.availability' | t }}{% elsif filter.param_name == 'filter.p.vendor' %}{{ 'products.product.vendor' | t }}{% elsif filter.param_name == 'filter.p.product_type' %}{{ 'storefront.product_type' | t }}{% else %}{{ filter.label | escape }}{% endif %}</summary>
+      {% case filter.type %}
+        {% when 'boolean', 'list' %}
+          {% for value in filter.values %}
+            <label class="catalog-filter__option">
+              <input type="checkbox" name="{{ value.param_name }}" value="{{ value.value | escape }}" {% if value.active %}checked{% elsif value.count == 0 %}disabled{% endif %}>
+              <span>{% if filter.param_name == 'filter.v.availability' %}{% if value.value == '1' %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}{% else %}{{ value.label | escape }}{% endif %} <bdi>({{ value.count }})</bdi></span>
+            </label>
+          {% endfor %}
+        {% when 'price_range' %}
+          <label>{{ 'products.facets.from' | t }} <input type="number" name="{{ filter.min_value.param_name }}" min="0" max="{{ filter.range_max | divided_by: 100.0 }}" step="0.01" {% if filter.min_value.value != blank %}value="{{ filter.min_value.value | divided_by: 100.0 }}"{% endif %}></label>
+          <label>{{ 'products.facets.to' | t }} <input type="number" name="{{ filter.max_value.param_name }}" min="0" max="{{ filter.range_max | divided_by: 100.0 }}" step="0.01" {% if filter.max_value.value != blank %}value="{{ filter.max_value.value | divided_by: 100.0 }}"{% endif %}></label>
+          {% assign maximum_price = filter.range_max | money %}<small>{{ 'products.facets.max_price' | t: price: maximum_price }}</small>
+      {% endcase %}
+    </details>
+  {% endfor %}
+  <button type="submit" class="theme-btn">{{ 'products.facets.apply' | t }}</button>
+</form>
+<div class="catalog-active-filters">
+  {% for filter in results.filters %}
+    {% for value in filter.active_values %}<a href="{{ value.url_to_remove }}">{{ 'products.facets.clear_filter' | t }}: {% if filter.param_name == 'filter.v.availability' %}{% if value.value == '1' %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}{% else %}{{ value.label | escape }}{% endif %}</a>{% endfor %}
+    {% if filter.type == 'price_range' and filter.min_value.value != blank or filter.type == 'price_range' and filter.max_value.value != blank %}<a href="{{ filter.url_to_remove }}">{{ 'products.facets.clear_filter' | t }}: {{ 'storefront.price' | t }}</a>{% endif %}
+  {% endfor %}
+  <a href="{{ reset_url }}">{{ 'products.facets.clear_all' | t }}</a>
+</div>

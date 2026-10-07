@@ -6,8 +6,8 @@
         <div class="col-lg-6 col-md-12 col-12">
           <div class="cta-item-left">
             <div class="cta-img">
-              <img src="{{ section.settings.image |  image_url: width: 900  }}" alt="" width="" height="">
-              <a href="{{ section.settings.button_url }}" class="theme-btn">{{ section.settings.button_text }}</a>
+              {% if section.settings.image != blank and section.settings.image.width != blank %}<img src="{{ section.settings.image |  image_url: width: 900  }}" alt="" width="" height="">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
+              <a href="{{ section.settings.button_url | default: settings.catalog_collection.url | default: routes.all_products_collection_url | escape }}" class="theme-btn">{% if section.settings.button_text != blank %}{{ section.settings.button_text }}{% else %}{{ 'storefront.shop_now' | t }}{% endif %}</a>
             </div>
           </div>
         </div>
@@ -15,7 +15,7 @@
           <div class="cta-item">
             <div class="cta-item-box">
               <div class="title">
-                <h3>{{ section.settings.title }}</h3>
+                <h3>{% if section.settings.title != blank %}{{ section.settings.title }}{% else %}{{ 'storefront.featured_title' | t }}{% endif %}</h3>
               </div>
               <h2>
                 {{ section.settings.subtitle -}}
@@ -44,94 +44,82 @@
 
 {% schema %}
 {
-  "name": "Shop Now Section",
+  "name": "t:storefront_editor.shop",
   "settings": [
     {
       "type": "image_picker",
       "id": "image",
-      "label": "Image"
+      "label": "t:storefront_editor.image"
     },
     {
       "type": "url",
       "id": "button_url",
-      "label": "Button URL"
+      "label": "t:storefront_editor.link"
     },
     {
       "type": "text",
       "id": "button_text",
-      "label": "Button Text",
-      "default": "Shop Now"
+      "label": "t:storefront_editor.button_text"
     },
     {
       "type": "text",
       "id": "title",
-      "label": "Title",
-      "default": "100% NATURAL"
+      "label": "t:storefront_editor.heading"
     },
     {
       "type": "text",
       "id": "subtitle",
-      "label": "Subtitle",
-      "default": "THE"
+      "label": "t:storefront_editor.subtitle"
     },
     {
       "type": "text",
       "id": "subtitle2",
-      "label": "Subtitle2",
-      "default": "THE SUPER GOOD SHOT"
+      "label": "t:storefront_editor.subtitle"
     },
     {
       "type": "text",
       "id": "subtitle3",
-      "label": "Description",
-      "default": "FROM NATURE"
+      "label": "t:storefront_editor.text"
     },
     {
       "type": "liquid",
       "id": "textList",
-      "label": "List of Text",
-      "default": "<ul><li><span>NO</span> ADDED SUGAR</li><li><span>NO</span> ADDED PRESERVATIVES</li></ul>"
+      "label": "t:storefront_editor.text"
     },
     {
       "type": "richtext",
       "id": "ingredients",
-      "label": "Ingredients",
-      "default": " <p><strong>INGREDIENTS:</strong> Apple juice from concentrated juice, ginger juice NFC (35%), lime juice from concentrated juice (6%), acerola extract (0.3%) with natural vitamin C.</p>"
+      "label": "t:storefront_editor.text"
     },
     {
       "type": "text",
       "id": "small2",
-      "label": "Small Text",
-      "default": "FRUIT JUICE BASED DRINK WITH GINGER ROOT JUICE."
+      "label": "t:storefront_editor.text"
     },
     {
       "type": "text",
       "id": "vitamin",
-      "label": "Vitamin",
-      "default": "VITAMIN C CONTRIBUTES TO THE NORMAL FUNCTION OF THE IMMUNE SYSTEM"
+      "label": "t:storefront_editor.text"
     },
     {
       "type": "text",
       "id": "small",
-      "label": "Enjoyed",
-      "default": "Enjoyed as part of a healthy lifestyle and balance diet."
+      "label": "t:storefront_editor.text"
     },
     {
       "type": "text",
       "id": "nutrition1",
-      "label": "Nutrition1",
-      "default": "Nutrition per 100 ml:"
+      "label": "t:storefront_editor.text"
     },
     {
       "type": "text",
       "id": "nutrition",
-      "label": "Nutrition",
-      "default": "Energy 182 kJ/44kcal, Fat 0.3g of which Saturates 0g, Carbohydrate 9.3g of which Sugars 8.9g, Fibre 0.4g, Protein 0.3g, Salt 0.01g, Vitamin C 200MG (250%)*"
+      "label": "t:storefront_editor.text"
     }
   ],
   "presets": [
     {
-      "name": "Shop Now Section"
+      "name": "t:storefront_editor.shop"
     }
   ]
 }

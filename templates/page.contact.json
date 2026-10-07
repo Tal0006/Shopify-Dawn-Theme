@@ -1,31 +1,11 @@
-/*
- * ------------------------------------------------------------
- * IMPORTANT: The contents of this file are auto-generated.
- *
- * This file may be updated by the Shopify admin theme editor
- * or related systems. Please exercise caution as any changes
- * made to this file may be overwritten.
- * ------------------------------------------------------------
- */
 {
   "sections": {
     "main": {
-      "type": "content",
-      "disabled": true,
-      "settings": {}
-    },
-    "contact_form_baatPz": {
       "type": "contact-form",
-      "settings": {
-        "title": "Contact Us",
-        "subtitle": "EMAIL - ONLINE@SUPERNATURESHOT.COM",
-        "compnay": "IMPRESSION BEVERAGES LTD.",
-        "address": "71 – 75 SHELTON STREET, LONDON WC2H 9JQ"
-      }
+      "settings": {}
     }
   },
   "order": [
-    "main",
-    "contact_form_baatPz"
+    "main"
   ]
 }

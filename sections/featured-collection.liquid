@@ -1,0 +1,54 @@
+{% assign chosen_collection = section.settings.collection %}
+{% if chosen_collection != blank or request.design_mode %}
+<section class="catalog-section container" {{ section.shopify_attributes }}>
+  {% assign heading = section.settings.heading | default: chosen_collection.title %}
+  {% if heading != blank %}<h2>{{ heading | escape }}</h2>{% endif %}
+  {% if section.settings.subtitle != blank %}<p>{{ section.settings.subtitle | escape }}</p>{% endif %}
+  {% if chosen_collection != blank %}
+    <div class="catalog-grid">{% for card_product in chosen_collection.products limit: section.settings.product_limit %}{% render 'product-card', card_product: card_product %}{% else %}<p>{{ 'sections.collection_template.empty' | t }}</p>{% endfor %}</div>
+    {% if section.settings.show_view_all %}<a class="theme-btn catalog-view-all" href="{{ chosen_collection.url }}">{{ 'sections.featured_collection.view_all' | t }}</a>{% endif %}
+  {% elsif request.design_mode %}<p class="catalog-editor-note">{{ 'storefront.choose_collection' | t }}</p>{% endif %}
+</section>
+{% endif %}
+{% schema %}
+{
+  "name": "t:storefront_editor.featured_collection",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:storefront_editor.heading"
+    },
+    {
+      "type": "text",
+      "id": "subtitle",
+      "label": "t:storefront_editor.subtitle"
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "t:storefront_editor.collection"
+    },
+    {
+      "type": "range",
+      "id": "product_limit",
+      "label": "t:storefront_editor.product_limit",
+      "min": 2,
+      "max": 24,
+      "step": 1,
+      "default": 8
+    },
+    {
+      "type": "checkbox",
+      "id": "show_view_all",
+      "label": "t:storefront_editor.view_all",
+      "default": true
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:storefront_editor.featured_collection"
+    }
+  ]
+}
+{% endschema %}

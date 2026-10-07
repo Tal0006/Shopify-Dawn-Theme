@@ -1,0 +1,8 @@
+<section class="catalog-section container"><h1>{{ 'storefront.all_categories' | t }}</h1>
+{% paginate collections by 24 %}<div class="catalog-categories">{% for category in collections %}<a class="catalog-category" href="{{ category.url }}">{% assign category_image = category.image | default: category.products.first.featured_image %}{% if category_image != blank %}{{ category_image | image_url: width: 400 | image_tag: loading: 'lazy', alt: category.title }}{% endif %}<span>{{ category.title | escape }}</span></a>{% endfor %}</div>{% render 'catalog-pagination', paginate: paginate %}{% endpaginate %}</section>
+{% schema %}
+{
+  "name": "t:storefront_editor.collections",
+  "settings": []
+}
+{% endschema %}

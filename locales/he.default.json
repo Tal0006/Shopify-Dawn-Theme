@@ -1,0 +1,622 @@
+{
+  "general": {
+    "password_page": {
+      "login_form_heading": "כניסה לחנות באמצעות סיסמה",
+      "login_password_button": "כניסה עם סיסמה",
+      "login_form_password_label": "סיסמה",
+      "login_form_password_placeholder": "הסיסמה שלך",
+      "login_form_error": "הסיסמה שגויה. כדאי לנסות שוב.",
+      "login_form_submit": "כניסה",
+      "admin_link_html": "זו החנות שלך? <a href=\"/admin\" class=\"link underlined-link\">כניסה לניהול החנות</a>",
+      "powered_by_shopify_html": "החנות פועלת באמצעות {{ shopify }}"
+    },
+    "social": {
+      "alt_text": {
+        "share_on_facebook": "שיתוף בפייסבוק",
+        "share_on_twitter": "שיתוף ב־X",
+        "share_on_pinterest": "שיתוף בפינטרסט"
+      },
+      "links": {
+        "twitter": "X (טוויטר)",
+        "facebook": "פייסבוק",
+        "pinterest": "פינטרסט",
+        "instagram": "אינסטגרם",
+        "tumblr": "טאמבלר",
+        "snapchat": "סנאפצ׳ט",
+        "youtube": "יוטיוב",
+        "vimeo": "וימאו",
+        "tiktok": "טיקטוק"
+      }
+    },
+    "continue_shopping": "המשך בקניות",
+    "pagination": {
+      "label": "ניווט בין עמודים",
+      "page": "עמוד {{ number }}",
+      "next": "לעמוד הבא",
+      "previous": "לעמוד הקודם"
+    },
+    "search": {
+      "search": "חיפוש",
+      "reset": "ניקוי החיפוש"
+    },
+    "cart": {
+      "view": "לסל הקניות ({{ count }})",
+      "view_empty_cart": "לסל הקניות",
+      "item_added": "המוצר נוסף לסל הקניות"
+    },
+    "share": {
+      "close": "סגירת השיתוף",
+      "copy_to_clipboard": "העתקת קישור",
+      "share_url": "קישור",
+      "success_message": "הקישור הועתק"
+    },
+    "slider": {
+      "of": "מתוך",
+      "next_slide": "לשקופית הבאה",
+      "previous_slide": "לשקופית הקודמת",
+      "name": "מצגת"
+    }
+  },
+  "newsletter": {
+    "label": "כתובת אימייל",
+    "success": "תודה על ההרשמה!",
+    "button_label": "הרשמה"
+  },
+  "accessibility": {
+    "skip_to_text": "דילוג לתוכן",
+    "skip_to_product_info": "דילוג לפרטי המוצר",
+    "close": "סגירה",
+    "unit_price_separator": "ל־",
+    "vendor": "מותג:",
+    "error": "שגיאה",
+    "refresh_page": "בחירת אפשרות תטען מחדש את העמוד.",
+    "link_messages": {
+      "new_window": "נפתח בחלון חדש.",
+      "external": "מעבר לאתר חיצוני."
+    },
+    "loading": "טוען…",
+    "total_reviews": "חוות דעת",
+    "star_reviews_info": "{{ rating_value }} מתוך {{ rating_max }} כוכבים",
+    "collapsible_content_title": "תוכן שניתן לפתוח ולסגור",
+    "complementary_products": "מוצרים משלימים"
+  },
+  "blogs": {
+    "article": {
+      "blog": "הבלוג",
+      "read_more_title": "להמשך קריאה: {{ title }}",
+      "comments": {
+        "one": "תגובה {{ count }}",
+        "other": "{{ count }} תגובות"
+      },
+      "moderated": "התגובות מתפרסמות לאחר אישור.",
+      "comment_form_title": "כתיבת תגובה",
+      "name": "שם",
+      "email": "אימייל",
+      "message": "תגובה",
+      "post": "שליחת תגובה",
+      "back_to_blog": "חזרה לבלוג",
+      "share": "שיתוף הכתבה",
+      "success": "התגובה פורסמה בהצלחה. תודה!",
+      "success_moderated": "התגובה נשלחה בהצלחה ותפורסם לאחר אישור. תודה!"
+    }
+  },
+  "onboarding": {
+    "product_title": "מוצר לדוגמה",
+    "collection_title": "שם הקטגוריה"
+  },
+  "products": {
+    "product": {
+      "add_to_cart": "הוספה לסל",
+      "choose_options": "לבחירת אפשרויות",
+      "choose_product_options": "בחירת אפשרויות עבור {{ product_name }}",
+      "description": "תיאור המוצר",
+      "inventory_in_stock": "במלאי",
+      "inventory_in_stock_show_count": "{{ quantity }} יחידות במלאי",
+      "inventory_low_stock": "נותרו יחידות בודדות",
+      "inventory_low_stock_show_count": "נותרו {{ quantity }} יחידות במלאי",
+      "inventory_out_of_stock": "אזל מהמלאי",
+      "inventory_out_of_stock_continue_selling": "במלאי",
+      "sku": "מק״ט",
+      "on_sale": "מבצע",
+      "product_variants": "אפשרויות המוצר",
+      "media": {
+        "gallery_viewer": "גלריית המוצר",
+        "load_image": "הצגת תמונה {{ index }} בגלריה",
+        "load_model": "הצגת דגם תלת־ממד {{ index }} בגלריה",
+        "load_video": "ניגון סרטון {{ index }} בגלריה",
+        "image_available": "תמונה {{ index }} מוצגת כעת בגלריה",
+        "open_media": "פתיחת פריט מדיה {{ index }} בחלון",
+        "play_model": "הצגת דגם תלת־ממד",
+        "play_video": "ניגון הסרטון"
+      },
+      "quantity": {
+        "label": "כמות",
+        "input_label": "כמות עבור {{ product }}",
+        "increase": "הגדלת הכמות של {{ product }}",
+        "decrease": "הקטנת הכמות של {{ product }}",
+        "minimum_of": "מינימום {{ quantity }} יחידות",
+        "maximum_of": "מקסימום {{ quantity }} יחידות",
+        "multiples_of": "בכפולות של {{ quantity }}",
+        "min_of": "מינ׳ {{ quantity }}",
+        "max_of": "מקס׳ {{ quantity }}",
+        "in_cart_html": "<span class=\"quantity-cart\">{{ quantity }}</span> בסל",
+        "note": "הצגת מגבלות הכמות"
+      },
+      "volume_pricing": {
+        "title": "מחיר לפי כמות",
+        "note": "קיימת הנחה לפי כמות",
+        "minimum": "{{ quantity }}+",
+        "price_at_each": "{{ price }} ליחידה",
+        "price_range": "{{ minimum }} – {{ maximum }}"
+      },
+      "pickup_availability": {
+        "view_store_info": "לפרטי נקודת האיסוף",
+        "check_other_stores": "בדיקת זמינות בנקודות איסוף נוספות",
+        "pick_up_available": "זמין לאיסוף עצמי",
+        "pick_up_available_at_html": "זמין לאיסוף עצמי ב־<span class=\"color-foreground\">{{ location_name }}</span>",
+        "pick_up_unavailable_at_html": "לא זמין כרגע לאיסוף עצמי ב־<span class=\"color-foreground\">{{ location_name }}</span>",
+        "unavailable": "לא ניתן לטעון את פרטי האיסוף העצמי",
+        "refresh": "רענון"
+      },
+      "price": {
+        "from_price_html": "החל מ־{{ price }}",
+        "regular_price": "מחיר רגיל",
+        "sale_price": "מחיר במבצע",
+        "unit_price": "מחיר ליחידת מידה"
+      },
+      "share": "שיתוף המוצר",
+      "sold_out": "אזל מהמלאי",
+      "unavailable": "לא זמין",
+      "vendor": "מותג",
+      "value_unavailable": "{{ option_value }} – לא זמין",
+      "variant_sold_out_or_unavailable": "האפשרות שנבחרה אזלה מהמלאי או אינה זמינה",
+      "video_exit_message": "{{ title }} נפתח כסרטון במסך מלא באותו חלון.",
+      "view_full_details": "לכל פרטי המוצר",
+      "xr_button": "הצגה בחלל שלך",
+      "xr_button_label": "הצגת המוצר בחלל שלך באמצעות מציאות רבודה",
+      "taxes_included": "המחיר כולל מסים.",
+      "duties_included": "המחיר כולל מכס.",
+      "duties_and_taxes_included": "המחיר כולל מכס ומסים.",
+      "shipping_policy_html": "עלות <a href=\"{{ link }}\">המשלוח</a> מחושבת במעבר לתשלום."
+    },
+    "modal": {
+      "label": "גלריית תמונות וסרטונים"
+    },
+    "facets": {
+      "filter_and_operator_subtitle": "התאמה לכל האפשרויות",
+      "apply": "החלת הסינון",
+      "clear": "ניקוי",
+      "clear_all": "ניקוי כל הסינונים",
+      "from": "מ־",
+      "filter_and_sort": "סינון ומיון",
+      "filter_by_label": "סינון לפי:",
+      "filter_button": "סינון",
+      "filters_selected": {
+        "one": "נבחר {{ count }} סינון",
+        "other": "נבחרו {{ count }} סינונים"
+      },
+      "filter_selected_accessibility": "{{ type }} (נבחרו {{ count }} סינונים)",
+      "show_more": "הצגת עוד",
+      "show_less": "הצגת פחות",
+      "max_price": "המחיר הגבוה ביותר הוא {{ price }}",
+      "product_count": {
+        "one": "{{ product_count }} מתוך {{ count }} מוצר",
+        "other": "{{ product_count }} מתוך {{ count }} מוצרים"
+      },
+      "product_count_simple": {
+        "one": "{{ count }} מוצר",
+        "other": "{{ count }} מוצרים"
+      },
+      "reset": "איפוס",
+      "sort_button": "מיון",
+      "sort_by_label": "מיון לפי:",
+      "to": "עד",
+      "clear_filter": "הסרת הסינון"
+    }
+  },
+  "templates": {
+    "404": {
+      "title": "העמוד לא נמצא",
+      "subtext": "404"
+    },
+    "search": {
+      "no_results": "לא נמצאו תוצאות עבור „{{ terms }}”. אפשר לבדוק את האיות או לחפש מילה אחרת.",
+      "page": "עמוד",
+      "products": "מוצרים",
+      "results_pages_with_count": {
+        "one": "{{ count }} עמוד",
+        "other": "{{ count }} עמודים"
+      },
+      "results_suggestions_with_count": {
+        "one": "{{ count }} הצעה",
+        "other": "{{ count }} הצעות"
+      },
+      "results_products_with_count": {
+        "one": "{{ count }} מוצר",
+        "other": "{{ count }} מוצרים"
+      },
+      "results_with_count": {
+        "one": "{{ count }} תוצאה",
+        "other": "{{ count }} תוצאות"
+      },
+      "results_with_count_and_term": {
+        "one": "נמצאה {{ count }} תוצאה עבור „{{ terms }}”",
+        "other": "נמצאו {{ count }} תוצאות עבור „{{ terms }}”"
+      },
+      "title": "תוצאות חיפוש",
+      "search_for": "חיפוש „{{ terms }}”",
+      "suggestions": "הצעות",
+      "pages": "עמודים"
+    },
+    "cart": {
+      "cart": "סל הקניות"
+    },
+    "contact": {
+      "form": {
+        "title": "יצירת קשר",
+        "name": "שם",
+        "email": "אימייל",
+        "phone": "טלפון",
+        "comment": "הודעה",
+        "send": "שליחת הודעה",
+        "post_success": "תודה שפנית אלינו! נחזור אליך בהקדם.",
+        "error_heading": "יש לתקן את הפרטים הבאים:"
+      }
+    }
+  },
+  "sections": {
+    "announcements": {
+      "previous_announcement": "להודעה הקודמת",
+      "next_announcement": "להודעה הבאה",
+      "carousel": "מצגת הודעות",
+      "announcement": "הודעה",
+      "announcement_bar": "סרגל הודעות"
+    },
+    "header": {
+      "announcement": "הודעה",
+      "menu": "תפריט",
+      "cart_count": {
+        "one": "{{ count }} מוצר",
+        "other": "{{ count }} מוצרים"
+      }
+    },
+    "cart": {
+      "title": "סל הקניות",
+      "caption": "המוצרים בסל",
+      "remove_title": "הסרת {{ title }}",
+      "estimated_total": "סה״כ משוער",
+      "new_estimated_total": "סה״כ משוער מעודכן",
+      "note": "הערות להזמנה",
+      "checkout": "מעבר לתשלום",
+      "empty": "סל הקניות שלך ריק",
+      "cart_error": "לא הצלחנו לעדכן את הסל. כדאי לנסות שוב.",
+      "cart_quantity_error_html": "ניתן להוסיף לסל עד {{ quantity }} יחידות ממוצר זה.",
+      "duties_and_taxes_included_shipping_at_checkout_with_policy_html": "המחיר כולל מכס ומסים. ההנחות ועלות <a href=\"{{ link }}\">המשלוח</a> מחושבות במעבר לתשלום.",
+      "duties_and_taxes_included_shipping_at_checkout_without_policy": "המחיר כולל מכס ומסים. ההנחות ועלות המשלוח מחושבות במעבר לתשלום.",
+      "taxes_included_shipping_at_checkout_with_policy_html": "המחיר כולל מסים. ההנחות ועלות <a href=\"{{ link }}\">המשלוח</a> מחושבות במעבר לתשלום.",
+      "taxes_included_shipping_at_checkout_without_policy": "המחיר כולל מסים. ההנחות ועלות המשלוח מחושבות במעבר לתשלום.",
+      "duties_included_taxes_at_checkout_shipping_at_checkout_with_policy_html": "המחיר כולל מכס. המסים, ההנחות ועלות <a href=\"{{ link }}\">המשלוח</a> מחושבים במעבר לתשלום.",
+      "duties_included_taxes_at_checkout_shipping_at_checkout_without_policy": "המחיר כולל מכס. המסים, ההנחות ועלות המשלוח מחושבים במעבר לתשלום.",
+      "taxes_at_checkout_shipping_at_checkout_with_policy_html": "המסים, ההנחות ועלות <a href=\"{{ link }}\">המשלוח</a> מחושבים במעבר לתשלום.",
+      "taxes_at_checkout_shipping_at_checkout_without_policy": "המסים, ההנחות ועלות המשלוח מחושבים במעבר לתשלום.",
+      "headings": {
+        "product": "המוצר",
+        "price": "מחיר",
+        "total": "סה״כ",
+        "quantity": "כמות",
+        "image": "תמונת המוצר"
+      },
+      "update": "עדכון הסל",
+      "login": {
+        "title": "יש לך חשבון?",
+        "paragraph_html": "<a href=\"{{ link }}\" class=\"link underlined-link\">כניסה לחשבון</a> להשלמת הקנייה מהר יותר."
+      }
+    },
+    "footer": {
+      "payment": "אמצעי תשלום"
+    },
+    "featured_blog": {
+      "view_all": "לכל הכתבות",
+      "onboarding_title": "כתבה לדוגמה",
+      "onboarding_content": "כאן אפשר להציג תקציר של הכתבה"
+    },
+    "featured_collection": {
+      "view_all": "לכל המוצרים",
+      "view_all_label": "לכל המוצרים בקטגוריית {{ collection_name }}"
+    },
+    "collection_list": {
+      "view_all": "לכל הקטגוריות"
+    },
+    "collection_template": {
+      "empty": "לא נמצאו מוצרים",
+      "title": "קטגוריה",
+      "use_fewer_filters_html": "אפשר לבחור פחות סינונים או <a class=\"{{ class }}\" href=\"{{ link }}\">לנקות את כולם</a>"
+    },
+    "video": {
+      "load_video": "ניגון סרטון: {{ description }}"
+    },
+    "slideshow": {
+      "load_slide": "טעינת שקופית",
+      "previous_slideshow": "לשקופית הקודמת",
+      "next_slideshow": "לשקופית הבאה",
+      "pause_slideshow": "עצירת המצגת",
+      "play_slideshow": "הפעלת המצגת",
+      "carousel": "מצגת",
+      "slide": "שקופית"
+    },
+    "page": {
+      "title": "כותרת העמוד"
+    },
+    "quick_order_list": {
+      "product_total": "סכום ביניים למוצר",
+      "view_cart": "לסל הקניות",
+      "each": "{{ money }} ליחידה",
+      "product": "מוצר",
+      "variant": "אפשרות",
+      "variant_total": "סה״כ לאפשרות",
+      "items_added": {
+        "one": "נוספה {{ quantity }} יחידה",
+        "other": "נוספו {{ quantity }} יחידות"
+      },
+      "items_removed": {
+        "one": "הוסרה {{ quantity }} יחידה",
+        "other": "הוסרו {{ quantity }} יחידות"
+      },
+      "product_variants": "אפשרויות המוצר",
+      "total_items": "סה״כ פריטים",
+      "remove_all_single_item_confirmation": "להסיר את הפריט מהסל?",
+      "remove_all_items_confirmation": "להסיר את כל {{ quantity }} הפריטים מהסל?",
+      "remove_all": "הסרת הכל",
+      "cancel": "ביטול",
+      "min_error": "הכמות המינימלית למוצר זה היא {{ min }}",
+      "max_error": "הכמות המרבית למוצר זה היא {{ max }}",
+      "step_error": "ניתן להוסיף מוצר זה בכפולות של {{ step }}"
+    }
+  },
+  "localization": {
+    "country_label": "מדינה או אזור",
+    "language_label": "שפה",
+    "update_language": "עדכון השפה",
+    "update_country": "עדכון המדינה או האזור",
+    "search": "חיפוש",
+    "popular_countries_regions": "מדינות ואזורים נפוצים",
+    "country_results_count": "נמצאו {{ count }} מדינות ואזורים"
+  },
+  "customer": {
+    "account": {
+      "title": "החשבון שלי",
+      "details": "פרטי החשבון",
+      "view_addresses": "כתובות למשלוח",
+      "return": "חזרה לפרטי החשבון"
+    },
+    "account_fallback": "החשבון שלי",
+    "activate_account": {
+      "title": "הפעלת החשבון",
+      "subtext": "יש לבחור סיסמה כדי להפעיל את החשבון.",
+      "password": "סיסמה",
+      "password_confirm": "אימות סיסמה",
+      "submit": "הפעלת החשבון",
+      "cancel": "דחיית ההזמנה"
+    },
+    "addresses": {
+      "title": "הכתובות שלי",
+      "default": "כתובת ברירת המחדל",
+      "add_new": "הוספת כתובת חדשה",
+      "edit_address": "עריכת כתובת",
+      "first_name": "שם פרטי",
+      "last_name": "שם משפחה",
+      "company": "חברה",
+      "address1": "רחוב ומספר בית",
+      "address2": "דירה, קומה ופרטים נוספים",
+      "city": "עיר",
+      "country": "מדינה או אזור",
+      "province": "מחוז",
+      "zip": "מיקוד",
+      "phone": "טלפון",
+      "set_default": "הגדרה ככתובת ברירת המחדל",
+      "add": "הוספת כתובת",
+      "update": "עדכון כתובת",
+      "cancel": "ביטול",
+      "edit": "עריכה",
+      "delete": "מחיקה",
+      "delete_confirm": "למחוק את הכתובת הזו?"
+    },
+    "log_in": "כניסה לחשבון",
+    "log_out": "יציאה מהחשבון",
+    "login_page": {
+      "cancel": "ביטול",
+      "create_account": "יצירת חשבון",
+      "email": "אימייל",
+      "forgot_password": "שכחת את הסיסמה?",
+      "guest_continue": "המשך",
+      "guest_title": "המשך כאורח",
+      "password": "סיסמה",
+      "title": "כניסה לחשבון",
+      "sign_in": "כניסה",
+      "submit": "שליחה",
+      "alternate_provider_separator": "או"
+    },
+    "order": {
+      "title": "הזמנה {{ name }}",
+      "date_html": "ההזמנה התקבלה בתאריך {{ date }}",
+      "cancelled_html": "ההזמנה בוטלה בתאריך {{ date }}",
+      "cancelled_reason": "סיבת הביטול: {{ reason }}",
+      "billing_address": "כתובת לחיוב",
+      "payment_status": "מצב התשלום",
+      "shipping_address": "כתובת למשלוח",
+      "fulfillment_status": "מצב הטיפול בהזמנה",
+      "discount": "הנחה",
+      "shipping": "משלוח",
+      "tax": "מס",
+      "product": "המוצר",
+      "sku": "מק״ט",
+      "price": "מחיר",
+      "quantity": "כמות",
+      "total": "סה״כ",
+      "total_refunded": "סכום ההחזר",
+      "fulfilled_at_html": "ההזמנה נשלחה בתאריך {{ date }}",
+      "track_shipment": "מעקב אחר המשלוח",
+      "tracking_url": "קישור למעקב",
+      "tracking_company": "חברת המשלוחים",
+      "tracking_number": "מספר מעקב",
+      "subtotal": "סכום ביניים",
+      "total_duties": "מכס"
+    },
+    "orders": {
+      "title": "ההזמנות שלי",
+      "order_number": "הזמנה",
+      "order_number_link": "הזמנה מספר {{ number }}",
+      "date": "תאריך",
+      "payment_status": "מצב התשלום",
+      "fulfillment_status": "מצב הטיפול בהזמנה",
+      "total": "סה״כ",
+      "none": "עדיין אין הזמנות בחשבון שלך."
+    },
+    "recover_password": {
+      "title": "איפוס סיסמה",
+      "subtext": "נשלח לך אימייל עם קישור לאיפוס הסיסמה",
+      "success": "שלחנו לך אימייל עם קישור לעדכון הסיסמה."
+    },
+    "register": {
+      "title": "יצירת חשבון",
+      "first_name": "שם פרטי",
+      "last_name": "שם משפחה",
+      "email": "אימייל",
+      "password": "סיסמה",
+      "submit": "יצירת חשבון"
+    },
+    "reset_password": {
+      "title": "איפוס הסיסמה לחשבון",
+      "subtext": "יש להזין סיסמה חדשה",
+      "password": "סיסמה",
+      "password_confirm": "אימות סיסמה",
+      "submit": "איפוס הסיסמה"
+    }
+  },
+  "gift_cards": {
+    "issued": {
+      "how_to_use_gift_card": "אפשר לממש את כרטיס המתנה באתר באמצעות הקוד, או בחנות באמצעות קוד ה־QR",
+      "title": "יתרת כרטיס המתנה שלך ב־{{ shop }} היא {{ value }}",
+      "subtext": "כרטיס המתנה שלך",
+      "gift_card_code": "קוד כרטיס המתנה",
+      "shop_link": "לחנות",
+      "add_to_apple_wallet": "הוספה ל־Apple Wallet",
+      "qr_image_alt": "קוד QR למימוש כרטיס המתנה",
+      "copy_code": "העתקת הקוד",
+      "expiration_date": "בתוקף עד {{ expires_on }}",
+      "copy_code_success": "הקוד הועתק בהצלחה",
+      "expired": "התוקף פג"
+    }
+  },
+  "recipient": {
+    "form": {
+      "checkbox": "אני רוצה לשלוח את המוצר במתנה",
+      "expanded": "טופס פרטי מקבל המתנה נפתח",
+      "collapsed": "טופס פרטי מקבל המתנה נסגר",
+      "email_label": "האימייל של מקבל המתנה",
+      "email_label_optional_for_no_js_behavior": "האימייל של מקבל המתנה (לא חובה)",
+      "email": "אימייל",
+      "name_label": "שם מקבל המתנה (לא חובה)",
+      "name": "שם",
+      "message_label": "ברכה אישית (לא חובה)",
+      "message": "ברכה",
+      "max_characters": "עד {{ max_chars }} תווים",
+      "send_on": "YYYY-MM-DD",
+      "send_on_label": "תאריך השליחה (לא חובה)"
+    }
+  },
+  "storefront": {
+    "home": "עמוד הבית",
+    "shop_now": "לקנייה",
+    "categories": "קונים לפי קטגוריה",
+    "laundry": "כביסה",
+    "general_cleaning": "ניקיון כללי",
+    "toiletries": "טואלטיקה",
+    "disinfection": "חיטוי",
+    "disposables": "חד־פעמי",
+    "search_placeholder": "חיפוש מוצרים…",
+    "back_to_top": "חזרה לראש העמוד",
+    "remove": "הסרה",
+    "subtotal": "סכום ביניים",
+    "view_cart": "לסל הקניות",
+    "select_variant": "יש לבחור אפשרות",
+    "price": "מחיר",
+    "shipping": "משלוחים",
+    "pickup": "איסוף עצמי",
+    "recommendations": "אולי יעניין אותך גם",
+    "newsletter_title": "עדכונים ומבצעים ישירות לאימייל",
+    "follow": "נשארים בקשר",
+    "contact": "יצירת קשר",
+    "contact_intro": "איך אפשר לעזור?",
+    "first_name": "שם פרטי",
+    "last_name": "שם משפחה",
+    "coming_soon": "בקרוב נפתחים",
+    "coming_soon_text": "רוצה לדעת כשהחנות נפתחת? אפשר להירשם לעדכונים.",
+    "under_construction": "החנות שלנו תהיה זמינה בקרוב.",
+    "about": "עלינו",
+    "about_heading": "כל מה שצריך לבית נקי",
+    "about_subtitle": "ניקיון, כביסה וטיפוח",
+    "about_text": "<p>מבחר מוצרים לניקיון הבית ולטיפוח, במקום אחד.</p>",
+    "hero_title": "כל מה שצריך לבית נקי",
+    "hero_subtitle": "ניקיון, כביסה, טואלטיקה ועוד",
+    "featured_title": "מוצרים נבחרים",
+    "feature_title": "בשביל הבית שלך",
+    "feature_description": "מגלים את המוצרים שמתאימים לך.",
+    "choose_collection": "יש לבחור קטגוריה בעורך התבנית.",
+    "no_categories": "יש לבחור קטגוריות בעורך התבנית.",
+    "no_image": "אין תמונה למוצר",
+    "shipping_note": "עלות המשלוח מחושבת במעבר לתשלום.",
+    "options": "אפשרויות",
+    "required": "יש למלא את שדות החובה.",
+    "invalid_email": "יש להזין כתובת אימייל תקינה.",
+    "network_error": "משהו השתבש. כדאי לנסות שוב.",
+    "quantity_error": "יש להזין כמות תקינה.",
+    "selling_plan": "אפשרות רכישה",
+    "page_title": "עמוד {{ number }}",
+    "tagged": "תגיות: {{ tags }}",
+    "facebook": "פייסבוק",
+    "whatsapp": "וואטסאפ",
+    "instagram": "אינסטגרם",
+    "tiktok": "טיקטוק",
+    "customer_service": "שירות לקוחות",
+    "policies": "מדיניות החנות",
+    "availability": "זמינות",
+    "all_products": "לכל המוצרים",
+    "all_categories": "לכל הקטגוריות",
+    "discounts": "הנחות",
+    "sort": {
+      "manual": "מומלצים",
+      "best-selling": "הנמכרים ביותר",
+      "title-ascending": "א–ת",
+      "title-descending": "ת–א",
+      "price-ascending": "מחיר: מהנמוך לגבוה",
+      "price-descending": "מחיר: מהגבוה לנמוך",
+      "created-ascending": "מהישן לחדש",
+      "created-descending": "מהחדש לישן",
+      "relevance": "רלוונטיות",
+      "most-relevant": "מומלצים"
+    },
+    "status": {
+      "pending": "ממתין לתשלום",
+      "authorized": "התשלום אושר",
+      "paid": "שולם",
+      "partially_paid": "שולם חלקית",
+      "refunded": "הוחזר",
+      "partially_refunded": "הוחזר חלקית",
+      "voided": "בוטל",
+      "unpaid": "טרם שולם",
+      "fulfilled": "נשלח",
+      "unfulfilled": "בטיפול",
+      "partial": "נשלח חלקית",
+      "restocked": "הוחזר למלאי",
+      "scheduled": "מתוזמן",
+      "on_hold": "מושהה"
+    },
+    "one_time_purchase": "רכישה חד־פעמית",
+    "product_type": "סוג מוצר"
+  },
+  "date_formats": {
+    "date": "%d/%m/%Y",
+    "date_at_time": "%d/%m/%Y %H:%M"
+  }
+}

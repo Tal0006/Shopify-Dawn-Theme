@@ -1,0 +1,32 @@
+<section class="catalog-section container">
+<h1>{{ 'sections.cart.title' | t }}</h1>
+{% if cart.empty? %}<p>{{ 'sections.cart.empty' | t }}</p><a class="theme-btn" href="{{ settings.catalog_collection.url | default: routes.all_products_collection_url }}">{{ 'general.continue_shopping' | t }}</a>
+{% else %}
+<form action="{{ routes.cart_url }}" method="post" id="Cart-{{ section.id }}">
+  <div class="catalog-cart-table"><table><caption class="sr-only">{{ 'sections.cart.caption' | t }}</caption>
+    <thead><tr><th>{{ 'sections.cart.headings.product' | t }}</th><th>{{ 'sections.cart.headings.price' | t }}</th><th>{{ 'sections.cart.headings.quantity' | t }}</th><th>{{ 'sections.cart.headings.total' | t }}</th><th><span class="sr-only">{{ 'storefront.remove' | t }}</span></th></tr></thead>
+    <tbody>{% for item in cart.items %}<tr>
+      <td><a class="catalog-cart-product" href="{{ item.url }}">{% if item.image != blank %}{{ item.image | image_url: width: 160 | image_tag: loading: 'lazy', alt: item.image.alt }}{% endif %}<span>{{ item.product.title | escape }}</span></a>
+        {% unless item.product.has_only_default_variant %}<small>{{ item.variant.title | escape }}</small>{% endunless %}
+        {% if item.selling_plan_allocation %}<small>{{ item.selling_plan_allocation.selling_plan.name | escape }}</small>{% endif %}
+        {% for property in item.properties %}{% assign first_character = property.first | slice: 0 %}{% if property.last != blank and first_character != '_' %}<small>{{ property.first | escape }}: {{ property.last | escape }}</small>{% endif %}{% endfor %}
+        {% for allocation in item.line_level_discount_allocations %}<small>{{ allocation.discount_application.title | escape }} (−<bdi>{{ allocation.amount | money }}</bdi>)</small>{% endfor %}
+      </td>
+      <td><bdi>{{ item.final_price | money }}</bdi>{% if item.original_price > item.final_price %}<s><bdi>{{ item.original_price | money }}</bdi></s>{% endif %}</td>
+      <td><label class="sr-only" for="CartQuantity-{{ item.index | plus: 1 }}">{{ 'products.product.quantity.input_label' | t: product: item.product.title }}</label><input id="CartQuantity-{{ item.index | plus: 1 }}" type="number" name="updates[]" value="{{ item.quantity }}" min="0" step="{{ item.variant.quantity_rule.increment | default: 1 }}" {% if item.variant.quantity_rule.max != blank %}max="{{ item.variant.quantity_rule.max }}"{% endif %}></td>
+      <td><bdi>{{ item.final_line_price | money }}</bdi></td><td><a href="{{ item.url_to_remove }}" aria-label="{{ 'sections.cart.remove_title' | t: title: item.product.title }}">{{ 'storefront.remove' | t }}</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <label for="CartNote-{{ section.id }}">{{ 'sections.cart.note' | t }}</label><textarea id="CartNote-{{ section.id }}" name="note">{{ cart.note | escape }}</textarea>
+  {% for discount in cart.cart_level_discount_applications %}<p>{{ discount.title | escape }}: −<bdi>{{ discount.total_allocated_amount | money }}</bdi></p>{% endfor %}
+  <p class="catalog-cart-total">{{ 'sections.cart.estimated_total' | t }}: <bdi>{{ cart.total_price | money }}</bdi></p>
+  <p>{% if cart.taxes_included %}{{ 'products.product.taxes_included' | t }} {% endif %}{% if shop.shipping_policy.body != blank %}{{ 'products.product.shipping_policy_html' | t: link: shop.shipping_policy.url }}{% else %}{{ 'storefront.shipping_note' | t }}{% endif %}</p>
+  <div class="catalog-actions"><button type="submit" name="update" class="theme-btn">{{ 'sections.cart.update' | t }}</button><button type="submit" name="checkout" class="theme-btn">{{ 'sections.cart.checkout' | t }}</button><a href="{{ settings.catalog_collection.url | default: routes.all_products_collection_url }}">{{ 'general.continue_shopping' | t }}</a></div>
+</form>
+{% endif %}</section>
+{% schema %}
+{
+  "name": "t:storefront_editor.cart",
+  "settings": []
+}
+{% endschema %}

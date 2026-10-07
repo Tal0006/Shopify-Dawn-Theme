@@ -2,11 +2,11 @@
   <div class="container">
     <div class="about-wrap">
       <div class="title">
-        <h2>{{ section.settings.title }}</h2>
+        <h2>{% if section.settings.title != blank %}{{ section.settings.title }}{% else %}{{ 'storefront.about' | t }}{% endif %}</h2>
       </div>
-      <strong>{{ section.settings.subtitle }}</strong>
-      <h3>{{ section.settings.heading }}</h3>
-      {{ section.settings.description }}
+      <strong>{% if section.settings.subtitle != blank %}{{ section.settings.subtitle }}{% else %}{{ 'storefront.about_subtitle' | t }}{% endif %}</strong>
+      <h3>{% if section.settings.heading != blank %}{{ section.settings.heading }}{% else %}{{ 'storefront.about_heading' | t }}{% endif %}</h3>
+      {% if section.settings.description != blank %}{{ section.settings.description }}{% else %}{{ 'storefront.about_text' | t }}{% endif %}
       <span class="shape1"><img src="{{ 'shape3.png' | asset_url }}" width="" height="" alt=""></span>
       <div class="shape2"><img src="{{ 'footer2.png' | asset_url }}" alt="" width="" height=""></div>
     </div>
@@ -15,36 +15,32 @@
 
 {% schema %}
 {
-  "name": "About Us",
+  "name": "t:storefront_editor.about",
   "settings": [
     {
       "type": "text",
       "id": "title",
-      "label": "Title",
-      "default": "ABOUT US"
+      "label": "t:storefront_editor.heading"
     },
     {
       "type": "text",
       "id": "subtitle",
-      "label": "Subtitle",
-      "default": "SHOTS SO GOOD WE CALL IT"
+      "label": "t:storefront_editor.subtitle"
     },
     {
       "type": "text",
       "id": "heading",
-      "label": "Heading",
-      "default": "THE SUPER GOOD SHOT FROM NATURE!"
+      "label": "t:storefront_editor.heading"
     },
     {
       "type": "richtext",
       "id": "description",
-      "label": "Description",
-      "default": "<p>After getting frustrated with most of the ginger shots on the market where they: Only contain between 17% to 25% ginger juice, Contain lab-made Vitamin C known as ascorbic acid, Cost an arm and a leg (😆) for a tiny 60ml shot bottle which finishes in one second.</p><p>We decided it was time to take matters into our own hands and create a nutrient-rich super ginger shot with:</p><ul><li>35% ginger juice,</li><li>100% natural Vitamin C from plants,</li><li>Comes in a super 100ml glass bottle (not plastic), which you can enjoy in multiple sips.</li></ul> <p>Super Nature is a 100% natural superfood shot that aims to support wellness from nature’s superfood without additives and preservatives.</p>"
+      "label": "t:storefront_editor.text"
     }
   ],
   "presets": [
     {
-      "name": "About Us"
+      "name": "t:storefront_editor.about"
     }
   ]
 }

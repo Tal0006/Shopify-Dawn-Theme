@@ -1,5 +1,5 @@
 <!doctype html>
-<html class="js" lang="{{ request.locale.iso_code }}">
+<html class="js" lang="{{ request.locale.iso_code }}" dir="{% if request.locale.iso_code == 'he' or request.locale.iso_code == 'ar' %}rtl{% else %}ltr{% endif %}">
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -17,8 +17,8 @@
 
     <title>
       {{ page_title }}
-      {%- if current_tags %} &ndash; tagged "{{ current_tags | join: ', ' }}"{% endif -%}
-      {%- if current_page != 1 %} &ndash; Page {{ current_page }}{% endif -%}
+      {%- if current_tags %} &ndash; {{ 'storefront.tagged' | t: tags: current_tags }}{% endif -%}
+      {%- if current_page != 1 %} &ndash; {{ 'storefront.page_title' | t: number: current_page }}{% endif -%}
       {%- unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless -%}
     </title>
 
@@ -33,6 +33,10 @@
     <link href="{{ 'themify-icons.css' | asset_url }}" rel="stylesheet">
     <link href="{{ 'style.css' | asset_url }}" rel="stylesheet">
 
+    {{ 'storefront.css' | asset_url | stylesheet_tag }}
+    {% if request.page_type == 'customers/account' or request.page_type == 'customers/login' or request.page_type contains 'customers/' %}{{ 'base.css' | asset_url | stylesheet_tag }}{% endif %}
+    <script>window.themeStrings = {required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}, previousSlide: {{ 'general.slider.previous_slide' | t | json }}, nextSlide: {{ 'general.slider.next_slide' | t | json }}};</script>
+    <script src="{{ 'storefront.js' | asset_url }}" defer></script>
     {{ content_for_header }}
 
     {% comment %}

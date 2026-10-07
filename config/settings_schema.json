@@ -1465,5 +1465,16 @@
         "default": "scheme-1"
       }
     ]
+  },
+  {
+    "name": "t:storefront_editor.collections",
+    "settings": [
+      {
+        "type": "collection",
+        "id": "catalog_collection",
+        "label": "t:storefront_editor.collection",
+        "info": "t:storefront_editor.category_info"
+      }
+    ]
   }
 ]

@@ -1,0 +1,123 @@
+{
+  "storefront_editor": {
+    "heading": "כותרת",
+    "subtitle": "כותרת משנה",
+    "collection": "קטגוריה",
+    "product_limit": "מספר מוצרים להצגה",
+    "view_all": "הצגת כפתור לכל המוצרים",
+    "image": "תמונה",
+    "logo": "לוגו",
+    "menu": "תפריט ראשי",
+    "footer_menu": "תפריט תחתון",
+    "service_menu": "תפריט שירות לקוחות",
+    "show_policies": "הצגת קישורים למדיניות החנות",
+    "facebook": "קישור לפייסבוק",
+    "whatsapp": "קישור לוואטסאפ",
+    "instagram": "קישור לאינסטגרם",
+    "tiktok": "קישור לטיקטוק",
+    "hero": "באנר ראשי",
+    "featured_collection": "מוצרים מקטגוריה",
+    "categories": "ניווט לפי קטגוריות",
+    "category": "קטגוריה",
+    "header": "כותרת עליונה",
+    "footer": "כותרת תחתונה",
+    "product": "עמוד מוצר",
+    "cart": "סל הקניות",
+    "search": "חיפוש",
+    "collection_page": "עמוד קטגוריה",
+    "collections": "כל הקטגוריות",
+    "contact": "יצירת קשר",
+    "about": "עלינו",
+    "content": "תוכן העמוד",
+    "features": "יתרונות",
+    "shop": "באנר קידום",
+    "social": "רשתות חברתיות",
+    "coming": "בקרוב",
+    "link": "קישור",
+    "button_text": "טקסט הכפתור",
+    "text": "טקסט",
+    "show_vendor": "הצגת מותג",
+    "show_dynamic_checkout": "הצגת כפתור תשלום מהיר",
+    "show_recommendations": "הצגת מוצרים מומלצים",
+    "shipping_text": "מידע על משלוחים",
+    "pickup_text": "מידע על איסוף עצמי",
+    "newsletter_title": "כותרת ההרשמה לעדכונים",
+    "follow_title": "כותרת הקישורים החברתיים",
+    "company": "שם החברה",
+    "address": "כתובת",
+    "title": "כותרת",
+    "newsletter": "הרשמה לעדכונים",
+    "category_info": "בוחרים קטגוריה קיימת ב־Shopify. השם, התמונה והקישור שלה מוצגים אוטומטית."
+  },
+  "sections": {
+    "all": {
+      "padding": {
+        "section_padding_heading": "ריווח",
+        "padding_top": "ריווח עליון",
+        "padding_bottom": "ריווח תחתון"
+      },
+      "colors": {
+        "label": "ערכת צבעים"
+      }
+    },
+    "main-account": {
+      "name": "החשבון שלי"
+    },
+    "main-activate-account": {
+      "name": "הפעלת חשבון"
+    },
+    "main-addresses": {
+      "name": "כתובות הלקוח"
+    },
+    "main-order": {
+      "name": "פרטי הזמנה"
+    },
+    "main-login": {
+      "name": "כניסה לחשבון"
+    },
+    "main-register": {
+      "name": "יצירת חשבון"
+    },
+    "main-reset-password": {
+      "name": "איפוס סיסמה"
+    },
+    "email-signup-banner": {
+      "name": "הרשמה לעדכונים"
+    },
+    "main-password-header": {
+      "name": "כותרת עמוד הסיסמה"
+    },
+    "main-password-footer": {
+      "name": "תחתית עמוד הסיסמה"
+    },
+    "related-products": {
+      "name": "מוצרים מומלצים"
+    }
+  },
+  "settings_schema": {
+    "logo": {
+      "name": "לוגו"
+    },
+    "colors": {
+      "name": "צבעים"
+    },
+    "typography": {
+      "name": "גופנים"
+    },
+    "layout": {
+      "name": "פריסה"
+    },
+    "animations": {
+      "name": "אנימציות"
+    },
+    "buttons": {
+      "name": "כפתורים"
+    },
+    "social_media": {
+      "name": "רשתות חברתיות"
+    },
+    "search": {
+      "name": "חיפוש"
+    }
+  }
+}

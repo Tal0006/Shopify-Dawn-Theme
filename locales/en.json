@@ -215,6 +215,10 @@
     }
   },
   "templates": {
+    "404": {
+      "title": "Page not found",
+      "subtext": "404"
+    },
     "search": {
       "no_results": "No results found for “{{ terms }}”. Check the spelling or use a different word or phrase.",
       "page": "Page",
@@ -258,10 +262,6 @@
         "post_success": "Thanks for contacting us. We'll get back to you as soon as possible.",
         "error_heading": "Please adjust the following:"
       }
-    },
-    "404": {
-      "title": "Page not found",
-      "subtext": "404"
     }
   },
   "sections": {
@@ -272,7 +272,6 @@
       "announcement": "Announcement",
       "announcement_bar": "Announcement bar"
     },
-
     "header": {
       "announcement": "Announcement",
       "menu": "Menu",
@@ -525,5 +524,99 @@
       "send_on": "YYYY-MM-DD",
       "send_on_label": "Send on (optional)"
     }
+  },
+  "storefront": {
+    "home": "Home",
+    "shop_now": "Shop now",
+    "categories": "Shop by category",
+    "laundry": "Laundry",
+    "general_cleaning": "General cleaning",
+    "toiletries": "Toiletries",
+    "disinfection": "Disinfection",
+    "disposables": "Disposables",
+    "search_placeholder": "Search products…",
+    "back_to_top": "Back to top",
+    "remove": "Remove",
+    "subtotal": "Subtotal",
+    "view_cart": "View cart",
+    "select_variant": "Select an option",
+    "price": "Price",
+    "shipping": "Shipping",
+    "pickup": "Local pickup",
+    "recommendations": "You may also like",
+    "newsletter_title": "News and offers by email",
+    "follow": "Follow us",
+    "contact": "Contact us",
+    "contact_intro": "How can we help?",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "coming_soon": "Opening soon",
+    "coming_soon_text": "Be the first to know when we open.",
+    "under_construction": "Our store will be available soon.",
+    "about": "About us",
+    "about_heading": "Everything you need for a clean home",
+    "about_subtitle": "Cleaning, laundry and personal care",
+    "about_text": "<p>Discover our household cleaning and personal care products.</p>",
+    "hero_title": "Everything you need for a clean home",
+    "hero_subtitle": "Cleaning, laundry, personal care and more",
+    "featured_title": "Featured products",
+    "feature_title": "For your home",
+    "feature_description": "Explore the products that suit your needs.",
+    "choose_collection": "Select a collection in the Theme Editor.",
+    "no_categories": "Select collections in the Theme Editor.",
+    "no_image": "No image available",
+    "shipping_note": "Shipping costs are calculated at checkout.",
+    "options": "Options",
+    "required": "Please complete the required fields.",
+    "invalid_email": "Please enter a valid email address.",
+    "network_error": "Something went wrong. Please try again.",
+    "quantity_error": "Please enter a valid quantity.",
+    "selling_plan": "Purchase option",
+    "page_title": "Page {{ number }}",
+    "tagged": "Tagged {{ tags }}",
+    "facebook": "Facebook",
+    "whatsapp": "WhatsApp",
+    "instagram": "Instagram",
+    "tiktok": "TikTok",
+    "customer_service": "Customer service",
+    "policies": "Policies",
+    "availability": "Availability",
+    "all_products": "All products",
+    "all_categories": "All categories",
+    "discounts": "Discounts",
+    "sort": {
+      "manual": "Featured",
+      "best-selling": "Best selling",
+      "title-ascending": "Alphabetically, A–Z",
+      "title-descending": "Alphabetically, Z–A",
+      "price-ascending": "Price: low to high",
+      "price-descending": "Price: high to low",
+      "created-ascending": "Oldest first",
+      "created-descending": "Newest first",
+      "relevance": "Relevance",
+      "most-relevant": "Recommended"
+    },
+    "status": {
+      "pending": "Pending",
+      "authorized": "Authorized",
+      "paid": "Paid",
+      "partially_paid": "Partially paid",
+      "refunded": "Refunded",
+      "partially_refunded": "Partially refunded",
+      "voided": "Voided",
+      "unpaid": "Unpaid",
+      "fulfilled": "Fulfilled",
+      "unfulfilled": "Unfulfilled",
+      "partial": "Partially fulfilled",
+      "restocked": "Restocked",
+      "scheduled": "Scheduled",
+      "on_hold": "On hold"
+    },
+    "one_time_purchase": "One-time purchase",
+    "product_type": "Product type"
+  },
+  "date_formats": {
+    "date": "%d/%m/%Y",
+    "date_at_time": "%d/%m/%Y %H:%M"
   }
 }

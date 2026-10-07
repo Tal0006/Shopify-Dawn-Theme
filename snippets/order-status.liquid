@@ -1,0 +1,3 @@
+{%- assign known_statuses = 'pending,authorized,paid,partially_paid,refunded,partially_refunded,voided,unpaid,fulfilled,unfulfilled,partial,restocked,scheduled,on_hold' | split: ',' -%}
+{%- assign status_value = status | default: 'unfulfilled' -%}
+{%- if known_statuses contains status_value -%}{%- assign status_key = 'storefront.status.' | append: status_value -%}{{ status_key | t }}{%- else -%}{{ status_label | escape }}{%- endif -%}
