@@ -57,7 +57,73 @@
         "padding_bottom": "ריווח תחתון"
       },
       "colors": {
-        "label": "ערכת צבעים"
+        "label": "ערכת צבעים",
+        "has_cards_info": "כדי לשנות את ערכת הצבעים של הכרטיס, יש לעדכן את הגדרות התבנית."
+      },
+      "animation": {
+        "content": "אנימציות",
+        "image_behavior": {
+          "options__1": {
+            "label": "ללא"
+          },
+          "options__2": {
+            "label": "תנועה עדינה"
+          },
+          "options__3": {
+            "label": "מיקום רקע קבוע"
+          },
+          "options__4": {
+            "label": "הגדלה במהלך הגלילה"
+          },
+          "label": "התנהגות התמונה"
+        }
+      },
+      "spacing": "ריווח",
+      "heading_size": {
+        "label": "גודל הכותרת",
+        "options__1": {
+          "label": "קטן"
+        },
+        "options__2": {
+          "label": "בינוני"
+        },
+        "options__3": {
+          "label": "גדול"
+        },
+        "options__4": {
+          "label": "גדול מאוד"
+        },
+        "options__5": {
+          "label": "גדול במיוחד"
+        }
+      },
+      "image_shape": {
+        "options__1": {
+          "label": "ברירת מחדל"
+        },
+        "options__2": {
+          "label": "קשת"
+        },
+        "options__3": {
+          "label": "צורה חופשית"
+        },
+        "options__4": {
+          "label": "שברון שמאלה"
+        },
+        "options__5": {
+          "label": "שברון ימינה"
+        },
+        "options__6": {
+          "label": "מעוין"
+        },
+        "options__7": {
+          "label": "מקבילית"
+        },
+        "options__8": {
+          "label": "עגול"
+        },
+        "label": "צורת התמונה",
+        "info": "לכרטיסים בסגנון רגיל אין מסגרת כאשר נבחרת צורה לתמונה."
       }
     },
     "main-account": {
@@ -73,7 +139,10 @@
       "name": "פרטי הזמנה"
     },
     "main-login": {
-      "name": "כניסה לחשבון"
+      "name": "כניסה לחשבון",
+      "shop_login_button": {
+        "enable": "הפעלת כניסה באמצעות Shop"
+      }
     },
     "main-register": {
       "name": "יצירת חשבון"
@@ -82,33 +151,3064 @@
       "name": "איפוס סיסמה"
     },
     "email-signup-banner": {
-      "name": "הרשמה לעדכונים"
+      "name": "הרשמה לעדכונים",
+      "settings": {
+        "paragraph": {
+          "content": "כל הרשמה באימייל יוצרת חשבון לקוח. [למידע נוסף](https://help.shopify.com/manual/customers)"
+        },
+        "image": {
+          "label": "תמונת רקע"
+        },
+        "image_overlay_opacity": {
+          "label": "אטימות שכבת הצבע מעל התמונה"
+        },
+        "show_background_image": {
+          "label": "הצגת תמונת רקע"
+        },
+        "show_text_box": {
+          "label": "הצגת מכל תוכן במחשב"
+        },
+        "desktop_content_position": {
+          "options__1": {
+            "label": "למעלה משמאל"
+          },
+          "options__2": {
+            "label": "למעלה במרכז"
+          },
+          "options__3": {
+            "label": "למעלה מימין"
+          },
+          "options__4": {
+            "label": "באמצע משמאל"
+          },
+          "options__5": {
+            "label": "באמצע במרכז"
+          },
+          "options__6": {
+            "label": "באמצע מימין"
+          },
+          "options__7": {
+            "label": "למטה משמאל"
+          },
+          "options__8": {
+            "label": "למטה במרכז"
+          },
+          "options__9": {
+            "label": "למטה מימין"
+          },
+          "label": "מיקום התוכן במחשב"
+        },
+        "color_scheme": {
+          "info": "מוצג כאשר מכל התוכן מוצג."
+        },
+        "image_height": {
+          "label": "גובה הבאנר",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "קטן"
+          },
+          "options__3": {
+            "label": "בינוני"
+          },
+          "options__4": {
+            "label": "גדול"
+          },
+          "info": "לקבלת תוצאה מיטבית, מומלץ להשתמש בתמונה ביחס ממדים של 16:9. [למידע נוסף](https://help.shopify.com/manual/shopify-admin/productivity-tools/image-editor#understanding-image-aspect-ratio)"
+        },
+        "desktop_content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן במחשב"
+        },
+        "header": {
+          "content": "פריסה בנייד"
+        },
+        "mobile_content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן בנייד"
+        },
+        "show_text_below": {
+          "label": "הצגת התוכן מתחת לתמונה בנייד",
+          "info": "לקבלת תוצאה מיטבית, מומלץ להשתמש בתמונה ביחס ממדים של 16:9. [למידע נוסף](https://help.shopify.com/manual/shopify-admin/productivity-tools/image-editor#understanding-image-aspect-ratio)"
+        }
+      },
+      "blocks": {
+        "heading": {
+          "name": "כותרת",
+          "settings": {
+            "heading": {
+              "label": "כותרת",
+              "default": "בקרוב נפתחים"
+            }
+          }
+        },
+        "paragraph": {
+          "name": "פסקה",
+          "settings": {
+            "paragraph": {
+              "label": "תיאור",
+              "default": "<p>אפשר להירשם כדי לדעת ראשונים כשהחנות נפתחת.</p>"
+            },
+            "text_style": {
+              "options__1": {
+                "label": "טקסט רגיל"
+              },
+              "options__2": {
+                "label": "כותרת משנה"
+              },
+              "label": "סגנון הטקסט"
+            }
+          }
+        },
+        "email_form": {
+          "name": "טופס אימייל"
+        }
+      },
+      "presets": {
+        "name": "באנר הרשמה באימייל"
+      }
     },
     "main-password-header": {
-      "name": "כותרת עמוד הסיסמה"
+      "name": "כותרת עמוד הסיסמה",
+      "settings": {
+        "logo_header": {
+          "content": "לוגו"
+        },
+        "logo_help": {
+          "content": "ניתן לערוך את הלוגו בהגדרות התבנית."
+        }
+      }
     },
     "main-password-footer": {
       "name": "תחתית עמוד הסיסמה"
     },
     "related-products": {
-      "name": "מוצרים מומלצים"
+      "name": "מוצרים מומלצים",
+      "settings": {
+        "heading": {
+          "label": "כותרת"
+        },
+        "products_to_show": {
+          "label": "מספר מוצרים מרבי להצגה"
+        },
+        "columns_desktop": {
+          "label": "מספר עמודות במחשב"
+        },
+        "paragraph__1": {
+          "content": "המלצות דינמיות מתבססות על פרטי הזמנות ומוצרים, ומשתנות ומשתפרות עם הזמן. [למידע נוסף](https://help.shopify.com/themes/development/recommended-products)",
+          "default": "אולי יעניין אותך גם"
+        },
+        "header__2": {
+          "content": "כרטיס מוצר"
+        },
+        "image_ratio": {
+          "label": "יחס הממדים של התמונה",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "לאורך"
+          },
+          "options__3": {
+            "label": "ריבוע"
+          }
+        },
+        "show_secondary_image": {
+          "label": "הצגת תמונה שנייה במעבר עכבר"
+        },
+        "show_vendor": {
+          "label": "הצגת מותג"
+        },
+        "show_rating": {
+          "label": "הצגת דירוג המוצר",
+          "info": "כדי להציג דירוג, יש להוסיף אפליקציה לדירוג מוצרים. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/theme-structure/page-types#product-recommendations-section-settings)"
+        },
+        "header_mobile": {
+          "content": "פריסה בנייד"
+        },
+        "columns_mobile": {
+          "label": "מספר עמודות בנייד",
+          "options__1": {
+            "label": "עמודה אחת"
+          },
+          "options__2": {
+            "label": "שתי עמודות"
+          }
+        }
+      }
+    },
+    "announcement-bar": {
+      "name": "סרגל הודעות",
+      "settings": {
+        "auto_rotate": {
+          "label": "החלפה אוטומטית של הודעות"
+        },
+        "change_slides_speed": {
+          "label": "החלפה בכל"
+        },
+        "header__1": {
+          "content": "סמלי רשתות חברתיות",
+          "info": "כדי להציג את חשבונות הרשתות החברתיות שלך, יש להוסיף קישורים ב[הגדרות התבנית](/editor?context=theme&category=social%20media)."
+        },
+        "header__2": {
+          "content": "הודעות"
+        },
+        "show_social": {
+          "label": "הצגת סמלים במחשב"
+        },
+        "header__3": {
+          "content": "בורר מדינה או אזור",
+          "info": "כדי להוסיף מדינה או אזור, יש לעבור ל[הגדרות השווקים.](/admin/settings/markets)"
+        },
+        "enable_country_selector": {
+          "label": "הפעלת בורר מדינה או אזור"
+        },
+        "header__4": {
+          "content": "בורר שפה",
+          "info": "כדי להוסיף שפה, יש לעבור ל[הגדרות השפות.](/admin/settings/languages)"
+        },
+        "enable_language_selector": {
+          "label": "הפעלת בורר שפה"
+        }
+      },
+      "blocks": {
+        "announcement": {
+          "name": "הודעה",
+          "settings": {
+            "text": {
+              "label": "טקסט",
+              "default": "ברוכים הבאים לחנות שלנו"
+            },
+            "text_alignment": {
+              "label": "יישור הטקסט",
+              "options__1": {
+                "label": "שמאל"
+              },
+              "options__2": {
+                "label": "מרכז"
+              },
+              "options__3": {
+                "label": "ימין"
+              }
+            },
+            "link": {
+              "label": "קישור"
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "סרגל הודעות"
+      }
+    },
+    "apps": {
+      "name": "אפליקציות",
+      "settings": {
+        "include_margins": {
+          "label": "התאמת שולי המקטע לשולי התבנית"
+        }
+      },
+      "presets": {
+        "name": "אפליקציות"
+      }
+    },
+    "collage": {
+      "name": "קולאז׳",
+      "settings": {
+        "heading": {
+          "default": "קולאז׳ מדיה",
+          "label": "כותרת"
+        },
+        "desktop_layout": {
+          "label": "פריסה במחשב",
+          "options__1": {
+            "label": "מקטע גדול משמאל"
+          },
+          "options__2": {
+            "label": "מקטע גדול מימין"
+          }
+        },
+        "mobile_layout": {
+          "label": "פריסה בנייד",
+          "options__1": {
+            "label": "קולאז׳"
+          },
+          "options__2": {
+            "label": "עמודה"
+          }
+        },
+        "card_styles": {
+          "label": "סגנון הכרטיס",
+          "info": "ניתן לעדכן את סגנונות כרטיסי המוצרים, הקטגוריות והבלוג בהגדרות התבנית.",
+          "options__1": {
+            "label": "שימוש בסגנון הנפרד של כל סוג כרטיס"
+          },
+          "options__2": {
+            "label": "עיצוב כל הכרטיסים ככרטיסי מוצרים"
+          }
+        }
+      },
+      "blocks": {
+        "image": {
+          "name": "תמונה",
+          "settings": {
+            "image": {
+              "label": "תמונה"
+            }
+          }
+        },
+        "product": {
+          "name": "מוצר",
+          "settings": {
+            "product": {
+              "label": "מוצר"
+            },
+            "secondary_background": {
+              "label": "הצגת רקע משני"
+            },
+            "second_image": {
+              "label": "הצגת תמונה שנייה במעבר עכבר"
+            }
+          }
+        },
+        "collection": {
+          "name": "קטגוריה",
+          "settings": {
+            "collection": {
+              "label": "קטגוריה"
+            }
+          }
+        },
+        "video": {
+          "name": "סרטון",
+          "settings": {
+            "cover_image": {
+              "label": "תמונת שער"
+            },
+            "video_url": {
+              "label": "כתובת URL",
+              "info": "הסרטון מופעל בחלון קופץ אם המקטע מכיל בלוקים נוספים.",
+              "placeholder": "יש להשתמש בקישור מיוטיוב או מווימאו"
+            },
+            "description": {
+              "default": "תיאור הסרטון",
+              "label": "טקסט חלופי לסרטון",
+              "info": "תיאור הסרטון עבור לקוחות שמשתמשים בקוראי מסך. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/theme-structure/theme-features#video-block)"
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "קולאז׳"
+      }
+    },
+    "collection-list": {
+      "name": "רשימת קטגוריות",
+      "settings": {
+        "title": {
+          "default": "קטגוריות",
+          "label": "כותרת"
+        },
+        "image_ratio": {
+          "label": "יחס הממדים של התמונה",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "לאורך"
+          },
+          "options__3": {
+            "label": "ריבוע"
+          },
+          "info": "ניתן להוסיף תמונות באמצעות עריכת הקטגוריות. [למידע נוסף](https://help.shopify.com/manual/products/collections)"
+        },
+        "columns_desktop": {
+          "label": "מספר עמודות במחשב"
+        },
+        "show_view_all": {
+          "label": "הפעלת כפתור ״לכל הקטגוריות״ כשיש ברשימה יותר קטגוריות מאלה שמוצגות"
+        },
+        "header_mobile": {
+          "content": "פריסה בנייד"
+        },
+        "columns_mobile": {
+          "label": "מספר עמודות בנייד",
+          "options__1": {
+            "label": "עמודה אחת"
+          },
+          "options__2": {
+            "label": "שתי עמודות"
+          }
+        },
+        "swipe_on_mobile": {
+          "label": "הפעלת החלקה בנייד"
+        }
+      },
+      "blocks": {
+        "featured_collection": {
+          "name": "קטגוריה",
+          "settings": {
+            "collection": {
+              "label": "קטגוריה"
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "רשימת קטגוריות"
+      }
+    },
+    "contact-form": {
+      "name": "טופס יצירת קשר",
+      "presets": {
+        "name": "טופס יצירת קשר"
+      },
+      "settings": {
+        "title": {
+          "default": "טופס יצירת קשר",
+          "label": "כותרת"
+        }
+      }
+    },
+    "custom-liquid": {
+      "name": "קוד Liquid מותאם אישית",
+      "settings": {
+        "custom_liquid": {
+          "label": "קוד Liquid",
+          "info": "הוספת קטעי קוד של אפליקציות או קוד אחר להתאמות מתקדמות. [למידע נוסף](https://shopify.dev/docs/api/liquid)"
+        }
+      },
+      "presets": {
+        "name": "קוד Liquid מותאם אישית"
+      }
+    },
+    "featured-blog": {
+      "name": "כתבות בלוג",
+      "settings": {
+        "heading": {
+          "default": "כתבות בלוג",
+          "label": "כותרת"
+        },
+        "blog": {
+          "label": "בלוג"
+        },
+        "post_limit": {
+          "label": "מספר כתבות בלוג להצגה"
+        },
+        "columns_desktop": {
+          "label": "מספר עמודות במחשב"
+        },
+        "show_view_all": {
+          "label": "הפעלת כפתור ״לכל הכתבות״ כשיש בבלוג יותר כתבות מאלה שמוצגות"
+        },
+        "show_image": {
+          "label": "הצגת תמונה ראשית",
+          "info": "לקבלת תוצאה מיטבית, מומלץ להשתמש בתמונה ביחס ממדים של 3:2. [למידע נוסף](https://help.shopify.com/manual/shopify-admin/productivity-tools/image-editor#understanding-image-aspect-ratio)"
+        },
+        "show_date": {
+          "label": "הצגת תאריך"
+        },
+        "show_author": {
+          "label": "הצגת מחבר"
+        }
+      },
+      "presets": {
+        "name": "כתבות בלוג"
+      }
+    },
+    "featured-collection": {
+      "name": "קטגוריה נבחרת",
+      "settings": {
+        "title": {
+          "label": "כותרת",
+          "default": "קטגוריה נבחרת"
+        },
+        "description": {
+          "label": "תיאור"
+        },
+        "show_description": {
+          "label": "הצגת תיאור הקטגוריה מממשק הניהול"
+        },
+        "description_style": {
+          "label": "סגנון התיאור",
+          "options__1": {
+            "label": "טקסט רגיל"
+          },
+          "options__2": {
+            "label": "כותרת משנה"
+          },
+          "options__3": {
+            "label": "אותיות רישיות"
+          }
+        },
+        "collection": {
+          "label": "קטגוריה"
+        },
+        "products_to_show": {
+          "label": "מספר מוצרים מרבי להצגה"
+        },
+        "columns_desktop": {
+          "label": "מספר עמודות במחשב"
+        },
+        "show_view_all": {
+          "label": "הפעלת כפתור ״לכל המוצרים״ כשיש בקטגוריה יותר מוצרים מאלה שמוצגים"
+        },
+        "view_all_style": {
+          "label": "סגנון כפתור ״לכל המוצרים״",
+          "options__1": {
+            "label": "קישור"
+          },
+          "options__2": {
+            "label": "כפתור עם מסגרת"
+          },
+          "options__3": {
+            "label": "כפתור מלא"
+          }
+        },
+        "enable_desktop_slider": {
+          "label": "הפעלת קרוסלה במחשב"
+        },
+        "full_width": {
+          "label": "הצגת מוצרים ברוחב מלא"
+        },
+        "header": {
+          "content": "כרטיס מוצר"
+        },
+        "image_ratio": {
+          "label": "יחס הממדים של התמונה",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "לאורך"
+          },
+          "options__3": {
+            "label": "ריבוע"
+          }
+        },
+        "show_secondary_image": {
+          "label": "הצגת תמונה שנייה במעבר עכבר"
+        },
+        "show_vendor": {
+          "label": "הצגת מותג"
+        },
+        "show_rating": {
+          "label": "הצגת דירוג המוצר",
+          "info": "כדי להציג דירוג, יש להוסיף אפליקציה לדירוג מוצרים. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/theme-structure/theme-features#featured-collection-show-product-rating)"
+        },
+        "enable_quick_buy": {
+          "label": "הפעלת כפתור הוספה מהירה",
+          "info": "מתאים במיוחד לסל קניות מסוג חלון קופץ או מגירת צד."
+        },
+        "header_mobile": {
+          "content": "פריסה בנייד"
+        },
+        "columns_mobile": {
+          "label": "מספר עמודות בנייד",
+          "options__1": {
+            "label": "עמודה אחת"
+          },
+          "options__2": {
+            "label": "שתי עמודות"
+          }
+        },
+        "swipe_on_mobile": {
+          "label": "הפעלת החלקה בנייד"
+        }
+      },
+      "presets": {
+        "name": "קטגוריה נבחרת"
+      }
+    },
+    "featured-product": {
+      "name": "מוצר נבחר",
+      "blocks": {
+        "text": {
+          "name": "טקסט",
+          "settings": {
+            "text": {
+              "default": "בלוק טקסט",
+              "label": "טקסט"
+            },
+            "text_style": {
+              "label": "סגנון הטקסט",
+              "options__1": {
+                "label": "טקסט רגיל"
+              },
+              "options__2": {
+                "label": "כותרת משנה"
+              },
+              "options__3": {
+                "label": "אותיות רישיות"
+              }
+            }
+          }
+        },
+        "title": {
+          "name": "כותרת"
+        },
+        "price": {
+          "name": "מחיר"
+        },
+        "quantity_selector": {
+          "name": "בורר כמות"
+        },
+        "variant_picker": {
+          "name": "בורר אפשרויות מוצר",
+          "settings": {
+            "picker_type": {
+              "label": "סגנון",
+              "options__1": {
+                "label": "תפריט נפתח"
+              },
+              "options__2": {
+                "label": "כפתורי בחירה"
+              }
+            },
+            "swatch_shape": {
+              "label": "דוגמית צבע או דוגמה",
+              "info": "מידע נוסף על [דוגמיות](https://help.shopify.com/en/manual/online-store/themes/theme-structure/theme-settings#options-with-swatches) באפשרויות מוצר",
+              "options__1": {
+                "label": "עיגול"
+              },
+              "options__2": {
+                "label": "ריבוע"
+              },
+              "options__3": {
+                "label": "ללא"
+              }
+            }
+          }
+        },
+        "buy_buttons": {
+          "name": "כפתורי רכישה",
+          "settings": {
+            "show_dynamic_checkout": {
+              "label": "הצגת כפתורי תשלום דינמיים",
+              "info": "לקוחות יראו את אמצעי התשלום המועדף עליהם, כמו PayPal או Apple Pay, בהתאם לאמצעי התשלום הזמינים בחנות. [למידע נוסף](https://help.shopify.com/manual/using-themes/change-the-layout/dynamic-checkout)"
+            }
+          }
+        },
+        "sku": {
+          "name": "מק״ט",
+          "settings": {
+            "text_style": {
+              "label": "סגנון הטקסט",
+              "options__1": {
+                "label": "טקסט רגיל"
+              },
+              "options__2": {
+                "label": "כותרת משנה"
+              },
+              "options__3": {
+                "label": "אותיות רישיות"
+              }
+            }
+          }
+        },
+        "description": {
+          "name": "תיאור"
+        },
+        "share": {
+          "name": "שיתוף",
+          "settings": {
+            "text": {
+              "label": "טקסט",
+              "default": "שיתוף"
+            },
+            "featured_image_info": {
+              "content": "בעת שיתוף קישור ברשתות חברתיות, התמונה הראשית של העמוד מוצגת כתמונת התצוגה המקדימה. [למידע נוסף](https://help.shopify.com/manual/online-store/images/showing-social-media-thumbnail-images)"
+            },
+            "title_info": {
+              "content": "שם החנות והתיאור שלה מוצגים לצד תמונת התצוגה המקדימה. [למידע נוסף](https://help.shopify.com/manual/promoting-marketing/seo/adding-keywords#set-a-title-and-description-for-your-online-store)"
+            }
+          }
+        },
+        "rating": {
+          "name": "דירוג המוצר",
+          "settings": {
+            "paragraph": {
+              "content": "כדי להציג דירוג, יש להוסיף אפליקציה לדירוג מוצרים. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/theme-structure/theme-features#featured-product-rating)"
+            }
+          }
+        }
+      },
+      "settings": {
+        "product": {
+          "label": "מוצר"
+        },
+        "secondary_background": {
+          "label": "הצגת רקע משני"
+        },
+        "header": {
+          "content": "מדיה",
+          "info": "מידע נוסף על [סוגי מדיה](https://help.shopify.com/manual/products/product-media)"
+        },
+        "media_position": {
+          "label": "מיקום המדיה במחשב",
+          "info": "המיקום מותאם אוטומטית למכשירים ניידים.",
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "ימין"
+          }
+        },
+        "hide_variants": {
+          "label": "הסתרת מדיה של אפשרויות מוצר שלא נבחרו במחשב"
+        },
+        "enable_video_looping": {
+          "label": "הפעלת ניגון חוזר של סרטונים"
+        }
+      },
+      "presets": {
+        "name": "מוצר נבחר"
+      }
+    },
+    "footer": {
+      "name": "תחתית האתר",
+      "blocks": {
+        "link_list": {
+          "name": "תפריט",
+          "settings": {
+            "heading": {
+              "label": "כותרת",
+              "default": "קישורים שימושיים"
+            },
+            "menu": {
+              "label": "תפריט",
+              "info": "מציג רק פריטי תפריט ברמה העליונה."
+            }
+          }
+        },
+        "brand_information": {
+          "name": "מידע על המותג",
+          "settings": {
+            "paragraph": {
+              "content": "בלוק זה מציג את המידע על המותג שלך. [עריכת מידע על המותג.](/editor?context=theme&category=brand%20information)"
+            },
+            "header__1": {
+              "content": "סמלי רשתות חברתיות"
+            },
+            "show_social": {
+              "label": "הצגת סמלי רשתות חברתיות",
+              "info": "כדי להציג את חשבונות הרשתות החברתיות שלך, יש להוסיף קישורים ב[הגדרות התבנית](/editor?context=theme&category=social%20media)."
+            }
+          }
+        },
+        "text": {
+          "name": "טקסט",
+          "settings": {
+            "heading": {
+              "label": "כותרת",
+              "default": "כותרת"
+            },
+            "subtext": {
+              "label": "טקסט משני",
+              "default": "<p>אפשר לשתף עם הלקוחות פרטי יצירת קשר, מידע על החנות ותוכן על המותג.</p>"
+            }
+          }
+        }
+      },
+      "settings": {
+        "newsletter_enable": {
+          "label": "הצגת הרשמה לעדכונים באימייל"
+        },
+        "newsletter_heading": {
+          "label": "כותרת",
+          "default": "הרשמה לעדכונים באימייל"
+        },
+        "header__1": {
+          "content": "הרשמה באימייל",
+          "info": "נרשמים מצורפים אוטומטית לרשימת הלקוחות שאישרו קבלת דיוור שיווקי. [למידע נוסף](https://help.shopify.com/manual/customers/manage-customers)"
+        },
+        "header__2": {
+          "content": "סמלי רשתות חברתיות",
+          "info": "כדי להציג את חשבונות הרשתות החברתיות שלך, יש להוסיף קישורים ב[הגדרות התבנית](/editor?context=theme&category=social%20media)."
+        },
+        "show_social": {
+          "label": "הצגת סמלי רשתות חברתיות"
+        },
+        "header__3": {
+          "content": "בורר מדינה או אזור"
+        },
+        "header__4": {
+          "info": "כדי להוסיף מדינה או אזור, יש לעבור ל[הגדרות השווקים.](/admin/settings/markets)"
+        },
+        "enable_country_selector": {
+          "label": "הפעלת בורר מדינה או אזור"
+        },
+        "header__5": {
+          "content": "בורר שפה"
+        },
+        "header__6": {
+          "info": "כדי להוסיף שפה, יש לעבור ל[הגדרות השפות.](/admin/settings/languages)"
+        },
+        "enable_language_selector": {
+          "label": "הפעלת בורר שפה"
+        },
+        "header__7": {
+          "content": "אמצעי תשלום"
+        },
+        "payment_enable": {
+          "label": "הצגת סמלי אמצעי תשלום"
+        },
+        "header__8": {
+          "content": "קישורים למדיניות החנות",
+          "info": "כדי להוסיף מדיניות לחנות, יש לעבור ל[הגדרות המדיניות](/admin/settings/legal)."
+        },
+        "show_policy": {
+          "label": "הצגת קישורים למדיניות החנות"
+        },
+        "margin_top": {
+          "label": "שוליים עליונים"
+        },
+        "header__9": {
+          "content": "מעקב ב־Shop",
+          "info": "כדי לאפשר ללקוחות לעקוב אחר החנות באפליקציית Shop דרך האתר, יש להפעיל את Shop Pay. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/customizing-themes/follow-on-shop)"
+        },
+        "enable_follow_on_shop": {
+          "label": "הפעלת מעקב ב־Shop"
+        }
+      }
+    },
+    "header": {
+      "name": "כותרת האתר",
+      "settings": {
+        "logo_help": {
+          "content": "ניתן לערוך את הלוגו ב[הגדרות התבנית](/editor?context=theme&category=logo)."
+        },
+        "logo_position": {
+          "label": "מיקום הלוגו במחשב",
+          "options__1": {
+            "label": "באמצע משמאל"
+          },
+          "options__2": {
+            "label": "למעלה משמאל"
+          },
+          "options__3": {
+            "label": "למעלה במרכז"
+          },
+          "options__4": {
+            "label": "באמצע במרכז"
+          }
+        },
+        "menu": {
+          "label": "תפריט"
+        },
+        "menu_type_desktop": {
+          "label": "סוג התפריט במחשב",
+          "info": "סוג התפריט מותאם אוטומטית למכשירים ניידים.",
+          "options__1": {
+            "label": "תפריט נפתח"
+          },
+          "options__2": {
+            "label": "תפריט מורחב"
+          },
+          "options__3": {
+            "label": "מגירת צד"
+          }
+        },
+        "show_line_separator": {
+          "label": "הצגת קו הפרדה"
+        },
+        "header__1": {
+          "content": "צבע"
+        },
+        "menu_color_scheme": {
+          "label": "ערכת הצבעים לתפריט"
+        },
+        "sticky_header_type": {
+          "label": "כותרת אתר קבועה",
+          "options__1": {
+            "label": "ללא"
+          },
+          "options__2": {
+            "label": "בעת גלילה למעלה"
+          },
+          "options__3": {
+            "label": "תמיד"
+          },
+          "options__4": {
+            "label": "תמיד, עם הקטנת הלוגו"
+          }
+        },
+        "header__3": {
+          "content": "בורר מדינה או אזור"
+        },
+        "header__4": {
+          "info": "כדי להוסיף מדינה או אזור, יש לעבור ל[הגדרות השווקים.](/admin/settings/markets)"
+        },
+        "enable_country_selector": {
+          "label": "הפעלת בורר מדינה או אזור"
+        },
+        "header__5": {
+          "content": "בורר שפה"
+        },
+        "header__6": {
+          "info": "כדי להוסיף שפה, יש לעבור ל[הגדרות השפות.](/admin/settings/languages)"
+        },
+        "enable_language_selector": {
+          "label": "הפעלת בורר שפה"
+        },
+        "margin_bottom": {
+          "label": "שוליים תחתונים"
+        },
+        "mobile_layout": {
+          "content": "פריסה בנייד"
+        },
+        "mobile_logo_position": {
+          "label": "מיקום הלוגו בנייד",
+          "options__1": {
+            "label": "מרכז"
+          },
+          "options__2": {
+            "label": "שמאל"
+          }
+        },
+        "header__7": {
+          "content": "כניסה לחשבון לקוח",
+          "info": "כדי לנהל חשבונות לקוחות, יש לעבור ל[הגדרות חשבונות הלקוחות](/admin/settings/customer_accounts)."
+        },
+        "enable_customer_avatar": {
+          "label": "הצגת תמונת פרופיל",
+          "info": "לקוחות יראו את תמונת הפרופיל שלהם רק כאשר הם מחוברים באמצעות Shop"
+        }
+      }
+    },
+    "image-banner": {
+      "name": "באנר תמונה",
+      "settings": {
+        "image": {
+          "label": "תמונה ראשונה"
+        },
+        "image_2": {
+          "label": "תמונה שנייה"
+        },
+        "image_overlay_opacity": {
+          "label": "אטימות שכבת הצבע מעל התמונה"
+        },
+        "image_height": {
+          "label": "גובה הבאנר",
+          "options__1": {
+            "label": "התאמה לתמונה הראשונה"
+          },
+          "options__2": {
+            "label": "קטן"
+          },
+          "options__3": {
+            "label": "בינוני"
+          },
+          "options__4": {
+            "label": "גדול"
+          },
+          "info": "לקבלת תוצאה מיטבית, מומלץ להשתמש בתמונה ביחס ממדים של 3:2. [למידע נוסף](https://help.shopify.com/manual/shopify-admin/productivity-tools/image-editor#understanding-image-aspect-ratio)"
+        },
+        "desktop_content_position": {
+          "options__1": {
+            "label": "למעלה משמאל"
+          },
+          "options__2": {
+            "label": "למעלה במרכז"
+          },
+          "options__3": {
+            "label": "למעלה מימין"
+          },
+          "options__4": {
+            "label": "באמצע משמאל"
+          },
+          "options__5": {
+            "label": "באמצע במרכז"
+          },
+          "options__6": {
+            "label": "באמצע מימין"
+          },
+          "options__7": {
+            "label": "למטה משמאל"
+          },
+          "options__8": {
+            "label": "למטה במרכז"
+          },
+          "options__9": {
+            "label": "למטה מימין"
+          },
+          "label": "מיקום התוכן במחשב"
+        },
+        "show_text_box": {
+          "label": "הצגת מכל תוכן במחשב"
+        },
+        "desktop_content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן במחשב"
+        },
+        "mobile": {
+          "content": "פריסה בנייד"
+        },
+        "mobile_content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן בנייד"
+        },
+        "stack_images_on_mobile": {
+          "label": "הצגת תמונות זו מתחת לזו בנייד"
+        },
+        "show_text_below": {
+          "label": "הצגת מכל תוכן בנייד"
+        }
+      },
+      "blocks": {
+        "heading": {
+          "name": "כותרת",
+          "settings": {
+            "heading": {
+              "label": "כותרת",
+              "default": "באנר תמונה"
+            }
+          }
+        },
+        "text": {
+          "name": "טקסט",
+          "settings": {
+            "text": {
+              "label": "תיאור",
+              "default": "אפשר להציג ללקוחות מידע על תמונות הבאנר או על תוכן התבנית."
+            },
+            "text_style": {
+              "options__1": {
+                "label": "טקסט רגיל"
+              },
+              "options__2": {
+                "label": "כותרת משנה"
+              },
+              "options__3": {
+                "label": "אותיות רישיות"
+              },
+              "label": "סגנון הטקסט"
+            }
+          }
+        },
+        "buttons": {
+          "name": "כפתורים",
+          "settings": {
+            "button_label_1": {
+              "label": "טקסט הכפתור הראשון",
+              "info": "השארת הטקסט ריק תסתיר את הכפתור.",
+              "default": "טקסט הכפתור"
+            },
+            "button_link_1": {
+              "label": "קישור הכפתור הראשון"
+            },
+            "button_style_secondary_1": {
+              "label": "שימוש בכפתור עם מסגרת"
+            },
+            "button_label_2": {
+              "label": "טקסט הכפתור השני",
+              "info": "השארת הטקסט ריק תסתיר את הכפתור.",
+              "default": "טקסט הכפתור"
+            },
+            "button_link_2": {
+              "label": "קישור הכפתור השני"
+            },
+            "button_style_secondary_2": {
+              "label": "שימוש בכפתור עם מסגרת"
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "באנר תמונה"
+      }
+    },
+    "image-with-text": {
+      "name": "תמונה עם טקסט",
+      "settings": {
+        "image": {
+          "label": "תמונה"
+        },
+        "height": {
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "קטן"
+          },
+          "options__3": {
+            "label": "בינוני"
+          },
+          "options__4": {
+            "label": "גדול"
+          },
+          "label": "גובה התמונה"
+        },
+        "desktop_image_width": {
+          "options__1": {
+            "label": "קטן"
+          },
+          "options__2": {
+            "label": "בינוני"
+          },
+          "options__3": {
+            "label": "גדול"
+          },
+          "label": "רוחב התמונה במחשב",
+          "info": "התמונה מותאמת אוטומטית למכשירים ניידים."
+        },
+        "layout": {
+          "options__1": {
+            "label": "תמונה תחילה"
+          },
+          "options__2": {
+            "label": "תמונה לאחר הטקסט"
+          },
+          "label": "מיקום התמונה במחשב",
+          "info": "הצגת התמונה תחילה היא פריסת ברירת המחדל בנייד."
+        },
+        "desktop_content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן במחשב"
+        },
+        "desktop_content_position": {
+          "options__1": {
+            "label": "למעלה"
+          },
+          "options__2": {
+            "label": "באמצע"
+          },
+          "options__3": {
+            "label": "למטה"
+          },
+          "label": "מיקום התוכן במחשב"
+        },
+        "content_layout": {
+          "options__1": {
+            "label": "ללא חפיפה"
+          },
+          "options__2": {
+            "label": "חפיפה"
+          },
+          "label": "פריסת התוכן"
+        },
+        "mobile_content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן בנייד"
+        }
+      },
+      "blocks": {
+        "heading": {
+          "name": "כותרת",
+          "settings": {
+            "heading": {
+              "label": "כותרת",
+              "default": "תמונה עם טקסט"
+            }
+          }
+        },
+        "caption": {
+          "name": "כיתוב",
+          "settings": {
+            "text": {
+              "label": "טקסט",
+              "default": "הוספת משפט קצר על המותג"
+            },
+            "text_style": {
+              "label": "סגנון הטקסט",
+              "options__1": {
+                "label": "כותרת משנה"
+              },
+              "options__2": {
+                "label": "אותיות רישיות"
+              }
+            },
+            "caption_size": {
+              "label": "גודל הטקסט",
+              "options__1": {
+                "label": "קטן"
+              },
+              "options__2": {
+                "label": "בינוני"
+              },
+              "options__3": {
+                "label": "גדול"
+              }
+            }
+          }
+        },
+        "text": {
+          "name": "טקסט",
+          "settings": {
+            "text": {
+              "label": "תוכן",
+              "default": "<p>אפשר לשלב טקסט עם תמונה כדי להציג מוצר, קטגוריה או כתבת בלוג נבחרים. ניתן להוסיף פרטים על זמינות וסגנון, או חוות דעת.</p>"
+            },
+            "text_style": {
+              "label": "סגנון הטקסט",
+              "options__1": {
+                "label": "טקסט רגיל"
+              },
+              "options__2": {
+                "label": "כותרת משנה"
+              }
+            }
+          }
+        },
+        "button": {
+          "name": "כפתור",
+          "settings": {
+            "button_label": {
+              "label": "טקסט הכפתור",
+              "info": "השארת הטקסט ריק תסתיר את הכפתור.",
+              "default": "טקסט הכפתור"
+            },
+            "button_link": {
+              "label": "קישור הכפתור"
+            },
+            "outline_button": {
+              "label": "שימוש בכפתור עם מסגרת"
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "תמונה עם טקסט"
+      }
+    },
+    "multirow": {
+      "name": "מספר שורות",
+      "settings": {
+        "image": {
+          "label": "תמונה"
+        },
+        "image_height": {
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "קטן"
+          },
+          "options__3": {
+            "label": "בינוני"
+          },
+          "options__4": {
+            "label": "גדול"
+          },
+          "label": "גובה התמונה"
+        },
+        "desktop_image_width": {
+          "options__1": {
+            "label": "קטן"
+          },
+          "options__2": {
+            "label": "בינוני"
+          },
+          "options__3": {
+            "label": "גדול"
+          },
+          "label": "רוחב התמונה במחשב",
+          "info": "התמונה מותאמת אוטומטית למכשירים ניידים."
+        },
+        "text_style": {
+          "options__1": {
+            "label": "טקסט רגיל"
+          },
+          "options__2": {
+            "label": "כותרת משנה"
+          },
+          "label": "סגנון הטקסט"
+        },
+        "button_style": {
+          "options__1": {
+            "label": "כפתור מלא"
+          },
+          "options__2": {
+            "label": "כפתור עם מסגרת"
+          },
+          "label": "סגנון הכפתור"
+        },
+        "desktop_content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן במחשב"
+        },
+        "desktop_content_position": {
+          "options__1": {
+            "label": "למעלה"
+          },
+          "options__2": {
+            "label": "באמצע"
+          },
+          "options__3": {
+            "label": "למטה"
+          },
+          "label": "מיקום התוכן במחשב",
+          "info": "המיקום מותאם אוטומטית למכשירים ניידים."
+        },
+        "image_layout": {
+          "options__1": {
+            "label": "לסירוגין, החל משמאל"
+          },
+          "options__2": {
+            "label": "לסירוגין, החל מימין"
+          },
+          "options__3": {
+            "label": "מיושר לשמאל"
+          },
+          "options__4": {
+            "label": "מיושר לימין"
+          },
+          "label": "מיקום התמונה במחשב",
+          "info": "המיקום מותאם אוטומטית למכשירים ניידים."
+        },
+        "container_color_scheme": {
+          "label": "ערכת הצבעים למכל התוכן"
+        },
+        "mobile_content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן בנייד"
+        },
+        "header_mobile": {
+          "content": "פריסה בנייד"
+        }
+      },
+      "blocks": {
+        "row": {
+          "name": "שורה",
+          "settings": {
+            "image": {
+              "label": "תמונה"
+            },
+            "caption": {
+              "label": "כיתוב",
+              "default": "כיתוב"
+            },
+            "heading": {
+              "label": "כותרת",
+              "default": "שורה"
+            },
+            "text": {
+              "label": "טקסט",
+              "default": "<p>אפשר לשלב טקסט עם תמונה כדי להציג מוצר, קטגוריה או כתבת בלוג נבחרים. ניתן להוסיף פרטים על זמינות וסגנון, או חוות דעת.</p>"
+            },
+            "button_label": {
+              "label": "טקסט הכפתור",
+              "default": "טקסט הכפתור"
+            },
+            "button_link": {
+              "label": "קישור הכפתור"
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "מספר שורות"
+      }
+    },
+    "main-article": {
+      "name": "כתבת בלוג",
+      "blocks": {
+        "featured_image": {
+          "name": "תמונה ראשית",
+          "settings": {
+            "image_height": {
+              "label": "גובה התמונה הראשית",
+              "options__1": {
+                "label": "התאמה לתמונה"
+              },
+              "options__2": {
+                "label": "קטן"
+              },
+              "options__3": {
+                "label": "בינוני"
+              },
+              "options__4": {
+                "label": "גדול"
+              },
+              "info": "לקבלת תוצאה מיטבית, מומלץ להשתמש בתמונה ביחס ממדים של 16:9. [למידע נוסף](https://help.shopify.com/manual/shopify-admin/productivity-tools/image-editor#understanding-image-aspect-ratio)"
+            }
+          }
+        },
+        "title": {
+          "name": "כותרת",
+          "settings": {
+            "blog_show_date": {
+              "label": "הצגת תאריך"
+            },
+            "blog_show_author": {
+              "label": "הצגת מחבר"
+            }
+          }
+        },
+        "content": {
+          "name": "תוכן"
+        },
+        "share": {
+          "name": "שיתוף",
+          "settings": {
+            "text": {
+              "label": "טקסט",
+              "default": "שיתוף"
+            },
+            "featured_image_info": {
+              "content": "בעת שיתוף קישור ברשתות חברתיות, התמונה הראשית של העמוד מוצגת כתמונת התצוגה המקדימה. [למידע נוסף](https://help.shopify.com/manual/online-store/images/showing-social-media-thumbnail-images)."
+            },
+            "title_info": {
+              "content": "שם החנות והתיאור שלה מוצגים לצד תמונת התצוגה המקדימה. [למידע נוסף](https://help.shopify.com/manual/promoting-marketing/seo/adding-keywords#set-a-title-and-description-for-your-online-store)."
+            }
+          }
+        }
+      }
+    },
+    "main-blog": {
+      "name": "כתבות בלוג",
+      "settings": {
+        "header": {
+          "content": "כרטיס כתבת בלוג"
+        },
+        "show_image": {
+          "label": "הצגת תמונה ראשית"
+        },
+        "show_date": {
+          "label": "הצגת תאריך"
+        },
+        "show_author": {
+          "label": "הצגת מחבר"
+        },
+        "paragraph": {
+          "content": "ניתן לשנות תקצירים באמצעות עריכת כתבות הבלוג. [למידע נוסף](https://help.shopify.com/manual/online-store/blogs/writing-blogs#display-an-excerpt-from-a-blog-post)"
+        },
+        "layout": {
+          "label": "פריסה במחשב",
+          "options__1": {
+            "label": "רשת"
+          },
+          "options__2": {
+            "label": "קולאז׳"
+          },
+          "info": "הכתבות מוצגות זו מתחת לזו בנייד."
+        },
+        "image_height": {
+          "label": "גובה התמונה הראשית",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "קטן"
+          },
+          "options__3": {
+            "label": "בינוני"
+          },
+          "options__4": {
+            "label": "גדול"
+          },
+          "info": "לקבלת תוצאה מיטבית, מומלץ להשתמש בתמונה ביחס ממדים של 3:2. [למידע נוסף](https://help.shopify.com/manual/shopify-admin/productivity-tools/image-editor#understanding-image-aspect-ratio)"
+        }
+      }
+    },
+    "main-cart-footer": {
+      "name": "סכום ביניים",
+      "blocks": {
+        "subtotal": {
+          "name": "מחיר סכום הביניים"
+        },
+        "buttons": {
+          "name": "כפתור מעבר לתשלום"
+        }
+      }
+    },
+    "main-cart-items": {
+      "name": "פריטים"
+    },
+    "main-collection-banner": {
+      "name": "באנר קטגוריה",
+      "settings": {
+        "paragraph": {
+          "content": "ניתן להוסיף תיאור או תמונה באמצעות עריכת הקטגוריה. [למידע נוסף](https://help.shopify.com/manual/products/collections/collection-layout)"
+        },
+        "show_collection_description": {
+          "label": "הצגת תיאור הקטגוריה"
+        },
+        "show_collection_image": {
+          "label": "הצגת תמונת הקטגוריה",
+          "info": "לקבלת תוצאה מיטבית, מומלץ להשתמש בתמונה ביחס ממדים של 16:9. [למידע נוסף](https://help.shopify.com/manual/shopify-admin/productivity-tools/image-editor#understanding-image-aspect-ratio)"
+        }
+      }
+    },
+    "main-collection-product-grid": {
+      "name": "רשת מוצרים",
+      "settings": {
+        "products_per_page": {
+          "label": "מוצרים לעמוד"
+        },
+        "columns_desktop": {
+          "label": "מספר עמודות במחשב"
+        },
+        "enable_filtering": {
+          "label": "הפעלת סינון",
+          "info": "ניתן להתאים את המסננים באמצעות אפליקציית Search & Discovery. [למידע נוסף](https://help.shopify.com/manual/online-store/search-and-discovery/filters)"
+        },
+        "filter_type": {
+          "label": "פריסת המסננים במחשב",
+          "options__1": {
+            "label": "אופקית"
+          },
+          "options__2": {
+            "label": "אנכית"
+          },
+          "options__3": {
+            "label": "מגירת צד"
+          },
+          "info": "מגירת צד היא פריסת ברירת המחדל בנייד."
+        },
+        "enable_sorting": {
+          "label": "הפעלת מיון"
+        },
+        "image_ratio": {
+          "label": "יחס הממדים של התמונה",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "לאורך"
+          },
+          "options__3": {
+            "label": "ריבוע"
+          }
+        },
+        "show_secondary_image": {
+          "label": "הצגת תמונה שנייה במעבר עכבר"
+        },
+        "show_vendor": {
+          "label": "הצגת מותג"
+        },
+        "show_rating": {
+          "label": "הצגת דירוג המוצר",
+          "info": "כדי להציג דירוג, יש להוסיף אפליקציה לדירוג מוצרים. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/theme-structure/page-types#product-grid-section-settings)"
+        },
+        "header__1": {
+          "content": "סינון ומיון"
+        },
+        "header__3": {
+          "content": "כרטיס מוצר"
+        },
+        "enable_tags": {
+          "label": "הפעלת סינון",
+          "info": "ניתן להתאים את המסננים באמצעות אפליקציית Search & Discovery. [למידע נוסף](https://help.shopify.com/manual/online-store/search-and-discovery/filters)"
+        },
+        "quick_add": {
+          "label": "הוספה מהירה",
+          "info": "הוספה בכמויות מותאמת למוצרים שנרכשים בכמויות גדולות.",
+          "options": {
+            "option_1": "ללא",
+            "option_2": "רגיל",
+            "option_3": "הוספה בכמויות"
+          }
+        },
+        "header_mobile": {
+          "content": "פריסה בנייד"
+        },
+        "columns_mobile": {
+          "label": "מספר עמודות בנייד",
+          "options__1": {
+            "label": "עמודה אחת"
+          },
+          "options__2": {
+            "label": "שתי עמודות"
+          }
+        }
+      }
+    },
+    "main-list-collections": {
+      "name": "עמוד רשימת קטגוריות",
+      "settings": {
+        "title": {
+          "label": "כותרת",
+          "default": "קטגוריות"
+        },
+        "sort": {
+          "label": "מיון קטגוריות לפי:",
+          "options__1": {
+            "label": "לפי סדר אלפביתי, א–ת"
+          },
+          "options__2": {
+            "label": "לפי סדר אלפביתי, ת–א"
+          },
+          "options__3": {
+            "label": "תאריך: מהחדש לישן"
+          },
+          "options__4": {
+            "label": "תאריך: מהישן לחדש"
+          },
+          "options__5": {
+            "label": "מספר מוצרים: מהגבוה לנמוך"
+          },
+          "options__6": {
+            "label": "מספר מוצרים: מהנמוך לגבוה"
+          }
+        },
+        "image_ratio": {
+          "label": "יחס הממדים של התמונה",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "לאורך"
+          },
+          "options__3": {
+            "label": "ריבוע"
+          },
+          "info": "ניתן להוסיף תמונות באמצעות עריכת הקטגוריות. [למידע נוסף](https://help.shopify.com/manual/products/collections)"
+        },
+        "columns_desktop": {
+          "label": "מספר עמודות במחשב"
+        },
+        "header_mobile": {
+          "content": "פריסה בנייד"
+        },
+        "columns_mobile": {
+          "label": "מספר עמודות בנייד",
+          "options__1": {
+            "label": "עמודה אחת"
+          },
+          "options__2": {
+            "label": "שתי עמודות"
+          }
+        }
+      }
+    },
+    "main-page": {
+      "name": "עמוד"
+    },
+    "main-product": {
+      "name": "פרטי המוצר",
+      "blocks": {
+        "text": {
+          "name": "טקסט",
+          "settings": {
+            "text": {
+              "label": "טקסט",
+              "default": "בלוק טקסט"
+            },
+            "text_style": {
+              "label": "סגנון הטקסט",
+              "options__1": {
+                "label": "טקסט רגיל"
+              },
+              "options__2": {
+                "label": "כותרת משנה"
+              },
+              "options__3": {
+                "label": "אותיות רישיות"
+              }
+            }
+          }
+        },
+        "title": {
+          "name": "כותרת"
+        },
+        "price": {
+          "name": "מחיר"
+        },
+        "inventory": {
+          "name": "מצב המלאי",
+          "settings": {
+            "text_style": {
+              "label": "סגנון הטקסט",
+              "options__1": {
+                "label": "טקסט רגיל"
+              },
+              "options__2": {
+                "label": "כותרת משנה"
+              },
+              "options__3": {
+                "label": "אותיות רישיות"
+              }
+            },
+            "inventory_threshold": {
+              "label": "סף מלאי נמוך",
+              "info": "יש לבחור 0 כדי להציג תמיד ״במלאי״ כשהמוצר זמין."
+            },
+            "show_inventory_quantity": {
+              "label": "הצגת כמות במלאי"
+            }
+          }
+        },
+        "quantity_selector": {
+          "name": "בורר כמות"
+        },
+        "variant_picker": {
+          "name": "בורר אפשרויות מוצר",
+          "settings": {
+            "picker_type": {
+              "label": "סגנון",
+              "options__1": {
+                "label": "תפריט נפתח"
+              },
+              "options__2": {
+                "label": "כפתורי בחירה"
+              }
+            },
+            "swatch_shape": {
+              "label": "דוגמית צבע או דוגמה",
+              "info": "מידע נוסף על [דוגמיות](https://help.shopify.com/en/manual/online-store/themes/theme-structure/theme-settings#options-with-swatches) באפשרויות מוצר",
+              "options__1": {
+                "label": "עיגול"
+              },
+              "options__2": {
+                "label": "ריבוע"
+              },
+              "options__3": {
+                "label": "ללא"
+              }
+            }
+          }
+        },
+        "buy_buttons": {
+          "name": "כפתורי רכישה",
+          "settings": {
+            "show_dynamic_checkout": {
+              "label": "הצגת כפתורי תשלום דינמיים",
+              "info": "לקוחות יראו את אמצעי התשלום המועדף עליהם, כמו PayPal או Apple Pay, בהתאם לאמצעי התשלום הזמינים בחנות. [למידע נוסף](https://help.shopify.com/manual/using-themes/change-the-layout/dynamic-checkout)"
+            },
+            "show_gift_card_recipient": {
+              "label": "הצגת טופס פרטי מקבל המתנה בכרטיסי מתנה",
+              "info": "מאפשר לרוכשים לשלוח כרטיסי מתנה בתאריך שנקבע מראש, עם ברכה אישית. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/customizing-themes/add-gift-card-recipient-fields)"
+            }
+          }
+        },
+        "pickup_availability": {
+          "name": "זמינות לאיסוף עצמי"
+        },
+        "description": {
+          "name": "תיאור"
+        },
+        "sku": {
+          "name": "מק״ט",
+          "settings": {
+            "text_style": {
+              "label": "סגנון הטקסט",
+              "options__1": {
+                "label": "טקסט רגיל"
+              },
+              "options__2": {
+                "label": "כותרת משנה"
+              },
+              "options__3": {
+                "label": "אותיות רישיות"
+              }
+            }
+          }
+        },
+        "share": {
+          "name": "שיתוף",
+          "settings": {
+            "text": {
+              "label": "טקסט",
+              "default": "שיתוף"
+            },
+            "featured_image_info": {
+              "content": "בעת שיתוף קישור ברשתות חברתיות, התמונה הראשית של העמוד מוצגת כתמונת התצוגה המקדימה. [למידע נוסף](https://help.shopify.com/manual/online-store/images/showing-social-media-thumbnail-images)."
+            },
+            "title_info": {
+              "content": "שם החנות והתיאור שלה מוצגים לצד תמונת התצוגה המקדימה. [למידע נוסף](https://help.shopify.com/manual/promoting-marketing/seo/adding-keywords#set-a-title-and-description-for-your-online-store)."
+            }
+          }
+        },
+        "collapsible_tab": {
+          "name": "שורה מתקפלת",
+          "settings": {
+            "heading": {
+              "info": "יש להוסיף כותרת שמסבירה את התוכן.",
+              "label": "כותרת",
+              "default": "שורה מתקפלת"
+            },
+            "content": {
+              "label": "תוכן השורה"
+            },
+            "page": {
+              "label": "תוכן השורה מתוך עמוד"
+            },
+            "icon": {
+              "label": "סמל",
+              "options__1": {
+                "label": "ללא"
+              },
+              "options__2": {
+                "label": "תפוח"
+              },
+              "options__3": {
+                "label": "בננה"
+              },
+              "options__4": {
+                "label": "בקבוק"
+              },
+              "options__5": {
+                "label": "קופסה"
+              },
+              "options__6": {
+                "label": "גזר"
+              },
+              "options__7": {
+                "label": "בועת שיחה"
+              },
+              "options__8": {
+                "label": "סימן אישור"
+              },
+              "options__9": {
+                "label": "לוח כתיבה"
+              },
+              "options__10": {
+                "label": "מוצרי חלב"
+              },
+              "options__11": {
+                "label": "ללא מוצרי חלב"
+              },
+              "options__12": {
+                "label": "מייבש כביסה"
+              },
+              "options__13": {
+                "label": "עין"
+              },
+              "options__14": {
+                "label": "אש"
+              },
+              "options__15": {
+                "label": "ללא גלוטן"
+              },
+              "options__16": {
+                "label": "לב"
+              },
+              "options__17": {
+                "label": "מגהץ"
+              },
+              "options__18": {
+                "label": "עלה"
+              },
+              "options__19": {
+                "label": "עור"
+              },
+              "options__20": {
+                "label": "ברק"
+              },
+              "options__21": {
+                "label": "שפתון"
+              },
+              "options__22": {
+                "label": "מנעול"
+              },
+              "options__23": {
+                "label": "סיכת מיקום במפה"
+              },
+              "options__24": {
+                "label": "ללא אגוזים"
+              },
+              "options__25": {
+                "label": "מכנסיים"
+              },
+              "options__26": {
+                "label": "טביעת כף רגל"
+              },
+              "options__27": {
+                "label": "פלפל"
+              },
+              "options__28": {
+                "label": "בושם"
+              },
+              "options__29": {
+                "label": "מטוס"
+              },
+              "options__30": {
+                "label": "צמח"
+              },
+              "options__31": {
+                "label": "תג מחיר"
+              },
+              "options__32": {
+                "label": "סימן שאלה"
+              },
+              "options__33": {
+                "label": "מיחזור"
+              },
+              "options__34": {
+                "label": "החזרה"
+              },
+              "options__35": {
+                "label": "סרגל"
+              },
+              "options__36": {
+                "label": "כלי הגשה"
+              },
+              "options__37": {
+                "label": "חולצה"
+              },
+              "options__38": {
+                "label": "נעל"
+              },
+              "options__39": {
+                "label": "צללית"
+              },
+              "options__40": {
+                "label": "פתית שלג"
+              },
+              "options__41": {
+                "label": "כוכב"
+              },
+              "options__42": {
+                "label": "שעון עצר"
+              },
+              "options__43": {
+                "label": "משאית"
+              },
+              "options__44": {
+                "label": "כביסה"
+              }
+            }
+          }
+        },
+        "popup": {
+          "name": "חלון קופץ",
+          "settings": {
+            "link_label": {
+              "label": "טקסט הקישור",
+              "default": "טקסט הקישור לחלון הקופץ"
+            },
+            "page": {
+              "label": "עמוד"
+            }
+          }
+        },
+        "rating": {
+          "name": "דירוג המוצר",
+          "settings": {
+            "paragraph": {
+              "content": "כדי להציג דירוג, יש להוסיף אפליקציה לדירוג מוצרים. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/theme-structure/page-types#product-rating-block)"
+            }
+          }
+        },
+        "complementary_products": {
+          "name": "מוצרים משלימים",
+          "settings": {
+            "paragraph": {
+              "content": "כדי לבחור מוצרים משלימים, יש להוסיף את אפליקציית Search & Discovery. [למידע נוסף](https://help.shopify.com/manual/online-store/search-and-discovery/product-recommendations)"
+            },
+            "heading": {
+              "label": "כותרת",
+              "default": "משתלב נהדר עם"
+            },
+            "make_collapsible_row": {
+              "label": "הצגה כשורה מתקפלת"
+            },
+            "icon": {
+              "info": "מוצג כאשר השורה המתקפלת מוצגת."
+            },
+            "product_list_limit": {
+              "label": "מספר מוצרים מרבי להצגה"
+            },
+            "products_per_page": {
+              "label": "מספר מוצרים לעמוד"
+            },
+            "pagination_style": {
+              "label": "סגנון הניווט בין עמודים",
+              "options": {
+                "option_1": "נקודות",
+                "option_2": "מונה",
+                "option_3": "מספרים"
+              }
+            },
+            "product_card": {
+              "heading": "כרטיס מוצר"
+            },
+            "image_ratio": {
+              "label": "יחס הממדים של התמונה",
+              "options": {
+                "option_1": "לאורך",
+                "option_2": "ריבוע"
+              }
+            },
+            "enable_quick_add": {
+              "label": "הפעלת כפתור הוספה מהירה"
+            }
+          }
+        },
+        "icon_with_text": {
+          "name": "סמל עם טקסט",
+          "settings": {
+            "layout": {
+              "label": "פריסה",
+              "options__1": {
+                "label": "אופקית"
+              },
+              "options__2": {
+                "label": "אנכית"
+              }
+            },
+            "content": {
+              "label": "תוכן",
+              "info": "ניתן לבחור סמל או להוסיף תמונה לכל עמודה או שורה."
+            },
+            "heading": {
+              "info": "השארת הכותרת ריקה תסתיר את עמודת הסמל."
+            },
+            "icon_1": {
+              "label": "סמל ראשון"
+            },
+            "image_1": {
+              "label": "תמונה ראשונה"
+            },
+            "heading_1": {
+              "label": "כותרת ראשונה",
+              "default": "כותרת"
+            },
+            "icon_2": {
+              "label": "סמל שני"
+            },
+            "image_2": {
+              "label": "תמונה שנייה"
+            },
+            "heading_2": {
+              "label": "כותרת שנייה",
+              "default": "כותרת"
+            },
+            "icon_3": {
+              "label": "סמל שלישי"
+            },
+            "image_3": {
+              "label": "תמונה שלישית"
+            },
+            "heading_3": {
+              "label": "כותרת שלישית",
+              "default": "כותרת"
+            }
+          }
+        }
+      },
+      "settings": {
+        "header": {
+          "content": "מדיה",
+          "info": "מידע נוסף על [סוגי מדיה.](https://help.shopify.com/manual/products/product-media)"
+        },
+        "enable_sticky_info": {
+          "label": "הפעלת תוכן קבוע במחשב"
+        },
+        "gallery_layout": {
+          "label": "פריסה במחשב",
+          "options__1": {
+            "label": "זו מתחת לזו"
+          },
+          "options__2": {
+            "label": "שתי עמודות"
+          },
+          "options__3": {
+            "label": "תמונות ממוזערות"
+          },
+          "options__4": {
+            "label": "קרוסלת תמונות ממוזערות"
+          }
+        },
+        "constrain_to_viewport": {
+          "label": "הגבלת גובה המדיה לגובה המסך"
+        },
+        "media_size": {
+          "label": "רוחב המדיה במחשב",
+          "info": "המדיה מותאמת אוטומטית למכשירים ניידים.",
+          "options__1": {
+            "label": "קטן"
+          },
+          "options__2": {
+            "label": "בינוני"
+          },
+          "options__3": {
+            "label": "גדול"
+          }
+        },
+        "image_zoom": {
+          "label": "הגדלת תמונה",
+          "info": "לחיצה ומעבר עכבר פותחים כברירת מחדל את התמונה בחלון תצוגה בנייד.",
+          "options__1": {
+            "label": "פתיחה בחלון תצוגת תמונה"
+          },
+          "options__2": {
+            "label": "לחיצה ומעבר עכבר"
+          },
+          "options__3": {
+            "label": "ללא הגדלה"
+          }
+        },
+        "media_position": {
+          "label": "מיקום המדיה במחשב",
+          "info": "המיקום מותאם אוטומטית למכשירים ניידים.",
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "ימין"
+          }
+        },
+        "media_fit": {
+          "label": "התאמת המדיה",
+          "options__1": {
+            "label": "מקורית"
+          },
+          "options__2": {
+            "label": "מילוי"
+          }
+        },
+        "mobile_thumbnails": {
+          "label": "פריסה בנייד",
+          "options__1": {
+            "label": "שתי עמודות"
+          },
+          "options__2": {
+            "label": "הצגת תמונות ממוזערות"
+          },
+          "options__3": {
+            "label": "הסתרת תמונות ממוזערות"
+          }
+        },
+        "hide_variants": {
+          "label": "הסתרת מדיה של אפשרויות מוצר אחרות לאחר בחירת אפשרות"
+        },
+        "enable_video_looping": {
+          "label": "הפעלת ניגון חוזר של סרטונים"
+        }
+      }
+    },
+    "main-search": {
+      "name": "תוצאות חיפוש",
+      "settings": {
+        "columns_desktop": {
+          "label": "מספר עמודות במחשב"
+        },
+        "image_ratio": {
+          "label": "יחס הממדים של התמונה",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "לאורך"
+          },
+          "options__3": {
+            "label": "ריבוע"
+          }
+        },
+        "show_secondary_image": {
+          "label": "הצגת תמונה שנייה במעבר עכבר"
+        },
+        "show_vendor": {
+          "label": "הצגת מותג"
+        },
+        "show_rating": {
+          "label": "הצגת דירוג המוצר",
+          "info": "כדי להציג דירוג, יש להוסיף אפליקציה לדירוג מוצרים. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/theme-structure/page-types#search-results-section-settings)"
+        },
+        "header__1": {
+          "content": "כרטיס מוצר"
+        },
+        "header__2": {
+          "content": "כרטיס בלוג",
+          "info": "סגנונות כרטיסי הבלוג חלים גם על כרטיסי עמודים בתוצאות החיפוש. כדי לשנות את סגנונות הכרטיסים, יש לעדכן את הגדרות התבנית."
+        },
+        "article_show_date": {
+          "label": "הצגת תאריך"
+        },
+        "article_show_author": {
+          "label": "הצגת מחבר"
+        },
+        "header_mobile": {
+          "content": "פריסה בנייד"
+        },
+        "columns_mobile": {
+          "label": "מספר עמודות בנייד",
+          "options__1": {
+            "label": "עמודה אחת"
+          },
+          "options__2": {
+            "label": "שתי עמודות"
+          }
+        }
+      }
+    },
+    "multicolumn": {
+      "name": "מספר עמודות",
+      "settings": {
+        "title": {
+          "label": "כותרת",
+          "default": "מספר עמודות"
+        },
+        "image_width": {
+          "label": "רוחב התמונה",
+          "options__1": {
+            "label": "שליש מרוחב העמודה"
+          },
+          "options__2": {
+            "label": "מחצית מרוחב העמודה"
+          },
+          "options__3": {
+            "label": "הרוחב המלא של העמודה"
+          }
+        },
+        "image_ratio": {
+          "label": "יחס הממדים של התמונה",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "לאורך"
+          },
+          "options__3": {
+            "label": "ריבוע"
+          },
+          "options__4": {
+            "label": "עיגול"
+          }
+        },
+        "columns_desktop": {
+          "label": "מספר עמודות במחשב"
+        },
+        "column_alignment": {
+          "label": "יישור העמודות",
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          }
+        },
+        "background_style": {
+          "label": "רקע משני",
+          "options__1": {
+            "label": "ללא"
+          },
+          "options__2": {
+            "label": "הצגה כרקע העמודה"
+          }
+        },
+        "button_label": {
+          "label": "טקסט הכפתור",
+          "default": "טקסט הכפתור"
+        },
+        "button_link": {
+          "label": "קישור הכפתור"
+        },
+        "header_mobile": {
+          "content": "פריסה בנייד"
+        },
+        "columns_mobile": {
+          "label": "מספר עמודות בנייד",
+          "options__1": {
+            "label": "עמודה אחת"
+          },
+          "options__2": {
+            "label": "שתי עמודות"
+          }
+        },
+        "swipe_on_mobile": {
+          "label": "הפעלת החלקה בנייד"
+        }
+      },
+      "blocks": {
+        "column": {
+          "name": "עמודה",
+          "settings": {
+            "image": {
+              "label": "תמונה"
+            },
+            "title": {
+              "label": "כותרת",
+              "default": "עמודה"
+            },
+            "text": {
+              "label": "תיאור",
+              "default": "<p>אפשר לשלב טקסט עם תמונה כדי להציג מוצר, קטגוריה או כתבת בלוג נבחרים. ניתן להוסיף פרטים על זמינות וסגנון, או חוות דעת.</p>"
+            },
+            "link_label": {
+              "label": "טקסט הקישור"
+            },
+            "link": {
+              "label": "קישור"
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "מספר עמודות"
+      }
+    },
+    "newsletter": {
+      "name": "הרשמה באימייל",
+      "settings": {
+        "full_width": {
+          "label": "הצגת המקטע ברוחב מלא"
+        },
+        "paragraph": {
+          "content": "כל הרשמה באימייל יוצרת חשבון לקוח. [למידע נוסף](https://help.shopify.com/manual/customers)"
+        }
+      },
+      "blocks": {
+        "heading": {
+          "name": "כותרת",
+          "settings": {
+            "heading": {
+              "label": "כותרת",
+              "default": "הרשמה לעדכונים באימייל"
+            }
+          }
+        },
+        "paragraph": {
+          "name": "כותרת משנה",
+          "settings": {
+            "paragraph": {
+              "label": "תיאור",
+              "default": "<p>אפשר להירשם כדי להתעדכן לפני כולם בקטגוריות חדשות ובמבצעים בלעדיים.</p>"
+            }
+          }
+        },
+        "email_form": {
+          "name": "טופס אימייל"
+        }
+      },
+      "presets": {
+        "name": "הרשמה באימייל"
+      }
+    },
+    "page": {
+      "name": "עמוד",
+      "settings": {
+        "page": {
+          "label": "עמוד"
+        }
+      },
+      "presets": {
+        "name": "עמוד"
+      }
+    },
+    "quick-order-list": {
+      "name": "רשימת הזמנה מהירה",
+      "settings": {
+        "show_image": {
+          "label": "הצגת תמונות"
+        },
+        "show_sku": {
+          "label": "הצגת מק״טים"
+        }
+      },
+      "presets": {
+        "name": "רשימת הזמנה מהירה"
+      }
+    },
+    "rich-text": {
+      "name": "טקסט עשיר",
+      "settings": {
+        "desktop_content_position": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "מיקום התוכן במחשב",
+          "info": "המיקום מותאם אוטומטית למכשירים ניידים."
+        },
+        "content_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור התוכן"
+        },
+        "full_width": {
+          "label": "הצגת המקטע ברוחב מלא"
+        }
+      },
+      "blocks": {
+        "heading": {
+          "name": "כותרת",
+          "settings": {
+            "heading": {
+              "label": "כותרת",
+              "default": "מידע על המותג שלך"
+            }
+          }
+        },
+        "caption": {
+          "name": "כיתוב",
+          "settings": {
+            "text": {
+              "label": "טקסט",
+              "default": "הוספת משפט קצר על המותג"
+            },
+            "text_style": {
+              "label": "סגנון הטקסט",
+              "options__1": {
+                "label": "כותרת משנה"
+              },
+              "options__2": {
+                "label": "אותיות רישיות"
+              }
+            },
+            "caption_size": {
+              "label": "גודל הטקסט",
+              "options__1": {
+                "label": "קטן"
+              },
+              "options__2": {
+                "label": "בינוני"
+              },
+              "options__3": {
+                "label": "גדול"
+              }
+            }
+          }
+        },
+        "text": {
+          "name": "טקסט",
+          "settings": {
+            "text": {
+              "label": "תיאור",
+              "default": "<p>אפשר לשתף עם הלקוחות מידע על המותג, לתאר מוצר, לפרסם הודעות או לברך אותם בבואם לחנות.</p>"
+            }
+          }
+        },
+        "buttons": {
+          "name": "כפתורים",
+          "settings": {
+            "button_label_1": {
+              "label": "טקסט הכפתור הראשון",
+              "info": "השארת הטקסט ריק תסתיר את הכפתור.",
+              "default": "טקסט הכפתור"
+            },
+            "button_link_1": {
+              "label": "קישור הכפתור הראשון"
+            },
+            "button_style_secondary_1": {
+              "label": "שימוש בכפתור עם מסגרת"
+            },
+            "button_label_2": {
+              "label": "טקסט הכפתור השני",
+              "info": "השארת הטקסט ריק תסתיר את הכפתור."
+            },
+            "button_link_2": {
+              "label": "קישור הכפתור השני"
+            },
+            "button_style_secondary_2": {
+              "label": "שימוש בכפתור עם מסגרת"
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "טקסט עשיר"
+      }
+    },
+    "video": {
+      "name": "סרטון",
+      "settings": {
+        "heading": {
+          "label": "כותרת",
+          "default": "סרטון"
+        },
+        "cover_image": {
+          "label": "תמונת שער"
+        },
+        "video": {
+          "label": "סרטון"
+        },
+        "enable_video_looping": {
+          "label": "ניגון הסרטון בלולאה"
+        },
+        "header__1": {
+          "content": "סרטון שמאוחסן ב־Shopify"
+        },
+        "header__2": {
+          "content": "או הטמעת סרטון באמצעות קישור"
+        },
+        "header__3": {
+          "content": "סגנון"
+        },
+        "paragraph": {
+          "content": "מוצג כאשר לא נבחר סרטון שמאוחסן ב־Shopify."
+        },
+        "video_url": {
+          "label": "כתובת URL",
+          "info": "יש להשתמש בקישור מיוטיוב או מווימאו"
+        },
+        "description": {
+          "label": "טקסט חלופי לסרטון",
+          "info": "תיאור הסרטון עבור לקוחות שמשתמשים בקוראי מסך. [למידע נוסף](https://help.shopify.com/manual/online-store/themes/theme-structure/theme-features#video)"
+        },
+        "image_padding": {
+          "label": "הוספת ריווח סביב התמונה",
+          "info": "כדאי להוסיף ריווח אם אין ברצונך שתמונת השער תיחתך."
+        },
+        "full_width": {
+          "label": "הצגת המקטע ברוחב מלא"
+        }
+      },
+      "presets": {
+        "name": "סרטון"
+      }
+    },
+    "slideshow": {
+      "name": "מצגת",
+      "settings": {
+        "layout": {
+          "label": "פריסה",
+          "options__1": {
+            "label": "רוחב מלא"
+          },
+          "options__2": {
+            "label": "רשת"
+          }
+        },
+        "slide_height": {
+          "label": "גובה השקופית",
+          "options__1": {
+            "label": "התאמה לתמונה הראשונה"
+          },
+          "options__2": {
+            "label": "קטן"
+          },
+          "options__3": {
+            "label": "בינוני"
+          },
+          "options__4": {
+            "label": "גדול"
+          }
+        },
+        "slider_visual": {
+          "label": "סגנון הניווט בין עמודים",
+          "options__1": {
+            "label": "מונה"
+          },
+          "options__2": {
+            "label": "נקודות"
+          },
+          "options__3": {
+            "label": "מספרים"
+          }
+        },
+        "auto_rotate": {
+          "label": "החלפה אוטומטית של שקופיות"
+        },
+        "change_slides_speed": {
+          "label": "החלפת שקופיות בכל"
+        },
+        "mobile": {
+          "content": "פריסה בנייד"
+        },
+        "show_text_below": {
+          "label": "הצגת התוכן מתחת לתמונות בנייד"
+        },
+        "accessibility": {
+          "content": "נגישות",
+          "label": "תיאור המצגת",
+          "info": "תיאור המצגת עבור לקוחות שמשתמשים בקוראי מסך.",
+          "default": "מצגת על המותג שלנו"
+        }
+      },
+      "blocks": {
+        "slide": {
+          "name": "שקופית",
+          "settings": {
+            "image": {
+              "label": "תמונה"
+            },
+            "heading": {
+              "label": "כותרת",
+              "default": "שקופית תמונה"
+            },
+            "subheading": {
+              "label": "כותרת משנה",
+              "default": "סיפור המותג שלך באמצעות תמונות"
+            },
+            "button_label": {
+              "label": "טקסט הכפתור",
+              "info": "השארת הטקסט ריק תסתיר את הכפתור.",
+              "default": "טקסט הכפתור"
+            },
+            "link": {
+              "label": "קישור הכפתור"
+            },
+            "secondary_style": {
+              "label": "שימוש בכפתור עם מסגרת"
+            },
+            "box_align": {
+              "label": "מיקום התוכן במחשב",
+              "info": "המיקום מותאם אוטומטית למכשירים ניידים.",
+              "options__1": {
+                "label": "למעלה משמאל"
+              },
+              "options__2": {
+                "label": "למעלה במרכז"
+              },
+              "options__3": {
+                "label": "למעלה מימין"
+              },
+              "options__4": {
+                "label": "באמצע משמאל"
+              },
+              "options__5": {
+                "label": "באמצע במרכז"
+              },
+              "options__6": {
+                "label": "באמצע מימין"
+              },
+              "options__7": {
+                "label": "למטה משמאל"
+              },
+              "options__8": {
+                "label": "למטה במרכז"
+              },
+              "options__9": {
+                "label": "למטה מימין"
+              }
+            },
+            "show_text_box": {
+              "label": "הצגת מכל תוכן במחשב"
+            },
+            "text_alignment": {
+              "label": "יישור התוכן במחשב",
+              "option_1": {
+                "label": "שמאל"
+              },
+              "option_2": {
+                "label": "מרכז"
+              },
+              "option_3": {
+                "label": "ימין"
+              }
+            },
+            "image_overlay_opacity": {
+              "label": "אטימות שכבת הצבע מעל התמונה"
+            },
+            "text_alignment_mobile": {
+              "label": "יישור התוכן בנייד",
+              "options__1": {
+                "label": "שמאל"
+              },
+              "options__2": {
+                "label": "מרכז"
+              },
+              "options__3": {
+                "label": "ימין"
+              }
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "מצגת"
+      }
+    },
+    "collapsible_content": {
+      "name": "תוכן מתקפל",
+      "settings": {
+        "caption": {
+          "label": "כיתוב"
+        },
+        "heading": {
+          "label": "כותרת",
+          "default": "תוכן מתקפל"
+        },
+        "heading_alignment": {
+          "label": "יישור הכותרת",
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          }
+        },
+        "layout": {
+          "label": "פריסה",
+          "options__1": {
+            "label": "ללא מכל תוכן"
+          },
+          "options__2": {
+            "label": "מכל תוכן לשורה"
+          },
+          "options__3": {
+            "label": "מכל תוכן למקטע"
+          }
+        },
+        "container_color_scheme": {
+          "label": "ערכת הצבעים למכל התוכן",
+          "info": "מוצג כאשר הפריסה מוגדרת למכל תוכן לשורה או למקטע."
+        },
+        "open_first_collapsible_row": {
+          "label": "פתיחת השורה המתקפלת הראשונה"
+        },
+        "header": {
+          "content": "פריסת התמונה"
+        },
+        "image": {
+          "label": "תמונה"
+        },
+        "image_ratio": {
+          "label": "יחס הממדים של התמונה",
+          "options__1": {
+            "label": "התאמה לתמונה"
+          },
+          "options__2": {
+            "label": "קטן"
+          },
+          "options__3": {
+            "label": "גדול"
+          }
+        },
+        "desktop_layout": {
+          "label": "פריסה במחשב",
+          "options__1": {
+            "label": "תמונה תחילה"
+          },
+          "options__2": {
+            "label": "תמונה לאחר הטקסט"
+          },
+          "info": "התמונה תמיד מוצגת תחילה בנייד."
+        }
+      },
+      "blocks": {
+        "collapsible_row": {
+          "name": "שורה מתקפלת",
+          "settings": {
+            "heading": {
+              "default": "שורה מתקפלת",
+              "info": "יש להוסיף כותרת שמסבירה את התוכן.",
+              "label": "כותרת"
+            },
+            "row_content": {
+              "label": "תוכן השורה"
+            },
+            "page": {
+              "label": "תוכן השורה מתוך עמוד"
+            },
+            "icon": {
+              "label": "סמל",
+              "options__1": {
+                "label": "ללא"
+              },
+              "options__2": {
+                "label": "תפוח"
+              },
+              "options__3": {
+                "label": "בננה"
+              },
+              "options__4": {
+                "label": "בקבוק"
+              },
+              "options__5": {
+                "label": "קופסה"
+              },
+              "options__6": {
+                "label": "גזר"
+              },
+              "options__7": {
+                "label": "בועת שיחה"
+              },
+              "options__8": {
+                "label": "סימן אישור"
+              },
+              "options__9": {
+                "label": "לוח כתיבה"
+              },
+              "options__10": {
+                "label": "מוצרי חלב"
+              },
+              "options__11": {
+                "label": "ללא מוצרי חלב"
+              },
+              "options__12": {
+                "label": "מייבש כביסה"
+              },
+              "options__13": {
+                "label": "עין"
+              },
+              "options__14": {
+                "label": "אש"
+              },
+              "options__15": {
+                "label": "ללא גלוטן"
+              },
+              "options__16": {
+                "label": "לב"
+              },
+              "options__17": {
+                "label": "מגהץ"
+              },
+              "options__18": {
+                "label": "עלה"
+              },
+              "options__19": {
+                "label": "עור"
+              },
+              "options__20": {
+                "label": "ברק"
+              },
+              "options__21": {
+                "label": "שפתון"
+              },
+              "options__22": {
+                "label": "מנעול"
+              },
+              "options__23": {
+                "label": "סיכת מיקום במפה"
+              },
+              "options__24": {
+                "label": "ללא אגוזים"
+              },
+              "options__25": {
+                "label": "מכנסיים"
+              },
+              "options__26": {
+                "label": "טביעת כף רגל"
+              },
+              "options__27": {
+                "label": "פלפל"
+              },
+              "options__28": {
+                "label": "בושם"
+              },
+              "options__29": {
+                "label": "מטוס"
+              },
+              "options__30": {
+                "label": "צמח"
+              },
+              "options__31": {
+                "label": "תג מחיר"
+              },
+              "options__32": {
+                "label": "סימן שאלה"
+              },
+              "options__33": {
+                "label": "מיחזור"
+              },
+              "options__34": {
+                "label": "החזרה"
+              },
+              "options__35": {
+                "label": "סרגל"
+              },
+              "options__36": {
+                "label": "כלי הגשה"
+              },
+              "options__37": {
+                "label": "חולצה"
+              },
+              "options__38": {
+                "label": "נעל"
+              },
+              "options__39": {
+                "label": "צללית"
+              },
+              "options__40": {
+                "label": "פתית שלג"
+              },
+              "options__41": {
+                "label": "כוכב"
+              },
+              "options__42": {
+                "label": "שעון עצר"
+              },
+              "options__43": {
+                "label": "משאית"
+              },
+              "options__44": {
+                "label": "כביסה"
+              }
+            }
+          }
+        }
+      },
+      "presets": {
+        "name": "תוכן מתקפל"
+      }
     }
   },
   "settings_schema": {
     "logo": {
-      "name": "לוגו"
+      "name": "לוגו",
+      "settings": {
+        "logo_image": {
+          "label": "לוגו"
+        },
+        "logo_width": {
+          "label": "רוחב הלוגו במחשב",
+          "info": "רוחב הלוגו מותאם אוטומטית למכשירים ניידים."
+        },
+        "favicon": {
+          "label": "סמל האתר",
+          "info": "התמונה תוקטן לגודל 32 × 32 פיקסלים"
+        }
+      }
     },
     "colors": {
-      "name": "צבעים"
+      "name": "צבעים",
+      "settings": {
+        "background": {
+          "label": "רקע"
+        },
+        "background_gradient": {
+          "label": "רקע עם מעבר צבעים",
+          "info": "רקע עם מעבר צבעים מחליף את צבע הרקע היכן שניתן."
+        },
+        "text": {
+          "label": "טקסט"
+        },
+        "button_background": {
+          "label": "רקע כפתור מלא"
+        },
+        "button_label": {
+          "label": "טקסט כפתור מלא"
+        },
+        "secondary_button_label": {
+          "label": "כפתור עם מסגרת"
+        },
+        "shadow": {
+          "label": "צל"
+        }
+      }
     },
     "typography": {
-      "name": "גופנים"
+      "name": "גופנים",
+      "settings": {
+        "type_header_font": {
+          "label": "גופן",
+          "info": "בחירת גופן אחר עשויה להשפיע על מהירות החנות. [מידע נוסף על גופני מערכת.](https://help.shopify.com/manual/online-store/os/store-speed/improving-speed#fonts)"
+        },
+        "heading_scale": {
+          "label": "קנה מידה של גודל הגופן"
+        },
+        "header__1": {
+          "content": "כותרות"
+        },
+        "header__2": {
+          "content": "טקסט רגיל"
+        },
+        "type_body_font": {
+          "label": "גופן",
+          "info": "בחירת גופן אחר עשויה להשפיע על מהירות החנות. [מידע נוסף על גופני מערכת.](https://help.shopify.com/manual/online-store/os/store-speed/improving-speed#fonts)"
+        },
+        "body_scale": {
+          "label": "קנה מידה של גודל הגופן"
+        }
+      }
     },
     "layout": {
-      "name": "פריסה"
+      "name": "פריסה",
+      "settings": {
+        "page_width": {
+          "label": "רוחב העמוד"
+        },
+        "spacing_sections": {
+          "label": "ריווח בין מקטעי התבנית"
+        },
+        "header__grid": {
+          "content": "רשת"
+        },
+        "paragraph__grid": {
+          "content": "משפיע על אזורים עם מספר עמודות או שורות."
+        },
+        "spacing_grid_horizontal": {
+          "label": "ריווח אופקי"
+        },
+        "spacing_grid_vertical": {
+          "label": "ריווח אנכי"
+        }
+      }
     },
     "animations": {
-      "name": "אנימציות"
+      "name": "אנימציות",
+      "settings": {
+        "animations_reveal_on_scroll": {
+          "label": "חשיפת מקטעים במהלך הגלילה"
+        },
+        "animations_hover_elements": {
+          "options__1": {
+            "label": "ללא"
+          },
+          "options__2": {
+            "label": "הרמה אנכית"
+          },
+          "options__3": {
+            "label": "הרמה בתלת־ממד"
+          },
+          "label": "אפקט במעבר עכבר",
+          "info": "משפיע על כרטיסים וכפתורים."
+        }
+      }
     },
     "buttons": {
       "name": "כפתורים"
@@ -118,6 +3218,260 @@
     },
     "search": {
       "name": "חיפוש"
+    },
+    "global": {
+      "settings": {
+        "header__border": {
+          "content": "מסגרת"
+        },
+        "header__shadow": {
+          "content": "צל"
+        },
+        "blur": {
+          "label": "טשטוש"
+        },
+        "corner_radius": {
+          "label": "רדיוס הפינות"
+        },
+        "horizontal_offset": {
+          "label": "היסט אופקי"
+        },
+        "vertical_offset": {
+          "label": "היסט אנכי"
+        },
+        "thickness": {
+          "label": "עובי"
+        },
+        "opacity": {
+          "label": "אטימות"
+        },
+        "image_padding": {
+          "label": "ריווח סביב התמונה"
+        },
+        "text_alignment": {
+          "options__1": {
+            "label": "שמאל"
+          },
+          "options__2": {
+            "label": "מרכז"
+          },
+          "options__3": {
+            "label": "ימין"
+          },
+          "label": "יישור הטקסט"
+        }
+      }
+    },
+    "cards": {
+      "name": "כרטיסי מוצרים",
+      "settings": {
+        "style": {
+          "options__1": {
+            "label": "רגיל"
+          },
+          "options__2": {
+            "label": "כרטיס"
+          },
+          "label": "סגנון"
+        }
+      }
+    },
+    "collection_cards": {
+      "name": "כרטיסי קטגוריות",
+      "settings": {
+        "style": {
+          "options__1": {
+            "label": "רגיל"
+          },
+          "options__2": {
+            "label": "כרטיס"
+          },
+          "label": "סגנון"
+        }
+      }
+    },
+    "blog_cards": {
+      "name": "כרטיסי בלוג",
+      "settings": {
+        "style": {
+          "options__1": {
+            "label": "רגיל"
+          },
+          "options__2": {
+            "label": "כרטיס"
+          },
+          "label": "סגנון"
+        }
+      }
+    },
+    "badges": {
+      "name": "תגיות",
+      "settings": {
+        "position": {
+          "options__1": {
+            "label": "למטה משמאל"
+          },
+          "options__2": {
+            "label": "למטה מימין"
+          },
+          "options__3": {
+            "label": "למעלה משמאל"
+          },
+          "options__4": {
+            "label": "למעלה מימין"
+          },
+          "label": "מיקום בכרטיסים"
+        },
+        "sale_badge_color_scheme": {
+          "label": "ערכת הצבעים לתגית המבצע"
+        },
+        "sold_out_badge_color_scheme": {
+          "label": "ערכת הצבעים לתגית מוצר שאזל מהמלאי"
+        }
+      }
+    },
+    "brand_information": {
+      "name": "מידע על המותג",
+      "settings": {
+        "paragraph": {
+          "content": "הוספת תיאור המותג לתחתית החנות."
+        },
+        "brand_headline": {
+          "label": "כותרת ראשית"
+        },
+        "brand_description": {
+          "label": "תיאור"
+        },
+        "brand_image": {
+          "label": "תמונה"
+        },
+        "brand_image_width": {
+          "label": "רוחב התמונה"
+        }
+      }
+    },
+    "variant_pills": {
+      "name": "כפתורי בחירת אפשרויות מוצר",
+      "paragraph": "כפתורי בחירה הם אחת הדרכים להצגת אפשרויות המוצר. [למידע נוסף](https://help.shopify.com/en/manual/online-store/themes/theme-structure/page-types#variant-picker-block)"
+    },
+    "inputs": {
+      "name": "שדות קלט"
+    },
+    "content_containers": {
+      "name": "מכלי תוכן"
+    },
+    "popups": {
+      "name": "תפריטים נפתחים וחלונות קופצים",
+      "paragraph": "משפיע על אזורים כמו תפריטי ניווט נפתחים, חלונות קופצים וחלונות סל הקניות."
+    },
+    "media": {
+      "name": "מדיה"
+    },
+    "drawers": {
+      "name": "מגירות צד"
+    },
+    "social-media": {
+      "name": "רשתות חברתיות",
+      "settings": {
+        "header": {
+          "content": "חשבונות ברשתות חברתיות"
+        },
+        "social_twitter_link": {
+          "label": "X / טוויטר",
+          "info": "https://x.com/shopify"
+        },
+        "social_facebook_link": {
+          "label": "פייסבוק",
+          "info": "https://facebook.com/shopify"
+        },
+        "social_pinterest_link": {
+          "label": "פינטרסט",
+          "info": "https://pinterest.com/shopify"
+        },
+        "social_instagram_link": {
+          "label": "אינסטגרם",
+          "info": "http://instagram.com/shopify"
+        },
+        "social_tiktok_link": {
+          "label": "טיקטוק",
+          "info": "https://tiktok.com/@shopify"
+        },
+        "social_tumblr_link": {
+          "label": "טאמבלר",
+          "info": "https://shopify.tumblr.com"
+        },
+        "social_snapchat_link": {
+          "label": "סנאפצ׳ט",
+          "info": "https://www.snapchat.com/add/shopify"
+        },
+        "social_youtube_link": {
+          "label": "יוטיוב",
+          "info": "https://www.youtube.com/shopify"
+        },
+        "social_vimeo_link": {
+          "label": "וימאו",
+          "info": "https://vimeo.com/shopify"
+        }
+      }
+    },
+    "search_input": {
+      "name": "התנהגות החיפוש",
+      "settings": {
+        "header": {
+          "content": "הצעות חיפוש"
+        },
+        "predictive_search_enabled": {
+          "label": "הפעלת הצעות חיפוש"
+        },
+        "predictive_search_show_vendor": {
+          "label": "הצגת מותג המוצר",
+          "info": "מוצג כאשר הצעות החיפוש מופעלות."
+        },
+        "predictive_search_show_price": {
+          "label": "הצגת מחיר המוצר",
+          "info": "מוצג כאשר הצעות החיפוש מופעלות."
+        }
+      }
+    },
+    "currency_format": {
+      "name": "פורמט המטבע",
+      "settings": {
+        "content": "קודי מטבע",
+        "paragraph": "המחירים בסל ובמעבר לתשלום תמיד כוללים קודי מטבע. לדוגמה: $1.00 USD.",
+        "currency_code_enabled": {
+          "label": "הצגת קודי מטבע"
+        }
+      }
+    },
+    "cart": {
+      "name": "סל הקניות",
+      "settings": {
+        "cart_type": {
+          "label": "סוג סל הקניות",
+          "drawer": {
+            "label": "מגירת צד"
+          },
+          "page": {
+            "label": "עמוד"
+          },
+          "notification": {
+            "label": "הודעה בחלון קופץ"
+          }
+        },
+        "show_vendor": {
+          "label": "הצגת מותג"
+        },
+        "show_cart_note": {
+          "label": "הפעלת הערות בסל הקניות"
+        },
+        "cart_drawer": {
+          "header": "מגירת סל הקניות",
+          "collection": {
+            "label": "קטגוריה",
+            "info": "מוצג כאשר מגירת סל הקניות ריקה."
+          }
+        }
+      }
     }
   }
 }

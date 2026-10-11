@@ -368,6 +368,12 @@
           "label": "Vertical space"
         }
       }
+    },
+    "social_media": {
+      "name": "Social media"
+    },
+    "search": {
+      "name": "Search"
     }
   },
   "sections": {
