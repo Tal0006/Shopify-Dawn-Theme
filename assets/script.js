@@ -155,6 +155,11 @@
   }
 
   $('.back-to-top').on('click', function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused')) {
+      window.scrollTo({top: 0, behavior: 'instant'});
+      document.querySelector('.a11y-skip-link').focus({preventScroll: true});
+      return false;
+    }
     $('html,body').animate(
       {
         scrollTop: 0,
@@ -167,7 +172,7 @@
   /*-----------------------
        cart-plus-minus-button 
      -------------------------*/
-  $('.quantitys').append('<div class="dec qtybutton qtybuttons">-</div><div class="inc qtybutton qtybuttons">+</div>');
+  $('.quantitys').append($('<button>', {type: 'button', class: 'dec qtybutton qtybuttons', 'aria-label': window.themeStrings.quantityDecrease, text: '−'}), $('<button>', {type: 'button', class: 'inc qtybutton qtybuttons', 'aria-label': window.themeStrings.quantityIncrease, text: '+'}));
   $('.qtybuttons').on('click', function () {
     var $button = $(this);
     var oldValue = $button.parent().find('input').val();
@@ -193,6 +198,7 @@
         $sync2 = $('.product-thumbnil-active'),
         flag = false,
         duration = 500;
+      function galleryDuration() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused') ? 0 : duration; }
 
       $sync1
         .owlCarousel({
@@ -206,7 +212,7 @@
         .on('changed.owl.carousel', function (e) {
           if (!flag) {
             flag = true;
-            $sync2.trigger('to.owl.carousel', [e.item.index, duration, true]);
+            $sync2.trigger('to.owl.carousel', [e.item.index, galleryDuration(), true]);
             flag = false;
           }
         });
@@ -243,12 +249,12 @@
           },
         })
         .on('click', '.owl-item', function () {
-          $sync1.trigger('to.owl.carousel', [$(this).index(), duration, true]);
+          $sync1.trigger('to.owl.carousel', [$(this).index(), galleryDuration(), true]);
         })
         .on('changed.owl.carousel', function (e) {
           if (!flag) {
             flag = true;
-            $sync1.trigger('to.owl.carousel', [e.item.index, duration, true]);
+            $sync1.trigger('to.owl.carousel', [e.item.index, galleryDuration(), true]);
             flag = false;
           }
         });

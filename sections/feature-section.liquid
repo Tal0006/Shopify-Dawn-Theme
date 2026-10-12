@@ -10,7 +10,7 @@
           <div class="col-lg-4 col-md-6 col-12">
             <div class="features-item">
               <div class="features-img">
-                {% if block.settings.image != blank and block.settings.image.width != blank %}<img src="{{ block.settings.image |  image_url: width: 500  }}" width="" height="" alt="">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
+                {% if block.settings.image != blank and block.settings.image.width != blank %}<img src="{{ block.settings.image |  image_url: width: 500  }}" width="" height="" alt="{{ block.settings.image.alt | default: block.settings.feature_title | default: shop.name | escape }}">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
               </div>
               <div class="features-text">
                 <h3>

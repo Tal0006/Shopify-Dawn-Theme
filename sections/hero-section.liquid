@@ -1,10 +1,12 @@
 <div class="hero-area{% if section.settings.image == blank %} storefront-hero--text-only{% endif %}"><div class="hero-wrap"><div class="container"><div class="row align-items-center">
 <div class="col-lg-6 col-12"><div class="hero-text">
-  {% if section.settings.left_image != blank %}<div class="heroImg">{{ section.settings.left_image | image_url: width: 1200 | image_tag: widths: '400, 800, 1200', alt: section.settings.left_image.alt }}</div>{% endif %}
+  {% assign hero_image_alt = section.settings.image.alt | default: section.settings.title %}{% if hero_image_alt == blank %}{% assign hero_image_alt = 'storefront.hero_title' | t %}{% endif %}
+  {% assign hero_logo_alt = section.settings.left_image.alt | default: shop.name %}
+  {% if section.settings.left_image != blank %}<div class="heroImg">{{ section.settings.left_image | image_url: width: 1200 | image_tag: widths: '400, 800, 1200', alt: hero_logo_alt }}</div>{% endif %}
   <h1 class="storefront-hero-heading">{% if section.settings.title != blank %}{{ section.settings.title | escape }}{% else %}{{ 'storefront.hero_title' | t }}{% endif %}</h1>
   <p class="storefront-hero-subtitle">{% if section.settings.subtitle != blank %}{{ section.settings.subtitle | escape }}{% else %}{{ 'storefront.hero_subtitle' | t }}{% endif %}</p>
   <div class="hero-btn"><a href="{{ section.settings.button_url | default: settings.catalog_collection.url | default: routes.all_products_collection_url }}" class="theme-btn">{% if section.settings.button_text != blank %}{{ section.settings.button_text | escape }}{% else %}{{ 'storefront.shop_now' | t }}{% endif %}</a></div>
-</div></div><div class="col-lg-6 col-12{% if section.settings.image == blank %} storefront-hero-blank{% endif %}"><div class="hero-img"><div class="main-img">{% if section.settings.image != blank %}{{ section.settings.image | image_url: width: 1300 | image_tag: class: 'storefront-hero-image', widths: '400, 800, 1300', sizes: '(min-width: 992px) 50vw, 100vw', alt: section.settings.image.alt }}{% endif %}</div></div></div>
+</div></div><div class="col-lg-6 col-12{% if section.settings.image == blank %} storefront-hero-blank{% endif %}"><div class="hero-img"><div class="main-img">{% if section.settings.image != blank %}{{ section.settings.image | image_url: width: 1300 | image_tag: class: 'storefront-hero-image', widths: '400, 800, 1300', sizes: '(min-width: 992px) 50vw, 100vw', alt: hero_image_alt }}{% endif %}</div></div></div>
 </div></div></div></div>
 {% schema %}
 {

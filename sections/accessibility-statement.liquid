@@ -1,0 +1,13 @@
+<section class="catalog-section container page-content">
+  <h1>{% if page.title != blank %}{{ page.title | escape }}{% else %}{{ 'accessibility_preferences.statement' | t }}{% endif %}</h1>
+  {% if page.content != blank %}{{ page.content }}{% else %}
+  <p>{{ 'accessibility_preferences.statement_intro' | t }}</p>
+  <h2>{{ 'accessibility_preferences.statement_features' | t }}</h2><p>{{ 'accessibility_preferences.statement_features_text' | t }}</p>
+  <h2>{{ 'accessibility_preferences.statement_contact' | t }}</h2><p>{{ 'accessibility_preferences.statement_contact_text' | t }}</p>
+  {% if section.settings.contact_page != blank %}<a href="{{ section.settings.contact_page.url }}">{{ 'accessibility_preferences.contact' | t }}</a>{% endif %}
+  <p>{{ 'accessibility_preferences.statement_review' | t }}</p>
+  {% endif %}
+</section>
+{% schema %}
+{"name":"הצהרת נגישות","settings":[{"type":"page","id":"contact_page","label":"עמוד יצירת קשר"}]}
+{% endschema %}

@@ -6,7 +6,7 @@
     const closer = event.target.closest('.storefront-header .menu-close');
     const cartToggle = event.target.closest('.storefront-header .cart-toggle-btn');
     const cartClose = event.target.closest('.storefront-header .mini-cart-close');
-    const parentLink = event.target.closest('.storefront-header .menu-item-has-children > a');
+    const submenuToggle = event.target.closest('.storefront-header .submenu-toggle');
     if (opener || closer) {
       const header = (opener || closer).closest('.storefront-header');
       const menu = header.querySelector('.navigation-holder');
@@ -16,11 +16,11 @@
     } else if (cartToggle || cartClose) {
       const content = (cartToggle || cartClose).closest('.mini-cart').querySelector('.mini-cart-content');
       content.classList.toggle('mini-cart-content-toggle', cartClose ? false : !content.classList.contains('mini-cart-content-toggle'));
-    } else if (parentLink && window.matchMedia('(max-width: 991px)').matches) {
-      const submenu = parentLink.parentElement.querySelector('.sub-menu');
-      const visible = getComputedStyle(submenu).display !== 'none';
-      submenu.style.display = visible ? 'none' : 'block';
-      parentLink.classList.toggle('rotate', !visible);
+    } else if (submenuToggle) {
+      const submenu = document.getElementById(submenuToggle.getAttribute('aria-controls'));
+      const open = submenuToggle.getAttribute('aria-expanded') !== 'true';
+      submenu.style.display = open ? 'block' : 'none';
+      submenuToggle.setAttribute('aria-expanded', String(open));
     } else {
       if (event.target.closest('.storefront-header .mini-cart-content')) event.stopPropagation();
       return;
@@ -77,6 +77,53 @@
     new MutationObserver(sync).observe(menu, {attributes: true, attributeFilter: ['class']});
     sync();
   }
+  function drawerState(root) {
+    const header = root.querySelector('.storefront-header');
+    if (!header) return;
+    const menu = header.querySelector('.navigation-holder');
+    const menuButton = header.querySelector('.open-btn');
+    const cart = header.querySelector('.mini-cart-content');
+    const cartButton = header.querySelector('.cart-toggle-btn');
+    const mobile = window.matchMedia('(max-width: 991px)');
+    function focusDrawer(drawer, button, selector, openClass) {
+      const focus = () => {
+        if (drawer.isConnected && drawer.classList.contains(openClass) && document.activeElement === button) drawer.querySelector(selector).focus({preventScroll: true});
+      };
+      requestAnimationFrame(focus);
+      setTimeout(focus, 350); // Legacy drawer visibility transitions can defer focusability.
+    }
+    let wasMenuOpen = menu.classList.contains('slideInn');
+    let wasCartOpen = cart.classList.contains('mini-cart-content-toggle');
+    const sync = () => {
+      const menuOpen = menu.classList.contains('slideInn');
+      const cartOpen = cart.classList.contains('mini-cart-content-toggle');
+      menu.inert = mobile.matches && !menuOpen;
+      cart.inert = !cartOpen;
+      cartButton.setAttribute('aria-expanded', String(cartOpen));
+      if (mobile.matches && menuOpen && !wasMenuOpen) focusDrawer(menu, menuButton, '.menu-close', 'slideInn');
+      if (cartOpen && !wasCartOpen) focusDrawer(cart, cartButton, '.mini-cart-close', 'mini-cart-content-toggle');
+      if (!menuOpen && wasMenuOpen && menu.contains(document.activeElement)) menuButton.focus();
+      if (!cartOpen && wasCartOpen && cart.contains(document.activeElement)) cartButton.focus();
+      wasMenuOpen = menuOpen; wasCartOpen = cartOpen;
+    };
+    new MutationObserver(sync).observe(header, {subtree: true, attributes: true, attributeFilter: ['class']});
+    mobile.addEventListener('change', sync);
+    sync();
+  }
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    const header = document.querySelector('.storefront-header');
+    if (!header) return;
+    const cart = header.querySelector('.mini-cart-content');
+    const menu = header.querySelector('.navigation-holder');
+    if (cart.classList.contains('mini-cart-content-toggle')) {
+      event.preventDefault(); cart.classList.remove('mini-cart-content-toggle'); header.querySelector('.cart-toggle-btn').focus();
+    } else if (menu.classList.contains('slideInn')) {
+      event.preventDefault(); menu.classList.remove('slideInn'); header.querySelector('.open-btn').focus();
+    }
+  });
+  drawerState(document);
+  document.addEventListener('shopify:section:load', event => drawerState(event.target));
   menuState(document);
   document.addEventListener('shopify:section:load', (event) => menuState(event.target));
   recommendations(document);

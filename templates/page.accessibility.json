@@ -1,0 +1,11 @@
+{
+  "sections": {
+    "main": {
+      "type": "accessibility-statement",
+      "settings": {}
+    }
+  },
+  "order": [
+    "main"
+  ]
+}

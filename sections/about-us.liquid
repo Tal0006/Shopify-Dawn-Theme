@@ -2,10 +2,10 @@
   <div class="container">
     <div class="about-wrap">
       <div class="title">
-        <h2>{% if section.settings.title != blank %}{{ section.settings.title }}{% else %}{{ 'storefront.about' | t }}{% endif %}</h2>
+        <h1>{% if section.settings.title != blank %}{{ section.settings.title }}{% else %}{{ 'storefront.about' | t }}{% endif %}</h1>
       </div>
       <strong>{% if section.settings.subtitle != blank %}{{ section.settings.subtitle }}{% else %}{{ 'storefront.about_subtitle' | t }}{% endif %}</strong>
-      <h3>{% if section.settings.heading != blank %}{{ section.settings.heading }}{% else %}{{ 'storefront.about_heading' | t }}{% endif %}</h3>
+      <h2>{% if section.settings.heading != blank %}{{ section.settings.heading }}{% else %}{{ 'storefront.about_heading' | t }}{% endif %}</h2>
       {% if section.settings.description != blank %}{{ section.settings.description }}{% else %}{{ 'storefront.about_text' | t }}{% endif %}
       <span class="shape1"><img src="{{ 'shape3.png' | asset_url }}" width="" height="" alt=""></span>
       <div class="shape2"><img src="{{ 'footer2.png' | asset_url }}" alt="" width="" height=""></div>

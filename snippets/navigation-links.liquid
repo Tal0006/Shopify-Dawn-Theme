@@ -1,6 +1,6 @@
 {% for link in menu.links %}
   <li {% if link.links != blank %}class="menu-item-has-children"{% endif %}>
     <a href="{{ link.url }}" {% if link.current %}aria-current="page"{% endif %}>{{ link.title | escape }}</a>
-    {% if link.links != blank %}<ul class="sub-menu">{% for child in link.links %}<li><a href="{{ child.url }}" {% if child.current %}aria-current="page"{% endif %}>{{ child.title | escape }}</a>{% if child.links != blank %}<ul>{% for grandchild in child.links %}<li><a href="{{ grandchild.url }}">{{ grandchild.title | escape }}</a></li>{% endfor %}</ul>{% endif %}</li>{% endfor %}</ul>{% endif %}
+    {% if link.links != blank %}<button class="submenu-toggle" type="button" aria-expanded="false" aria-controls="NavSubmenu-{{ section.id }}-{{ forloop.index }}" aria-label="{{ link.title | escape }}"><span aria-hidden="true">⌄</span></button><ul id="NavSubmenu-{{ section.id }}-{{ forloop.index }}" class="sub-menu">{% for child in link.links %}<li><a href="{{ child.url }}" {% if child.current %}aria-current="page"{% endif %}>{{ child.title | escape }}</a>{% if child.links != blank %}<ul>{% for grandchild in child.links %}<li><a href="{{ grandchild.url }}">{{ grandchild.title | escape }}</a></li>{% endfor %}</ul>{% endif %}</li>{% endfor %}</ul>{% endif %}
   </li>
 {% endfor %}

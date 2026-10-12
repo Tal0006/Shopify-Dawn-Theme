@@ -1,0 +1,15 @@
+<div class="a11y-widget" data-accessibility-menu>
+  <button class="a11y-launcher" type="button" aria-controls="AccessibilityPanel" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'accessibility_preferences.open' | t }}" hidden>
+    <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="4" r="2"/><path d="M4 8h16M12 8v7m0-4-5 9m5-9 5 9"/></svg>
+  </button>
+  <dialog id="AccessibilityPanel" class="a11y-panel" aria-labelledby="AccessibilityTitle">
+    <div class="a11y-panel-heading"><h2 id="AccessibilityTitle">{{ 'accessibility_preferences.title' | t }}</h2><button type="button" data-a11y-close aria-label="{{ 'accessibility_preferences.close' | t }}"><span aria-hidden="true">×</span></button></div>
+    <div class="a11y-text-controls"><button type="button" data-a11y-action="increase">{{ 'accessibility_preferences.increase' | t }}</button><button type="button" data-a11y-action="decrease">{{ 'accessibility_preferences.decrease' | t }}</button></div>
+    <p data-a11y-size data-template="{{ 'accessibility_preferences.size' | t: percent: '__PERCENT__' | escape }}"></p>
+    {% assign accessibility_modes = 'contrast,grayscale,links,motion' | split: ',' %}
+    {% for mode in accessibility_modes %}{% assign mode_key = 'accessibility_preferences.' | append: mode %}<button type="button" data-a11y-action="{{ mode }}" aria-pressed="false">{{ mode_key | t }}</button>{% endfor %}
+    <button type="button" data-a11y-action="reset">{{ 'accessibility_preferences.reset' | t }}</button>
+    <p class="a11y-status" role="status" aria-live="polite" data-a11y-status data-reset="{{ 'accessibility_preferences.reset_done' | t | escape }}" data-storage="{{ 'accessibility_preferences.storage_unavailable' | t | escape }}"></p>
+  </dialog>
+</div>
+<div class="a11y-grayscale-overlay" aria-hidden="true" hidden></div>

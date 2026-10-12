@@ -98,8 +98,8 @@ button, input, select, textarea { font: inherit; }
 .catalog-card__image img { display: block; position: absolute; inset: 12px; width: calc(100% - 24px); height: calc(100% - 24px); object-fit: contain; }
 .catalog-no-image { display: flex; align-items: center; justify-content: center; height: 100%; padding: var(--space-md); color: #59665f; font-size: 14px; }
 .catalog-card__content { display: flex; flex-direction: column; flex: 1; padding: var(--space-md); }
-.catalog-card h3 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 16px; line-height: 1.5; height: 3em; margin-block: 0 var(--space-sm); overflow-wrap: anywhere; }
-.catalog-card h3 a { color: inherit; }
+.catalog-card :is(h2,h3) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 16px; line-height: 1.5; height: 3em; margin-block: 0 var(--space-sm); overflow-wrap: anywhere; }
+.catalog-card :is(h2,h3) a { color: inherit; }
 .catalog-price { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: baseline; font-size: 17px; font-weight: 700; line-height: 1.5; }
 .catalog-price s { color: #626d67; font-size: .85em; font-weight: 400; }
 .catalog-price small { flex-basis: 100%; font-size: 12px; font-weight: 400; }
@@ -221,7 +221,6 @@ html[dir=rtl] .field__label { inset-inline-start: 1.5rem; inset-inline-end: auto
   .storefront-header #navbar ul a, .storefront-header #navbar > ul > li > a { color: #fff; min-height: 44px; padding: 10px 0; text-align: start; }
   .storefront-header #navbar > ul > li > .sub-menu { position: static; padding: 0; width: auto; min-width: 0; }
   .storefront-header #navbar .sub-menu a { padding-inline: var(--space-md); }
-  .storefront-header #navbar li:focus-within > .sub-menu { display: block; }
   .hero-area .hero-wrap > .container > .row { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
   .hero-area .hero-text { max-width: 620px; }
   .hero-area .hero-img .main-img img { max-height: 260px; }
@@ -231,7 +230,7 @@ html[dir=rtl] .field__label { inset-inline-start: 1.5rem; inset-inline-end: auto
   .catalog-grid, .catalog-categories { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .catalog-card__content { padding: 12px; }
   .catalog-card__image { padding: var(--space-sm); }
-  .catalog-card h3 { font-size: 14px; }
+  .catalog-card :is(h2,h3) { font-size: 14px; }
   .catalog-card .theme-btn { font-size: 14px; }
   .catalog-price { font-size: 16px; }
   .catalog-category img { height: 76px; }

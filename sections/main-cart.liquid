@@ -6,7 +6,7 @@
   <div class="catalog-cart-table"><table><caption class="sr-only">{{ 'sections.cart.caption' | t }}</caption>
     <thead><tr><th>{{ 'sections.cart.headings.product' | t }}</th><th>{{ 'sections.cart.headings.price' | t }}</th><th>{{ 'sections.cart.headings.quantity' | t }}</th><th>{{ 'sections.cart.headings.total' | t }}</th><th><span class="sr-only">{{ 'storefront.remove' | t }}</span></th></tr></thead>
     <tbody>{% for item in cart.items %}<tr>
-      <td><a class="catalog-cart-product" href="{{ item.url }}">{% if item.image != blank %}{{ item.image | image_url: width: 160 | image_tag: loading: 'lazy', alt: item.image.alt }}{% endif %}<span>{{ item.product.title | escape }}</span></a>
+      <td><a class="catalog-cart-product" href="{{ item.url }}">{% if item.image != blank %}{% assign item_image_alt = item.image.alt | default: item.product.title %}{{ item.image | image_url: width: 160 | image_tag: loading: 'lazy', alt: item_image_alt }}{% endif %}<span>{{ item.product.title | escape }}</span></a>
         {% unless item.product.has_only_default_variant %}<small>{{ item.variant.title | escape }}</small>{% endunless %}
         {% if item.selling_plan_allocation %}<small>{{ item.selling_plan_allocation.selling_plan.name | escape }}</small>{% endif %}
         {% for property in item.properties %}{% assign first_character = property.first | slice: 0 %}{% if property.last != blank and first_character != '_' %}<small>{{ property.first | escape }}: {{ property.last | escape }}</small>{% endif %}{% endfor %}

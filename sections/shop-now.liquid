@@ -6,7 +6,7 @@
         <div class="col-lg-6 col-md-12 col-12">
           <div class="cta-item-left">
             <div class="cta-img">
-              {% if section.settings.image != blank and section.settings.image.width != blank %}<img src="{{ section.settings.image |  image_url: width: 900  }}" alt="" width="" height="">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
+              {% if section.settings.image != blank and section.settings.image.width != blank %}<img src="{{ section.settings.image |  image_url: width: 900  }}" alt="{{ section.settings.image.alt | default: section.settings.title | default: shop.name | escape }}" width="" height="">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
               <a href="{{ section.settings.button_url | default: settings.catalog_collection.url | default: routes.all_products_collection_url | escape }}" class="theme-btn">{% if section.settings.button_text != blank %}{{ section.settings.button_text }}{% else %}{{ 'storefront.shop_now' | t }}{% endif %}</a>
             </div>
           </div>

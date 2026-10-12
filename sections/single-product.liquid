@@ -7,8 +7,8 @@
 -%}
 <section class="shop-single-section product-details section-padding"><div class="container"><div class="row">
 <div class="col col-lg-6 col-12"><div class="product-single-img"><div class="product-active owl-carousel">
-  {% for image in product.images %}<div class="item">{{ image | image_url: width: 1200 | image_tag: widths: '400, 800, 1200', sizes: '(min-width: 992px) 50vw, 100vw', alt: image.alt }}</div>{% endfor %}
-</div><div class="product-thumbnil-active owl-carousel">{% for image in product.images %}<div class="item">{{ image | image_url: width: 300 | image_tag: loading: 'lazy', alt: image.alt }}</div>{% endfor %}</div></div></div>
+  {% for image in product.images %}{% assign product_image_alt = image.alt | default: product.title %}<div class="item">{{ image | image_url: width: 1200 | image_tag: widths: '400, 800, 1200', sizes: '(min-width: 992px) 50vw, 100vw', alt: product_image_alt }}</div>{% endfor %}
+</div><div class="product-thumbnil-active owl-carousel">{% for image in product.images %}{% assign product_image_alt = image.alt | default: product.title %}<div class="item"><button type="button" aria-label="{{ 'products.product.media.load_image' | t: index: forloop.index }}">{{ image | image_url: width: 300 | image_tag: loading: 'lazy', alt: product_image_alt }}</button></div>{% endfor %}</div></div></div>
 <div class="col col-lg-6 col-12"><div class="product-details"><h1>{{ product.title | escape }}</h1>
   {% if section.settings.show_vendor %}<p>{{ product.vendor | escape }}</p>{% endif %}
   <p>{{ 'storefront.price' | t }}</p>{% render 'product-price', card_product: product, variant: selected_variant %}

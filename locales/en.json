@@ -618,5 +618,30 @@
   "date_formats": {
     "date": "%d/%m/%Y",
     "date_at_time": "%d/%m/%Y %H:%M"
+  },
+  "accessibility_preferences": {
+    "title": "Accessibility options",
+    "open": "Open accessibility options",
+    "close": "Close accessibility options",
+    "increase": "Increase text size",
+    "decrease": "Decrease text size",
+    "contrast": "High contrast",
+    "grayscale": "Grayscale",
+    "links": "Highlight links",
+    "motion": "Pause animations",
+    "reset": "Reset accessibility settings",
+    "size": "Text size: {{ percent }}%",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "reset_done": "Accessibility settings reset.",
+    "storage_unavailable": "Preferences apply for this visit; your browser cannot save them.",
+    "statement": "Accessibility statement",
+    "statement_intro": "We are working to make this store easier to use for everyone.",
+    "statement_features": "Accessibility features",
+    "statement_features_text": "The store includes keyboard controls, a skip-to-content link, labeled forms, and accessibility preferences for text size, contrast, links, and motion.",
+    "statement_contact": "Report an accessibility issue",
+    "statement_contact_text": "If you encounter a barrier, contact us and include the page address, what you were trying to do, and your browser or assistive technology.",
+    "contact": "Contact us",
+    "statement_review": "This statement describes the available features. It is not a certification of compliance. The store owner should add verified testing results, known limitations, contact details, and the date of the latest review."
   }
 }

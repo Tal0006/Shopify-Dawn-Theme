@@ -1,7 +1,7 @@
 <!-- social-area -->
 <div class="social-area">
   <div class="title">
-    <h3>{% if section.settings.title != blank %}{{ section.settings.title }}{% else %}{{ 'storefront.follow' | t }}{% endif %}</h3>
+    <h2>{% if section.settings.title != blank %}{{ section.settings.title }}{% else %}{{ 'storefront.follow' | t }}{% endif %}</h2>
   </div>
   <div class="container">
     <div class="social-wrap">
@@ -14,8 +14,8 @@
               {{ section.settings.social }}
 
               <div class="social-item">
-                <a href="{{ block.settings.url | default: routes.root_url | escape }}" class="social-img">
-                  {% if block.settings.image != blank and block.settings.image.width != blank %}<img src="{{ block.settings.image | image_url: width: 800 }}" width="" height="" alt="">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
+                <a href="{{ block.settings.url | default: routes.root_url | escape }}" class="social-img" aria-label="{{ block.settings.alt_text | default: block.settings.image.alt | default: section.settings.title | default: shop.name | escape }}">
+                  {% if block.settings.image != blank and block.settings.image.width != blank %}<img src="{{ block.settings.image | image_url: width: 800 }}" width="" height="" alt="{{ block.settings.image.alt | default: block.settings.alt_text | default: section.settings.title | default: shop.name | escape }}">{% else %}{{ 'image' | placeholder_svg_tag }}{% endif %}
                 </a>
               </div>
             </div>
@@ -55,6 +55,11 @@
           "type": "url",
           "id": "url",
           "label": "t:storefront_editor.link"
+        },
+        {
+          "type": "text",
+          "id": "alt_text",
+          "label": "תיאור התמונה והקישור לנגישות"
         }
       ]
     }

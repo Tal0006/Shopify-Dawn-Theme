@@ -35,8 +35,10 @@
 
     {{ 'storefront.css' | asset_url | stylesheet_tag }}
     {% if request.page_type == 'customers/account' or request.page_type == 'customers/login' or request.page_type contains 'customers/' %}{{ 'base.css' | asset_url | stylesheet_tag }}{% endif %}
-    <script>window.themeStrings = {required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}, previousSlide: {{ 'general.slider.previous_slide' | t | json }}, nextSlide: {{ 'general.slider.next_slide' | t | json }}};</script>
+    <script>window.themeStrings = {quantityIncrease: {{ 'products.product.quantity.increase' | t: product: product.title | json }}, quantityDecrease: {{ 'products.product.quantity.decrease' | t: product: product.title | json }}, required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}, previousSlide: {{ 'general.slider.previous_slide' | t | json }}, nextSlide: {{ 'general.slider.next_slide' | t | json }}};</script>
     <script src="{{ 'storefront.js' | asset_url }}" defer></script>
+    {{ 'accessibility.css' | asset_url | stylesheet_tag }}
+    <script src="{{ 'accessibility.js' | asset_url }}" defer></script>
     {{ content_for_header }}
 
     {% comment %}
@@ -49,6 +51,7 @@
   </head>
 
   <body class="">
+    <a class="a11y-skip-link" href="#MainContent">{{ 'accessibility.skip_to_text' | t }}</a>
     <div class="page-wrapper">
       <!-- start preloader -->
       <div class="preloader">
@@ -67,10 +70,13 @@
 
       {% section 'header' %}
 
-      {{ content_for_layout }}
+      <main id="MainContent" tabindex="-1">
+        {{ content_for_layout }}
+      </main>
 
       {% section 'footer' %}
     </div>
+    {% render 'accessibility-menu' %}
 
     <script src="{{ 'jquery.min.js' | asset_url }}" defer></script>
     <script src="{{ 'bootstrap.bundle.min.js' | asset_url }}" defer></script>
