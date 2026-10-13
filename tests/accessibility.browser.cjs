@@ -84,6 +84,7 @@ test('Storefront accessibility browser checks', {timeout: 120000}, async t => {
       await ev('document.querySelector(".open-btn").focus()'); await key('Enter','Enter',13); await sleep(400);
       assert.equal(await ev('document.querySelector("#navbar").inert'),false); assert.equal(await ev('document.activeElement.className'),'menu-close');
       await ev('document.querySelector(".submenu-toggle").focus()'); await key('Enter','Enter',13); assert.equal(await ev('document.querySelector(".submenu-toggle").getAttribute("aria-expanded")'),'true');
+      await key('Escape','Escape',27); assert.equal(await ev('document.querySelector("[data-mega-trigger]").getAttribute("aria-expanded")'),'false');
       await key('Escape','Escape',27); assert.equal(await ev('document.querySelector("#navbar").inert'),true); assert.ok(await ev('document.activeElement.classList.contains("open-btn")'));
       await ev('document.querySelector(".cart-toggle-btn").focus()'); await key('Enter','Enter',13); await sleep(400); assert.equal(await ev('document.querySelector(".mini-cart-content").inert'),false);
       await key('Escape','Escape',27); assert.equal(await ev('document.activeElement.className'),'cart-toggle-btn');

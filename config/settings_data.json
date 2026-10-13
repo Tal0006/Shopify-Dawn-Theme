@@ -157,7 +157,8 @@
           "show_policies": true,
           "show_footer_links": false,
           "show_newsletter": false,
-          "show_payment_icons": false
+          "show_payment_icons": false,
+          "accessibility_statement_page": "הצהרת-נגישות"
         }
       }
     },

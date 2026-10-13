@@ -24,7 +24,7 @@
   // Function for toggle class for small menu
   function toggleClassForSmallNav() {
     var windowWidth = window.innerWidth;
-    var mainNav = $('#navbar > ul');
+    var mainNav = $('#navbar > ul').filter(function () { return !$(this).closest('.storefront-header').length; });
 
     if (windowWidth <= 991) {
       mainNav.addClass('small-nav');
@@ -38,8 +38,8 @@
   // Function for small menu
   function smallNavFunctionality() {
     var windowWidth = window.innerWidth;
-    var mainNav = $('.navigation-holder');
-    var smallNav = $('.navigation-holder > .small-nav');
+    var mainNav = $('.navigation-holder').filter(function () { return !$(this).closest('.storefront-header').length; });
+    var smallNav = mainNav.children('.small-nav');
     var subMenu = smallNav.find('.sub-menu');
     var megamenu = smallNav.find('.mega-menu');
     var menuItemWidthSubMenu = smallNav.find('.menu-item-has-children > a');

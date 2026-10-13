@@ -1,6 +1,23 @@
 {% for link in menu.links %}
-  <li {% if link.links != blank %}class="menu-item-has-children"{% endif %}>
-    <a href="{{ link.url }}" {% if link.current %}aria-current="page"{% endif %}>{{ link.title | escape }}</a>
-    {% if link.links != blank %}<button class="submenu-toggle" type="button" aria-expanded="false" aria-controls="NavSubmenu-{{ section.id }}-{{ forloop.index }}" aria-label="{{ link.title | escape }}"><span aria-hidden="true">⌄</span></button><ul id="NavSubmenu-{{ section.id }}-{{ forloop.index }}" class="sub-menu">{% for child in link.links %}<li><a href="{{ child.url }}" {% if child.current %}aria-current="page"{% endif %}>{{ child.title | escape }}</a>{% if child.links != blank %}<ul>{% for grandchild in child.links %}<li><a href="{{ grandchild.url }}">{{ grandchild.title | escape }}</a></li>{% endfor %}</ul>{% endif %}</li>{% endfor %}</ul>{% endif %}
-  </li>
+  {% if link.links != blank %}
+    {% assign navigation_panel_id = 'NavSubmenu-' | append: section.id | append: '-' | append: forloop.index %}
+    <li class="nav-disclosure" data-nav-disclosure>
+      <button id="{{ navigation_panel_id }}-Trigger" class="nav-mega-trigger submenu-toggle{% if link.active %} is-active{% endif %}" type="button" data-mega-trigger aria-expanded="false" aria-controls="{{ navigation_panel_id }}">
+        <span>{{ link.title | escape }}</span><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+      </button>
+      <div id="{{ navigation_panel_id }}" class="nav-mega-panel" data-mega-panel role="region" aria-labelledby="{{ navigation_panel_id }}-Trigger" hidden>
+        <ul class="nav-mega-groups" role="list">
+          {% for child in link.links %}
+            {% assign navigation_group_id = navigation_panel_id | append: '-Group-' | append: forloop.index %}
+            <li class="nav-mega-group{% if child.links != blank %} has-children{% endif %}">
+              <div class="nav-mega-group-heading"><a href="{{ child.url }}" {% if child.current %}aria-current="page"{% endif %}>{{ child.title | escape }}</a>
+              {% if child.links != blank %}<button class="nav-group-toggle submenu-toggle" type="button" data-group-trigger aria-expanded="false" aria-controls="{{ navigation_group_id }}" aria-label="{{ child.title | escape }}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>{% endif %}</div>
+              {% if child.links != blank %}<ul id="{{ navigation_group_id }}" class="nav-mega-children" role="list">{% for grandchild in child.links %}<li><a href="{{ grandchild.url }}" {% if grandchild.current %}aria-current="page"{% endif %}>{{ grandchild.title | escape }}</a></li>{% endfor %}</ul>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        <div class="nav-mega-footer"><a href="{{ link.url }}" {% if link.current %}aria-current="page"{% endif %}>{{ link.title | escape }}</a>{% assign navigation_catalog_url = settings.catalog_collection.url | default: routes.all_products_collection_url %}{% if navigation_catalog_url != link.url %}<a href="{{ navigation_catalog_url }}">{{ 'storefront.all_products' | t }}</a>{% endif %}</div>
+      </div>
+    </li>
+  {% else %}<li><a href="{{ link.url }}" {% if link.current %}aria-current="page"{% endif %}>{{ link.title | escape }}</a></li>{% endif %}
 {% endfor %}
