@@ -643,7 +643,8 @@
     "product_additional": "מידע נוסף",
     "product_whatsapp_question": "שאלה על המוצר ב-WhatsApp",
     "product_whatsapp_message": "שלום, יש לי שאלה לגבי:\n{{ title }}",
-    "product_recommendations": "אולי יעניין אותך גם"
+    "product_recommendations": "אולי יעניין אותך גם",
+    "cart_toast_success": "המוצר נוסף לסל בהצלחה"
   },
   "date_formats": {
     "date": "%d/%m/%Y",

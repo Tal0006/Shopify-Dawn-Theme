@@ -1,0 +1,19 @@
+{% doc %}
+  Shared mobile cart feedback. JavaScript updates its single live region.
+  @example
+  {% render 'cart-toast' %}
+{% enddoc %}
+<div class="cart-toast" data-cart-toast data-success="{{ 'storefront.cart_toast_success' | t | escape }}" hidden>
+  <p role="status" aria-live="polite" aria-atomic="true" data-cart-toast-message></p>
+  <a href="{{ routes.cart_url }}">{{ 'storefront.drawer_view' | t }}</a>
+</div>
+{% stylesheet %}
+.cart-toast { position: fixed; z-index: 1000002; inset-inline: 16px; inset-block-end: var(--cart-toast-bottom, calc(84px + env(safe-area-inset-bottom))); width: fit-content; max-width: min(360px, calc(100vw - 32px)); margin-inline: auto; padding: 12px 16px; border: 1px solid var(--storefront-border); border-inline-start: 3px solid var(--storefront-green); border-radius: 8px; background: #fffefa; color: var(--storefront-ink); box-shadow: 0 4px 18px #182b2520; text-align: start; animation: cart-toast-enter .16s ease-out; }
+.cart-toast[data-closing] { animation: none; opacity: 0; transform: translateY(6px); transition: opacity .16s ease, transform .16s ease; }
+.cart-toast[hidden] { display: none; }
+.cart-toast p { margin: 0; font-size: 14px; line-height: 1.5; }
+.cart-toast a { display: inline-flex; align-items: center; min-height: 44px; color: var(--storefront-green); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.cart-toast[data-error] { border-inline-start-color: #9b2525; }
+@keyframes cart-toast-enter { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .cart-toast { animation: none; transition: none; } }
+{% endstylesheet %}

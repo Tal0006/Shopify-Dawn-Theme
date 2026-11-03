@@ -643,7 +643,8 @@
     "product_additional": "Additional information",
     "product_whatsapp_question": "Ask about this product on WhatsApp",
     "product_whatsapp_message": "Hello, I have a question about:\n{{ title }}",
-    "product_recommendations": "You may also like"
+    "product_recommendations": "You may also like",
+    "cart_toast_success": "Product added to cart successfully"
   },
   "date_formats": {
     "date": "%d/%m/%Y",

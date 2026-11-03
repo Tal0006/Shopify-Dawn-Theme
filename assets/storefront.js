@@ -63,6 +63,50 @@
     feedback.textContent = message;
     if (!error) cardFeedbackTimers.set(form, setTimeout(() => { if (feedback.isConnected) feedback.textContent = ''; }, 5500));
   }
+  const cartMobile = window.matchMedia('(max-width: 991px)');
+  let toastTimer;
+  let toastExitTimer;
+  const toastReady = new WeakSet();
+  function hideCartToast(toast) {
+    clearTimeout(toastTimer);
+    clearTimeout(toastExitTimer);
+    toast.setAttribute('data-closing', '');
+    toastExitTimer = setTimeout(() => { toast.hidden = true; toast.removeAttribute('data-closing'); toast.querySelector('[data-cart-toast-message]').textContent = ''; }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 160);
+  }
+  function scheduleCartToast(toast) {
+    clearTimeout(toastTimer);
+    if (!toast.contains(document.activeElement) && !toast.matches(':hover')) toastTimer = setTimeout(() => hideCartToast(toast), 3200);
+  }
+  function addFeedback(form, message, error = false) {
+    const toast = document.querySelector('[data-cart-toast]');
+    if (!cartMobile.matches || !toast) { cardFeedback(form, message, error); return; }
+    const inline = form.querySelector('[data-card-feedback]');
+    if (inline) inline.textContent = '';
+    clearTimeout(toastTimer);
+    clearTimeout(toastExitTimer);
+    toast.removeAttribute('data-closing');
+    if (!toastReady.has(toast)) {
+      toastReady.add(toast);
+      toast.addEventListener('focusin', () => { clearTimeout(toastTimer); clearTimeout(toastExitTimer); toast.removeAttribute('data-closing'); });
+      toast.addEventListener('focusout', () => setTimeout(() => scheduleCartToast(toast), 0));
+      toast.addEventListener('pointerenter', event => { if (event.pointerType === 'mouse') clearTimeout(toastTimer); });
+      toast.addEventListener('pointerleave', () => scheduleCartToast(toast));
+      toast.addEventListener('pointerdown', () => clearTimeout(toastTimer));
+      toast.addEventListener('pointerup', () => scheduleCartToast(toast));
+    }
+    toast.toggleAttribute('data-error', error);
+    toast.querySelector('[data-cart-toast-message]').textContent = error ? message : toast.dataset.success;
+    toast.style.removeProperty('--cart-toast-bottom');
+    toast.hidden = false;
+    // Keep the floating notification above the triggering purchase control.
+    const button = form.querySelector('[name=add]');
+    const control = button?.getBoundingClientRect(), rect = toast.getBoundingClientRect();
+    if (control && control.bottom > rect.top && control.top < rect.bottom && control.top > rect.height + 24) {
+      toast.style.setProperty('--cart-toast-bottom', (innerHeight - control.top + 12) + 'px');
+    }
+    scheduleCartToast(toast);
+  }
+  cartMobile.addEventListener('change', () => { const toast = document.querySelector('[data-cart-toast]'); if (toast) hideCartToast(toast); });
   function renderCardCartSection(html) {
     if (typeof html !== 'string') return false;
     const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -123,7 +167,7 @@
     const button = form.querySelector('button[name=add]');
     if (!button || button.disabled) return;
     const formData = window.fankeeCartSubmit?.consume(form) || new FormData(form);
-    const shouldOpenDrawer = !!drawer();
+    const shouldOpenDrawer = !!drawer() && !cartMobile.matches;
     let drawerMessage = '';
     let drawerError = false;
     cardCartPending.add(form);
@@ -153,15 +197,15 @@
         const result = await response.json();
         const refreshed = await refreshCardCart(result.sections, sectionId);
         if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer().dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
-        else cardFeedback(form, refreshed || !document.querySelector('.mini-cart-content') ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed && !!document.querySelector('.mini-cart-content'));
+        else addFeedback(form, refreshed || !document.querySelector('.mini-cart-content') ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed && !!document.querySelector('.mini-cart-content'));
       } catch (error) {
         if (window.Shopify?.designMode) console.warn('[Cart] AJAX add failed', {message: error.message, status: error.status});
         if (added) {
           const refreshed = await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection);
           if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer()?.dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
-          else cardFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
+          else addFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
         }
-        else cardFeedback(form, feedback.dataset.error, true);
+        else addFeedback(form, feedback.dataset.error, true);
       } finally {
         button.disabled = false;
         button.removeAttribute('aria-busy');
@@ -169,8 +213,9 @@
         button.textContent = label;
         cardCartPending.delete(form);
         if (drawerMessage) {
-          if (openCart(button)) cartStatus(drawerMessage, drawerError);
-          else cardFeedback(form, feedback.dataset.success);
+          if (cartMobile.matches) addFeedback(form, drawerMessage, drawerError);
+          else if (openCart(button)) cartStatus(drawerMessage, drawerError);
+          else addFeedback(form, feedback.dataset.success);
         }
       }
     });
