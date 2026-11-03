@@ -1,5 +1,105 @@
 (() => {
   'use strict';
+
+  // One delegated card handler also covers recommendations and Theme Editor reloads.
+  const cardCartPending = new WeakSet();
+  const cardFeedbackTimers = new WeakMap();
+  let cardCartQueue = Promise.resolve();
+  const cartRoot = () => window.Shopify?.routes?.root || (document.querySelector('form[data-card-cart]')?.action.replace(/cart\/add.*$/, '') || '/');
+  function cardFeedback(form, message, error = false) {
+    const feedback = form.querySelector('[data-card-feedback]');
+    clearTimeout(cardFeedbackTimers.get(form));
+    feedback.toggleAttribute('data-feedback-error', error);
+    feedback.textContent = message;
+    if (!error) cardFeedbackTimers.set(form, setTimeout(() => { if (feedback.isConnected) feedback.textContent = ''; }, 5500));
+  }
+  function renderCardCartSection(html) {
+    if (typeof html !== 'string') return false;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const fresh = doc.querySelector('.storefront-header .mini-cart');
+    const current = document.querySelector('.storefront-header .mini-cart');
+    const freshButton = fresh?.querySelector('.cart-toggle-btn');
+    const freshItems = fresh?.querySelector('.mini-cart-items');
+    const button = current?.querySelector('.cart-toggle-btn');
+    const items = current?.querySelector('.mini-cart-items');
+    if (!freshButton || !freshItems || !button || !items) return false;
+    // Keep existing controls/drawer nodes and their focus observers; replace only server-rendered cart content.
+    button.replaceChildren(...freshButton.childNodes);
+    button.setAttribute('aria-label', freshButton.getAttribute('aria-label'));
+    items.replaceChildren(...freshItems.childNodes);
+    return true;
+  }
+  async function refreshCardCart(sections, sectionId) {
+    if (sectionId && renderCardCartSection(sections?.[sectionId])) return true;
+    if (sectionId) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('section_id');
+        url.searchParams.set('sections', sectionId);
+        const response = await fetch(url, {headers: {Accept: 'application/json'}, credentials: 'same-origin', cache: 'no-store'});
+        if (response.ok && renderCardCartSection((await response.json())[sectionId])) return true;
+      } catch { /* An add can succeed even when Shopify cannot render a section. */ }
+    }
+    // Last-resort badge state comes from Shopify, never from a locally incremented count.
+    try {
+      const response = await fetch(cartRoot() + 'cart.js', {headers: {Accept: 'application/json'}, credentials: 'same-origin', cache: 'no-store'});
+      if (response.ok) {
+        const cart = await response.json();
+        const button = document.querySelector('.storefront-header .cart-toggle-btn');
+        const badge = button?.querySelector('.cart-count');
+        if (badge && Number.isInteger(cart.item_count)) {
+          badge.textContent = String(cart.item_count);
+          button.setAttribute('aria-label', button.dataset.countLabel.replace('__COUNT__', String(cart.item_count)));
+        }
+      }
+    } catch { /* Report stale display separately; never retry the successful add. */ }
+    return false;
+  }
+  document.addEventListener('submit', event => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.matches('[data-card-cart]')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (cardCartPending.has(form)) return;
+    const button = form.querySelector('button[name=add]');
+    if (!button || button.disabled) return;
+    cardCartPending.add(form);
+    const label = button.textContent;
+    const feedback = form.querySelector('[data-card-feedback]');
+    clearTimeout(cardFeedbackTimers.get(form));
+    feedback.textContent = '';
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    form.setAttribute('aria-busy', 'true');
+    button.textContent = button.dataset.pendingLabel;
+    // Serialize mutations to prevent concurrent section responses from overwriting newer cart state.
+    const operation = cardCartQueue.then(async () => {
+      let added = false;
+      try {
+        const id = new FormData(form).get('id');
+        if (!id || !/^\d+$/.test(String(id))) throw Error('Missing variant');
+        const sectionId = document.querySelector('.storefront-header')?.dataset.cartSection;
+        const body = {items: [{id: String(id), quantity: 1}], ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})};
+        const response = await fetch(cartRoot() + 'cart/add.js', {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, credentials: 'same-origin', body: JSON.stringify(body)});
+        if (!response.ok) throw Error('Cart add rejected');
+        added = true;
+        const result = await response.json();
+        const refreshed = await refreshCardCart(result.sections, sectionId);
+        cardFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
+      } catch {
+        if (added) { await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection); cardFeedback(form, feedback.dataset.refreshError, true); }
+        else cardFeedback(form, feedback.dataset.error, true);
+      } finally {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        form.removeAttribute('aria-busy');
+        button.textContent = label;
+        cardCartPending.delete(form);
+      }
+    });
+    cardCartQueue = operation.catch(() => {});
+  }, true);
+
   // Delegation keeps header controls working after Theme Editor section reloads.
   document.addEventListener('click', (event) => {
     const opener = event.target.closest('.storefront-header .open-btn');

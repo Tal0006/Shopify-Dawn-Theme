@@ -1,6 +1,8 @@
 {% if card_product != blank %}
   {% assign card_variant = card_product.selected_or_first_available_variant %}
   {% assign card_heading_tag = 'h3' %}{% if request.page_type == 'collection' or request.page_type == 'search' %}{% assign card_heading_tag = 'h2' %}{% endif %}
+  {% assign card_quantity_min = card_variant.quantity_rule.min | default: 1 %}
+  {% assign card_quantity_increment = card_variant.quantity_rule.increment | default: 1 %}
   {% assign card_image_alt = card_product.featured_image.alt | default: card_product.title %}
   <article class="catalog-card">
     <a href="{{ card_product.url }}" class="catalog-card__image" aria-label="{{ card_product.title | escape }}">
@@ -15,12 +17,13 @@
       <p class="catalog-availability">{% if card_product.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</p>
       {% if card_product.available == false %}
         <button class="theme-btn" disabled>{{ 'products.product.sold_out' | t }}</button>
-      {% elsif card_product.has_only_default_variant and card_product.requires_selling_plan == false %}
+      {% elsif card_product.variants.size == 1 and card_product.requires_selling_plan == false and card_quantity_min <= 1 and card_quantity_increment == 1 %}
         {% assign card_form_id = 'CardProductForm-' | append: section.id | append: '-' | append: card_product.id %}
-        {% form 'product', card_product, id: card_form_id, class: 'catalog-card__form' %}
+        {% form 'product', card_product, id: card_form_id, class: 'catalog-card__form', data-card-cart: '' %}
           <input type="hidden" name="id" value="{{ card_variant.id }}">
-          <input type="hidden" name="quantity" value="{{ card_variant.quantity_rule.min | default: 1 }}">
-          <button type="submit" class="theme-btn" name="add">{{ 'products.product.add_to_cart' | t }}</button>
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit" class="theme-btn" name="add" aria-describedby="{{ card_form_id }}-Feedback" data-pending-label="{{ 'storefront.cart_adding' | t | escape }}">{{ 'products.product.add_to_cart' | t }}</button>
+          <p id="{{ card_form_id }}-Feedback" class="catalog-card-feedback" role="status" aria-live="polite" aria-atomic="true" data-card-feedback data-success="{{ 'storefront.cart_added' | t | escape }}" data-error="{{ 'storefront.cart_add_error' | t | escape }}" data-refresh-error="{{ 'storefront.cart_refresh_error' | t | escape }}"></p>
         {% endform %}
       {% else %}
         <a class="theme-btn" href="{{ card_product.url }}">{{ 'products.product.choose_options' | t }}</a>

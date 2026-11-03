@@ -1,4 +1,5 @@
-<header id="header" class="storefront-header">
+<script src="{{ 'predictive-search.js' | asset_url }}" defer></script>
+<header id="header" class="storefront-header" data-cart-section="{{ section.id }}">
 <div class="site-header header-style-1"><nav class="navigation navbar navbar-expand-lg navbar-light"><div class="container-fluid"><div class="row">
   <a class="navbar-brand storefront-menu-logo" href="{{ routes.root_url }}">
     {% assign header_logo = section.settings.logo | default: settings.logo %}
@@ -13,14 +14,11 @@
     </ul>
   </div>
   <div class="storefront-header-tools">
-    <form method="get" action="{{ routes.search_url }}" role="search">
-      <label class="sr-only" for="HeaderSearch-{{ section.id }}">{{ 'general.search.search' | t }}</label>
-      <input type="search" id="HeaderSearch-{{ section.id }}" name="q" placeholder="{{ 'storefront.search_placeholder' | t }}" value="{{ search.terms | escape }}"><input type="hidden" name="type" value="product"><input type="hidden" name="options[prefix]" value="last">
-      <button type="submit" aria-label="{{ 'general.search.search' | t }}"><i class="ti-search" aria-hidden="true"></i></button>
-    </form>
+    {% assign header_search_id = 'HeaderSearch-' | append: section.id %}
+    {% render 'predictive-search', search_id: header_search_id %}
     {% if shop.customer_accounts_enabled %}<a class="storefront-account" href="{{ routes.account_url }}" aria-label="{{ 'customer.account.title' | t }}"><i class="ti-user" aria-hidden="true"></i></a>{% endif %}
     <div class="mini-cart">
-      <button type="button" class="cart-toggle-btn" aria-controls="MiniCart-{{ section.id }}" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><img src="{{ 'shopping-cart.png' | asset_url }}" width="24" height="24" alt=""></i><span class="cart-count">{{ cart.item_count }}</span></button>
+      <button type="button" class="cart-toggle-btn" data-count-label="{{ 'general.cart.view' | t: count: '__COUNT__' | escape }}" aria-controls="MiniCart-{{ section.id }}" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><img src="{{ 'shopping-cart.png' | asset_url }}" width="24" height="24" alt=""></i><span class="cart-count">{{ cart.item_count }}</span></button>
       <div id="MiniCart-{{ section.id }}" class="mini-cart-content" role="dialog" aria-modal="false" aria-labelledby="MiniCartTitle-{{ section.id }}" inert>
         <button type="button" class="mini-cart-close" aria-label="{{ 'accessibility.close' | t }}"><i class="ti-close" aria-hidden="true"></i></button>
         <div class="mini-cart-items"><p class="top-p" id="MiniCartTitle-{{ section.id }}">{{ 'sections.cart.title' | t }} ({{ cart.item_count }})</p>

@@ -1,0 +1,33 @@
+{% doc %}
+  Server-rendered product suggestions shared by predictive and normal-search routes.
+  @param {product[]} products - Shopify product results.
+  @example
+  {% render 'predictive-search-products', products: predictive_search.resources.products %}
+{% enddoc %}
+{% render 'predictive-search-styles' %}
+<div data-predictive-fragment>
+  {% if products.size > 0 %}
+    <ul class="predictive-search__list" role="listbox" aria-label="{{ 'storefront.predictive.products' | t | escape }}">
+      {% for product in products limit: 6 %}
+        <li role="presentation">
+          <a href="{{ product.url }}" class="predictive-search__option" role="option" aria-selected="false">
+            <span class="predictive-search__image">
+              {% if product.featured_image != blank %}
+                {{ product.featured_image | image_url: width: 108 | image_tag: loading: 'lazy', widths: '54, 108', sizes: '54px', alt: '' }}
+              {% else %}<span aria-hidden="true">—</span>{% endif %}
+            </span>
+            <div class="predictive-search__content">
+              <span class="predictive-search__title">{{ product.title | escape }}</span>
+              {% if product.vendor != blank %}<span class="predictive-search__meta">{{ product.vendor | escape }}</span>{% endif %}
+              {% render 'product-price', card_product: product %}
+              <span class="predictive-search__meta">{% if product.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</span>
+            </div>
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="predictive-search__empty">{{ 'storefront.predictive.empty' | t }}<small>{{ 'storefront.predictive.hint' | t }}</small></p>
+    <ul class="predictive-search__list" role="listbox" aria-label="{{ 'storefront.predictive.products' | t | escape }}"></ul>
+  {% endif %}
+</div>

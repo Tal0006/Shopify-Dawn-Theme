@@ -613,7 +613,20 @@
       "on_hold": "On hold"
     },
     "one_time_purchase": "One-time purchase",
-    "product_type": "Product type"
+    "product_type": "Product type",
+    "cart_adding": "Adding…",
+    "cart_add_error": "We could not add this product. Please try again.",
+    "cart_refresh_error": "The product was added. We could not refresh the cart display; open your cart to review it.",
+    "cart_added": "Product added to cart",
+    "predictive": {
+      "loading": "Searching products…",
+      "error": "Suggestions are unavailable. You can open all results.",
+      "empty": "No products found",
+      "hint": "Try a product name or brand",
+      "count": "{{ count }} products found",
+      "all": "View all results",
+      "products": "Product suggestions"
+    }
   },
   "date_formats": {
     "date": "%d/%m/%Y",

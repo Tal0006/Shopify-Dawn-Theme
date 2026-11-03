@@ -8,3 +8,8 @@
 ehthumbs.db
 Thumbs.db
 .shopify
+
+# Local importer credentials
+.env
+.env.*
+!.env.example

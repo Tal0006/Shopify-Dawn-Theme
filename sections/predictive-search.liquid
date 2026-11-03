@@ -1,0 +1,13 @@
+{% comment %}
+  Section contract: six product rows for locale-aware Ajax search responses.
+  Native predictive search is used where supported; normal search supplies Hebrew results.
+  @example
+  /search?q=soap&type=product&section_id=predictive-search
+{% endcomment %}
+{% if predictive_search.performed %}
+  {% render 'predictive-search-products', products: predictive_search.resources.products %}
+{% elsif search.performed %}
+  {% paginate search.results by 6 %}
+    {% render 'predictive-search-products', products: search.results %}
+  {% endpaginate %}
+{% endif %}

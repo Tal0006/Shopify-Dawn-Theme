@@ -293,3 +293,9 @@ html[dir=rtl] .storefront-header #navbar .nav-mega-panel { transform: translateX
   .storefront-header #navbar .nav-mega-panel :focus-visible, .storefront-header #navbar .nav-mega-trigger:focus-visible { outline-color: #fff !important; }
   .storefront-header #navbar .nav-mega-footer { border-color: #ffffff40; }
 }
+
+/* Inline product-card cart feedback; Hebrew direction follows the card. */
+.catalog-card-feedback { font-size: 13px; line-height: 1.5; margin-block: 8px 0; color: #135541; }
+.catalog-card-feedback:empty { margin: 0; }
+.catalog-card-feedback[data-feedback-error] { color: #9b2525; }
+.catalog-card__form[aria-busy=true] .theme-btn { cursor: progress; }

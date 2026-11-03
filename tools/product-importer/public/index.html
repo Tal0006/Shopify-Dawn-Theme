@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>הוספת מוצר לפי ברקוד</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script></head>
+<body><main><p>פאנקי · כלי ניהול מוצרים</p><h1>הוספת מוצר לפי ברקוד</h1>
+<p>הזינו ברקוד ומחיר מכירה. המוצר יישמר כטיוטה לאחר אישור.</p>
+<form id="lookup"><label for="barcode">ברקוד</label><input id="barcode" name="barcode" dir="ltr" inputmode="numeric" required autocomplete="off">
+<label for="price">מחיר</label><input id="price" name="price" dir="ltr" inputmode="decimal" required autocomplete="off" placeholder="15.90">
+<label for="manual-image">תמונה חלופית</label><input id="manual-image" name="manualImageUrl" type="url" dir="ltr" inputmode="url" autocomplete="off" placeholder="https://..." aria-describedby="image-help">
+<small id="image-help">לא חובה. אם לא נמצאה תמונה אוטומטית, הדביקו כתובת תמונה ולחצו שוב על חיפוש מוצר. השאירו ריק כדי ליצור גם ללא תמונה.</small>
+<button id="search">חיפוש מוצר</button></form>
+<p id="message" role="status" aria-live="polite"></p>
+<section id="preview" hidden aria-labelledby="product-title">
+<img id="image" width="220" height="220" alt="" hidden referrerpolicy="no-referrer"><p id="missing">לא נמצאה תמונה למוצר</p>
+<h2 id="product-title"></h2><dl id="details"></dl>
+<p id="search-selection" hidden>תמונה נבחרה ידנית מתוצאות חיפוש</p>
+<a id="source-page" hidden target="_blank" rel="noopener noreferrer">דף מקור התמונה</a>
+<section id="candidate-area" hidden aria-labelledby="candidate-title">
+<h3 id="candidate-title">בחר תמונת מוצר</h3>
+<p>תוצאות חיפוש הן הצעות בלבד. בחרו תמונה מתאימה ובדקו את תנאי השימוש והרשאת השימוש במקור.</p>
+<div id="candidate-list" class="candidates" role="group" aria-labelledby="candidate-title"></div>
+</section>
+<button id="without-image" type="button">המשך ללא תמונה</button>
+<p>המוצר ייווצר כטיוטה ללא שיוך לאוסף. ניתן לשייך אוסף ולפרסם ב-Shopify.</p>
+<button id="confirm" type="button">צור מוצר ב-Shopify</button></section>
+<section id="result" hidden aria-label="תוצאת הייבוא"><h2 id="result-title"></h2><dl id="result-details"></dl><a id="admin" target="_blank" rel="noopener noreferrer">פתיחה בניהול Shopify</a></section>
+<noscript>יש להפעיל JavaScript כדי להשתמש בכלי הייבוא.</noscript>
+</main></body></html>
