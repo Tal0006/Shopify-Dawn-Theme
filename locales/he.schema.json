@@ -47,7 +47,11 @@
     "address": "כתובת",
     "title": "כותרת",
     "newsletter": "הרשמה לעדכונים",
-    "category_info": "בוחרים קטגוריה קיימת ב־Shopify. השם, התמונה והקישור שלה מוצגים אוטומטית."
+    "category_info": "בוחרים קטגוריה קיימת ב־Shopify. השם, התמונה והקישור שלה מוצגים אוטומטית.",
+    "free_shipping_threshold": "סכום למשלוח חינם",
+    "free_shipping_threshold_info": "במטבע החנות. 0 מסתיר את ההודעה. יש להתאים לכללי המשלוח; ההגדרה אינה משנה תעריפים.",
+    "product_usage": "הוראות שימוש",
+    "product_additional": "מידע נוסף"
   },
   "sections": {
     "all": {

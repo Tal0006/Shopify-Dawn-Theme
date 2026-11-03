@@ -3472,6 +3472,10 @@
     "address": "Address",
     "title": "Title",
     "newsletter": "Newsletter",
-    "category_info": "Choose an existing Shopify collection. Its name, image and URL are used automatically."
+    "category_info": "Choose an existing Shopify collection. Its name, image and URL are used automatically.",
+    "free_shipping_threshold": "Free shipping threshold",
+    "free_shipping_threshold_info": "In shop currency. 0 hides the message. Match your shipping rules; this setting does not change rates.",
+    "product_usage": "Usage instructions",
+    "product_additional": "Additional information"
   }
 }

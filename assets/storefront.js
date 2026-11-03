@@ -6,6 +6,55 @@
   const cardFeedbackTimers = new WeakMap();
   let cardCartQueue = Promise.resolve();
   const cartRoot = () => window.Shopify?.routes?.root || (document.querySelector('form[data-card-cart]')?.action.replace(/cart\/add.*$/, '') || '/');
+  let cartReturnFocus = null;
+  let drawerPending = false;
+  const drawerReady = new WeakSet();
+  const closedDrawers = new WeakSet();
+  const drawer = () => document.querySelector('dialog.cart-drawer');
+  function cartStatus(message, error = false) {
+    const status = drawer()?.querySelector('[data-cart-status]');
+    if (status) { status.toggleAttribute('data-error', error); status.textContent = message; }
+  }
+  function openCart(opener) {
+    const panel = drawer();
+    if (!panel) return;
+    if (!panel.open) {
+      closedDrawers.delete(panel);
+      cartReturnFocus = opener || document.activeElement;
+      panel.inert = false;
+      panel.showModal();
+      panel.classList.add('mini-cart-content-toggle');
+      panel.closest('.mini-cart').querySelector('.cart-toggle-btn').setAttribute('aria-expanded', 'true');
+      panel.querySelector('.mini-cart-close').focus({preventScroll: true});
+    }
+  }
+  function finishCartClose(panel) {
+    // A queued native close event can arrive after the drawer has reopened.
+    if (panel.open || closedDrawers.has(panel)) return;
+    closedDrawers.add(panel);
+    panel.classList.remove('mini-cart-content-toggle');
+    panel.closest('.mini-cart')?.querySelector('.cart-toggle-btn')?.setAttribute('aria-expanded', 'false');
+    const target = cartReturnFocus?.isConnected ? cartReturnFocus : document.querySelector('.cart-toggle-btn');
+    target?.focus({preventScroll: true});
+  }
+  function closeCart() {
+    const panel = drawer();
+    if (panel?.open) { panel.close(); finishCartClose(panel); }
+  }
+  function initCart(root) {
+    root.querySelectorAll('dialog.cart-drawer').forEach(panel => {
+      if (drawerReady.has(panel)) return;
+      drawerReady.add(panel);
+      panel.addEventListener('close', () => finishCartClose(panel));
+
+    });
+  }
+  initCart(document);
+  document.addEventListener('shopify:section:load', event => initCart(event.target));
+  document.addEventListener('shopify:section:unload', event => {
+    const panel = event.target.querySelector('dialog.cart-drawer');
+    if (panel?.open) panel.close();
+  });
   function cardFeedback(form, message, error = false) {
     const feedback = form.querySelector('[data-card-feedback]');
     clearTimeout(cardFeedbackTimers.get(form));
@@ -26,7 +75,15 @@
     // Keep existing controls/drawer nodes and their focus observers; replace only server-rendered cart content.
     button.replaceChildren(...freshButton.childNodes);
     button.setAttribute('aria-label', freshButton.getAttribute('aria-label'));
+    const focused = items.contains(document.activeElement) ? document.activeElement : null;
+    const lineKey = focused?.closest('[data-cart-line]')?.dataset.cartLine;
+    const action = focused?.matches('[data-cart-quantity]') ? '[data-cart-quantity]' : focused?.matches('[data-cart-remove]') ? '[data-cart-remove]' : focused?.matches('[data-cart-delta]') ? '[data-cart-delta="' + focused.dataset.cartDelta + '"]' : null;
     items.replaceChildren(...freshItems.childNodes);
+    if (focused && drawer()?.open) {
+      const line = [...items.querySelectorAll('[data-cart-line]')].find(item => item.dataset.cartLine === lineKey);
+      const target = action && line?.querySelector(action);
+      (target && !target.disabled ? target : drawer().querySelector('.mini-cart-close')).focus({preventScroll: true});
+    }
     return true;
   }
   async function refreshCardCart(sections, sectionId) {
@@ -58,11 +115,15 @@
   document.addEventListener('submit', event => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || !form.matches('[data-card-cart]')) return;
+    if (event.submitter && event.submitter.name !== 'add') return;
     event.preventDefault();
     event.stopImmediatePropagation();
     if (cardCartPending.has(form)) return;
     const button = form.querySelector('button[name=add]');
     if (!button || button.disabled) return;
+    const shouldOpenDrawer = !!drawer();
+    let drawerMessage = '';
+    let drawerError = false;
     cardCartPending.add(form);
     const label = button.textContent;
     const feedback = form.querySelector('[data-card-feedback]');
@@ -76,18 +137,27 @@
     const operation = cardCartQueue.then(async () => {
       let added = false;
       try {
-        const id = new FormData(form).get('id');
+        const data = new FormData(form);
+        const id = data.get('id');
+        const quantity = Number(data.get('quantity') || 1);
+        if (!Number.isInteger(quantity) || quantity < 1) throw Error('Invalid quantity');
+        const properties = Object.fromEntries([...data].filter(([key]) => /^properties\[.+\]$/.test(key)).map(([key, value]) => [key.slice(11, -1), value]));
         if (!id || !/^\d+$/.test(String(id))) throw Error('Missing variant');
         const sectionId = document.querySelector('.storefront-header')?.dataset.cartSection;
-        const body = {items: [{id: String(id), quantity: 1}], ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})};
+        const body = {items: [{id: String(id), quantity, ...(data.get('selling_plan') ? {selling_plan: data.get('selling_plan')} : {}), ...(Object.keys(properties).length ? {properties} : {})}], ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})};
         const response = await fetch(cartRoot() + 'cart/add.js', {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, credentials: 'same-origin', body: JSON.stringify(body)});
         if (!response.ok) throw Error('Cart add rejected');
         added = true;
         const result = await response.json();
         const refreshed = await refreshCardCart(result.sections, sectionId);
-        cardFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
+        if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer().dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
+        else cardFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
       } catch {
-        if (added) { await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection); cardFeedback(form, feedback.dataset.refreshError, true); }
+        if (added) {
+          const refreshed = await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection);
+          if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer()?.dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
+          else cardFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
+        }
         else cardFeedback(form, feedback.dataset.error, true);
       } finally {
         button.disabled = false;
@@ -95,6 +165,7 @@
         form.removeAttribute('aria-busy');
         button.textContent = label;
         cardCartPending.delete(form);
+        if (drawerMessage) { openCart(button); cartStatus(drawerMessage, drawerError); }
       }
     });
     cardCartQueue = operation.catch(() => {});
@@ -115,7 +186,13 @@
       header.querySelector('.open-btn').classList.toggle('x-close', open);
     } else if (cartToggle || cartClose) {
       const content = (cartToggle || cartClose).closest('.mini-cart').querySelector('.mini-cart-content');
-      content.classList.toggle('mini-cart-content-toggle', cartClose ? false : !content.classList.contains('mini-cart-content-toggle'));
+      if (content.matches('dialog.cart-drawer')) { if (cartClose || content.open) closeCart(); else openCart(cartToggle); }
+      else content.classList.toggle('mini-cart-content-toggle', cartClose ? false : !content.classList.contains('mini-cart-content-toggle'));
+    } else if (event.target.matches('dialog.cart-drawer')) {
+      const rect = event.target.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeCart();
+    } else if (event.target.closest('[data-cart-continue]')) {
+      closeCart();
     } else if (submenuToggle) {
       const open = submenuToggle.getAttribute('aria-expanded') !== 'true';
       navigationDisclosure(submenuToggle, open);
@@ -126,7 +203,70 @@
     event.preventDefault();
     event.stopImmediatePropagation();
   }, true);
+  // Share the add queue: server-rendered sections remain the sole source of cart state.
+  function changeCart(control, quantity) {
+    const panel = drawer();
+    const line = control.closest('[data-cart-line]');
+    const input = line?.querySelector('[data-cart-quantity]');
+    if (!panel || !line || !input || drawerPending) return;
+    if (!Number.isInteger(quantity) || (quantity !== 0 && (quantity < Number(input.min) || (input.max && quantity > Number(input.max)) || (quantity - Number(input.min)) % Number(input.step)))) {
+      input.value = input.defaultValue; cartStatus(panel.dataset.cartError, true); return;
+    }
+    const focusedControl = document.activeElement;
+    const restoreControl = line.contains(focusedControl);
+    drawerPending = true;
+    panel.setAttribute('aria-busy', 'true');
+    const disabled = new Map([...panel.querySelectorAll('.cart-drawer__form button, .cart-drawer__form input')].map(el => [el, el.disabled]));
+    disabled.forEach((_value, el) => { el.disabled = true; });
+    cartStatus('');
+    const key = line.dataset.cartLine;
+    const operation = cardCartQueue.then(async () => {
+      let changed = false;
+      try {
+        const sectionId = document.querySelector('.storefront-header').dataset.cartSection;
+        const response = await fetch(cartRoot() + 'cart/change.js', {
+          method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, credentials: 'same-origin',
+          body: JSON.stringify({id: key, quantity, sections: [sectionId], sections_url: window.location.pathname + window.location.search})
+        });
+        if (!response.ok) throw Error('Cart change rejected');
+        changed = true;
+        const result = await response.json();
+        const refreshed = await refreshCardCart(result.sections, sectionId);
+        cartStatus(refreshed ? panel.dataset.cartUpdated : panel.dataset.cartStale, !refreshed);
+      } catch {
+        if (changed) await refreshCardCart(null, document.querySelector('.storefront-header').dataset.cartSection);
+        input.value = input.defaultValue;
+        cartStatus(changed ? panel.dataset.cartStale : panel.dataset.cartError, true);
+      } finally {
+        drawerPending = false;
+        panel.removeAttribute('aria-busy');
+        disabled.forEach((value, el) => { if (el.isConnected) el.disabled = value; });
+        if (panel.open && restoreControl && (document.activeElement === document.body || document.activeElement === focusedControl)) {
+          const nextLine = [...panel.querySelectorAll('[data-cart-line]')].find(item => item.dataset.cartLine === key);
+          const selector = control.matches('[data-cart-quantity]') ? '[data-cart-quantity]' : control.matches('[data-cart-delta]') ? '[data-cart-delta="' + control.dataset.cartDelta + '"]' : '[data-cart-remove]';
+          const next = nextLine?.querySelector(selector);
+          (next && !next.disabled ? next : panel.querySelector('.mini-cart-close')).focus({preventScroll: true});
+        }
+      }
+    });
+    cardCartQueue = operation.catch(() => {});
+  }
+  document.addEventListener('click', event => {
+    const control = event.target.closest('.cart-drawer [data-cart-delta], .cart-drawer [data-cart-remove]');
+    if (!control) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    if (drawerPending || control.disabled) return;
+    const input = control.closest('[data-cart-line]').querySelector('[data-cart-quantity]');
+    changeCart(control, control.hasAttribute('data-cart-remove') ? 0 : Number(input.value) + Number(control.dataset.cartDelta) * Number(input.step));
+  }, true);
+  document.addEventListener('change', event => {
+    if (event.target.matches('.cart-drawer [data-cart-quantity]')) changeCart(event.target, Number(event.target.value));
+  });
+  document.addEventListener('submit', event => {
+    if (event.target.matches('.cart-drawer__form') && drawerPending) event.preventDefault();
+  }, true);
   document.addEventListener('change', (event) => {
+    if (event.target.closest('[data-product-page]')) return;
     if (!event.target.matches('[data-variant-select]') || !event.target.value) return;
     const url = new URL(window.location.href);
     url.searchParams.set('variant', event.target.value);
@@ -302,7 +442,9 @@
     const cart = header.querySelector('.mini-cart-content');
     const menu = header.querySelector('.navigation-holder');
     if (cart.classList.contains('mini-cart-content-toggle')) {
-      event.preventDefault(); cart.classList.remove('mini-cart-content-toggle'); header.querySelector('.cart-toggle-btn').focus();
+      event.preventDefault();
+      if (cart.matches('dialog.cart-drawer')) closeCart();
+      else { cart.classList.remove('mini-cart-content-toggle'); header.querySelector('.cart-toggle-btn').focus(); }
     } else if (menu.classList.contains('slideInn')) {
       event.preventDefault(); menu.classList.remove('slideInn'); header.querySelector('.open-btn').focus();
     }

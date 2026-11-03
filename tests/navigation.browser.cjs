@@ -21,8 +21,8 @@ test('RTL mega menu desktop and mobile behavior', {timeout:120000}, async t=>{
     await t.test('Wide RTL panel uses responsive columns and stays within the viewport',async()=>{
       for(const width of [1440,1280,1024]){
         await viewport(width);await visit();await open();
-        const result=await ev(`(()=>{const p=document.querySelector('[data-mega-panel]'),r=p.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height,columns:getComputedStyle(p.querySelector('.nav-mega-groups')).columnCount,groups:p.querySelectorAll('.nav-mega-group').length,links:p.querySelectorAll('a').length,dir:getComputedStyle(p).direction,hidden:p.hidden,overflow:document.documentElement.scrollWidth>innerWidth}})()`);
-        assert.equal(result.hidden,false);assert.equal(result.dir,'rtl');assert.ok(result.w>=600&&result.w<=900);assert.ok(result.x>=15&&result.x+result.w<=width-15);assert.ok(result.y+result.h<=901);assert.equal(result.columns,width>=1200?'3':'2');assert.ok(result.groups>0);assert.equal(result.overflow,false);
+        const result=await ev(`(()=>{const p=document.querySelector('[data-mega-panel]'),r=p.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height,columns:getComputedStyle(p.querySelector('.nav-mega-groups')).gridTemplateColumns.split(' ').length,groups:p.querySelectorAll('.nav-mega-group').length,links:p.querySelectorAll('a').length,dir:getComputedStyle(p).direction,hidden:p.hidden,overflow:document.documentElement.scrollWidth>innerWidth}})()`);
+        assert.equal(result.hidden,false);assert.equal(result.dir,'rtl');assert.ok(result.w>=600&&result.w<=900);assert.ok(result.x>=15&&result.x+result.w<=width-15);assert.ok(result.y+result.h<=901);assert.equal(result.columns,width>=1200?3:2);assert.ok(result.groups>0);assert.equal(result.overflow,false);
       }
     });
     await t.test('Enter/Space opens, ArrowDown enters links, Escape returns focus, outside click closes',async()=>{
@@ -48,7 +48,7 @@ test('RTL mega menu desktop and mobile behavior', {timeout:120000}, async t=>{
     await t.test('Mobile drawer has one column, nested accordions, no horizontal overflow, and separate Escape levels',async()=>{
       for(const width of [390,320]){
         await viewport(width);await visit();await ev('document.querySelector(".open-btn").click()');await sleep(400);await open();
-        assert.equal(await ev('getComputedStyle(document.querySelector(".nav-mega-groups")).columnCount'),'1');assert.equal(await ev('document.querySelector("[data-mega-panel]").hidden'),false);assert.equal(await ev('document.documentElement.scrollWidth<=innerWidth'),true);
+        assert.equal(await ev('getComputedStyle(document.querySelector(".nav-mega-groups")).gridTemplateColumns.split(" ").length'),1);assert.equal(await ev('document.querySelector("[data-mega-panel]").hidden'),false);assert.equal(await ev('document.documentElement.scrollWidth<=innerWidth'),true);
         const nested=await ev('document.querySelectorAll("[data-group-trigger]").length');
         if(nested){assert.equal(await ev('document.getElementById(document.querySelector("[data-group-trigger]").getAttribute("aria-controls")).hidden'),true);await ev('document.querySelector("[data-group-trigger]").click()');assert.equal(await ev('document.querySelector("[data-group-trigger]").getAttribute("aria-expanded")'),'true');}
         await ev('document.querySelector("[data-mega-trigger]").focus()');await key('Escape','Escape',27);assert.equal(await ev('document.querySelector("[data-mega-panel]").hidden'),true);assert.equal(await ev('document.querySelector("#navbar").inert'),false);

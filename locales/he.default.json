@@ -626,7 +626,24 @@
       "count": "נמצאו {{ count }} מוצרים",
       "all": "הצגת כל התוצאות",
       "products": "הצעות למוצרים"
-    }
+    },
+    "drawer_close": "סגירת סל הקניות",
+    "drawer_empty": "הסל שלך ריק",
+    "drawer_total": "סה״כ",
+    "drawer_view": "צפייה בסל",
+    "drawer_updated": "סל הקניות עודכן",
+    "drawer_stale": "הסל עודכן, אך התצוגה לא התרעננה. אפשר לצפות בסל דרך הקישור.",
+    "drawer_shipping_remaining": "נשארו לך {{ amount }} למשלוח חינם",
+    "drawer_shipping_reached": "יש לך משלוח חינם 🎉",
+    "product_variant_error": "לא הצלחנו לטעון את האפשרות שנבחרה. כדאי לנסות שוב.",
+    "product_variant_updated": "המחיר, הזמינות והכמות עודכנו לאפשרות שנבחרה.",
+    "product_gallery": "תמונות המוצר",
+    "product_delivery": "משלוחים ואיסוף עצמי",
+    "product_usage": "הוראות שימוש",
+    "product_additional": "מידע נוסף",
+    "product_whatsapp_question": "שאלה על המוצר ב-WhatsApp",
+    "product_whatsapp_message": "שלום, יש לי שאלה לגבי:\n{{ title }}",
+    "product_recommendations": "אולי יעניין אותך גם"
   },
   "date_formats": {
     "date": "%d/%m/%Y",

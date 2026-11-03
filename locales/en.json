@@ -626,7 +626,24 @@
       "count": "{{ count }} products found",
       "all": "View all results",
       "products": "Product suggestions"
-    }
+    },
+    "drawer_close": "Close shopping cart",
+    "drawer_empty": "Your cart is empty",
+    "drawer_total": "Total",
+    "drawer_view": "View cart",
+    "drawer_updated": "Cart updated",
+    "drawer_stale": "Cart updated, but the display could not refresh. Use the view cart link.",
+    "drawer_shipping_remaining": "You are {{ amount }} away from free shipping",
+    "drawer_shipping_reached": "You have free shipping 🎉",
+    "product_variant_error": "Could not load this option. Please try again.",
+    "product_variant_updated": "Price, availability and quantity updated for the selected option.",
+    "product_gallery": "Product images",
+    "product_delivery": "Shipping and pickup",
+    "product_usage": "Usage instructions",
+    "product_additional": "Additional information",
+    "product_whatsapp_question": "Ask about this product on WhatsApp",
+    "product_whatsapp_message": "Hello, I have a question about:\n{{ title }}",
+    "product_recommendations": "You may also like"
   },
   "date_formats": {
     "date": "%d/%m/%Y",

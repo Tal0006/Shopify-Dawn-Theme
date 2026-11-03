@@ -1,37 +1,152 @@
+{% comment %}Product purchase region. Product/variant content is rendered by Shopify and refreshed by product-page.js.{% endcomment %}
 {%- liquid
-  assign selected_variant = product.selected_variant
-  if product.has_only_default_variant
-    assign selected_variant = product.selected_or_first_available_variant
-  endif
+  assign selected_variant = product.selected_or_first_available_variant
   assign form_id = 'ProductForm-' | append: section.id
+  assign primary_image = selected_variant.featured_image | default: product.featured_image
+  assign pickup_locations = selected_variant.store_availabilities | where: 'pick_up_enabled', true
 -%}
-<section class="shop-single-section product-details section-padding"><div class="container"><div class="row">
-<div class="col col-lg-6 col-12"><div class="product-single-img"><div class="product-active owl-carousel">
-  {% for image in product.images %}{% assign product_image_alt = image.alt | default: product.title %}<div class="item">{{ image | image_url: width: 1200 | image_tag: widths: '400, 800, 1200', sizes: '(min-width: 992px) 50vw, 100vw', alt: product_image_alt }}</div>{% endfor %}
-</div><div class="product-thumbnil-active owl-carousel">{% for image in product.images %}{% assign product_image_alt = image.alt | default: product.title %}<div class="item"><button type="button" aria-label="{{ 'products.product.media.load_image' | t: index: forloop.index }}">{{ image | image_url: width: 300 | image_tag: loading: 'lazy', alt: product_image_alt }}</button></div>{% endfor %}</div></div></div>
-<div class="col col-lg-6 col-12"><div class="product-details"><h1>{{ product.title | escape }}</h1>
-  {% if section.settings.show_vendor %}<p>{{ product.vendor | escape }}</p>{% endif %}
-  <p>{{ 'storefront.price' | t }}</p>{% render 'product-price', card_product: product, variant: selected_variant %}
-  <p>{% if selected_variant != blank %}{% if selected_variant.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}{% elsif product.available %}{{ 'products.product.choose_options' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</p>
-  {% form 'product', product, id: form_id, class: 'catalog-product-form storefront-validated-form' %}
-    {% if product.has_only_default_variant %}<input type="hidden" name="id" value="{{ selected_variant.id }}">
-    {% else %}<label for="Variant-{{ section.id }}">{{ 'storefront.options' | t }}<select name="id" id="Variant-{{ section.id }}" data-variant-select required><option value="" {% if selected_variant == blank %}selected{% endif %}>{{ 'storefront.select_variant' | t }}</option>{% for variant in product.variants %}<option value="{{ variant.id }}" {% if variant.id == selected_variant.id %}selected{% endif %}>{{ variant.title | escape }} — {{ variant.price | money }}{% unless variant.available %} — {{ 'products.product.sold_out' | t }}{% endunless %}</option>{% endfor %}</select></label>{% endif %}
-    {% if product.selling_plan_groups != blank %}<label for="Plan-{{ section.id }}">{{ 'storefront.selling_plan' | t }}<select name="selling_plan" id="Plan-{{ section.id }}" {% if product.requires_selling_plan %}required{% endif %}><option value="">{% if product.requires_selling_plan %}{{ 'storefront.select_variant' | t }}{% else %}{{ 'storefront.one_time_purchase' | t }}{% endif %}</option>{% for group in product.selling_plan_groups %}<optgroup label="{{ group.name | escape }}">{% for plan in group.selling_plans %}<option value="{{ plan.id }}">{{ plan.name | escape }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>{% endif %}
-    <label for="Quantity-{{ section.id }}">{{ 'products.product.quantity.label' | t }}</label><div class="catalog-quantity" data-quantity-controls>
-      <button type="button" data-quantity-change="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: product.title }}">−</button>
-      <input id="Quantity-{{ section.id }}" name="quantity" type="number" min="{{ selected_variant.quantity_rule.min | default: 1 }}" step="{{ selected_variant.quantity_rule.increment | default: 1 }}" value="{{ selected_variant.quantity_rule.min | default: 1 }}" {% if selected_variant.quantity_rule.max != blank %}max="{{ selected_variant.quantity_rule.max }}"{% endif %} required>
-      <button type="button" data-quantity-change="1" aria-label="{{ 'products.product.quantity.increase' | t: product: product.title }}">+</button>
+<script src="{{ 'product-page.js' | asset_url }}" defer></script>
+<section class="product-page section-padding" data-product-page data-section-id="{{ section.id }}" data-product-id="{{ product.id }}" data-product-url="{{ product.url }}" data-variant-error="{{ 'storefront.product_variant_error' | t | escape }}" data-variant-updated="{{ 'storefront.product_variant_updated' | t | escape }}">
+  <div class="container">
+    <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-product-status></p>
+    <div class="product-page__layout">
+      <div class="product-page__gallery" data-product-gallery>
+        <div class="product-page__stage">
+          {% for image in product.images %}
+            {% assign image_alt = image.alt | default: product.title %}
+            {% assign source_width = image.width | at_most: 960 %}
+            {% assign image_loading = 'lazy' %}{% if image.id == primary_image.id %}{% assign image_loading = 'eager' %}{% endif %}
+            <div id="ProductImage-{{ section.id }}-{{ image.id }}" class="product-page__image" data-product-image="{{ image.id }}" {% unless image.id == primary_image.id %}hidden{% endunless %}>
+              {{ image | image_url: width: source_width | image_tag: widths: '240, 480, 720, 960', sizes: '(min-width: 1200px) 550px, (min-width: 992px) 46vw, 92vw', loading: image_loading, alt: image_alt }}
+            </div>
+          {% else %}<p class="catalog-no-image">{{ 'storefront.no_image' | t }}</p>{% endfor %}
+        </div>
+        {% if product.images.size > 1 %}
+          <div class="product-page__thumbnails" role="group" aria-label="{{ 'storefront.product_gallery' | t }}">
+            {% for image in product.images %}
+              <button type="button" data-product-image-target="{{ image.id }}" aria-controls="ProductImage-{{ section.id }}-{{ image.id }}" aria-pressed="{% if image.id == primary_image.id %}true{% else %}false{% endif %}" aria-label="{{ 'products.product.media.load_image' | t: index: forloop.index | escape }}">
+                {{ image | image_url: width: 144 | image_tag: widths: '72, 144', sizes: '64px', loading: 'lazy', alt: '' }}
+              </button>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="product-page__purchase" data-product-purchase>
+        {% if section.settings.show_vendor and product.vendor != blank %}<p class="product-page__vendor">{{ product.vendor | escape }}</p>{% endif %}
+        <h1>{{ product.title | escape }}</h1>
+        <div class="product-page__price">{% render 'product-price', card_product: product, variant: selected_variant %}{% if selected_variant.compare_at_price > selected_variant.price %}<span class="product-page__sale">{{ 'products.product.on_sale' | t }}</span>{% endif %}</div>
+        <p class="product-page__availability" data-available="{{ selected_variant.available }}">{% if selected_variant.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</p>
+        {% form 'product', product, id: form_id, class: 'catalog-product-form storefront-validated-form', data-card-cart: '' %}
+          {% if product.has_only_default_variant %}<input type="hidden" name="id" value="{{ selected_variant.id }}">
+          {% else %}
+            <label for="Variant-{{ section.id }}">{{ product.options | join: ' / ' | escape }}
+              <select name="id" id="Variant-{{ section.id }}" data-product-variant data-current-variant="{{ selected_variant.id }}" required>
+                {% for variant in product.variants %}
+                  <option value="{{ variant.id }}" {% if variant.id == selected_variant.id %}selected{% endif %} {% unless variant.available %}disabled{% endunless %}>{% for value in variant.options %}{{ product.options[forloop.index0] | escape }}: {{ value | escape }}{% unless forloop.last %} · {% endunless %}{% endfor %}{% unless variant.available %} — {{ 'products.product.sold_out' | t }}{% endunless %}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <noscript><ul>{% for variant in product.variants %}{% if variant.available %}<li><a href="{{ variant.url }}">{{ variant.title | escape }}</a></li>{% endif %}{% endfor %}</ul></noscript>
+          {% endif %}
+          {% if product.selling_plan_groups != blank %}<label for="Plan-{{ section.id }}">{{ 'storefront.selling_plan' | t }}<select name="selling_plan" id="Plan-{{ section.id }}" {% if product.requires_selling_plan %}required{% endif %}><option value="">{% if product.requires_selling_plan %}{{ 'storefront.select_variant' | t }}{% else %}{{ 'storefront.one_time_purchase' | t }}{% endif %}</option>{% for group in product.selling_plan_groups %}<optgroup label="{{ group.name | escape }}">{% for plan in group.selling_plans %}<option value="{{ plan.id }}">{{ plan.name | escape }}</option>{% endfor %}</optgroup>{% endfor %}</select></label>{% endif %}
+          <div class="product-page__quantity-field">
+            <label for="Quantity-{{ section.id }}">{{ 'products.product.quantity.label' | t }}</label>
+            <div class="catalog-quantity" data-quantity-controls>
+              <button type="button" data-quantity-change="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: product.title | escape }}" disabled>−</button>
+              <input id="Quantity-{{ section.id }}" name="quantity" type="number" min="{{ selected_variant.quantity_rule.min | default: 1 }}" step="{{ selected_variant.quantity_rule.increment | default: 1 }}" value="{{ selected_variant.quantity_rule.min | default: 1 }}" {% if selected_variant.quantity_rule.max != blank %}max="{{ selected_variant.quantity_rule.max }}"{% endif %} required>
+              <button type="button" data-quantity-change="1" aria-label="{{ 'products.product.quantity.increase' | t: product: product.title | escape }}" {% if selected_variant.quantity_rule.max != blank and selected_variant.quantity_rule.max <= selected_variant.quantity_rule.min %}disabled{% endif %}>+</button>
+            </div>
+            {% if selected_variant.quantity_rule.min > 1 %}<small>{{ 'products.product.quantity.minimum_of' | t: quantity: selected_variant.quantity_rule.min }}</small>{% endif %}
+            {% if selected_variant.quantity_rule.increment > 1 %}<small>{{ 'products.product.quantity.multiples_of' | t: quantity: selected_variant.quantity_rule.increment }}</small>{% endif %}
+          </div>
+          <button class="theme-btn product-page__add" type="submit" name="add" data-pending-label="{{ 'storefront.cart_adding' | t | escape }}" aria-describedby="{{ form_id }}-Feedback" {% unless selected_variant.available %}disabled{% endunless %}>{% if selected_variant.available %}{{ 'products.product.add_to_cart' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</button>
+          <p id="{{ form_id }}-Feedback" class="catalog-card-feedback" role="status" aria-live="polite" aria-atomic="true" data-card-feedback data-success="{{ 'storefront.cart_added' | t | escape }}" data-error="{{ 'storefront.cart_add_error' | t | escape }}" data-refresh-error="{{ 'storefront.cart_refresh_error' | t | escape }}"></p>
+          {% if form.errors %}<div role="alert" class="storefront-form-errors">{{ form.errors | default_errors }}</div>{% endif %}
+          {% if section.settings.show_dynamic_checkout and selected_variant.available %}{{ form | payment_button }}{% endif %}
+        {% endform %}
+        {% if section.settings.shipping_text != blank or shop.shipping_policy.body != blank or section.settings.pickup_text != blank or pickup_locations.size > 0 %}
+          <aside class="product-page__reassurance" aria-label="{{ 'storefront.product_delivery' | t }}">
+            {% if section.settings.shipping_text != blank %}<p><strong>{{ 'storefront.shipping' | t }}</strong> {{ section.settings.shipping_text | strip_html | truncate: 130 }}</p>{% elsif shop.shipping_policy.body != blank %}<p>{{ 'products.product.shipping_policy_html' | t: link: shop.shipping_policy.url }}</p>{% endif %}
+            {% if section.settings.pickup_text != blank %}<p><strong>{{ 'storefront.pickup' | t }}</strong> {{ section.settings.pickup_text | strip_html | truncate: 130 }}</p>{% endif %}
+            {% for availability in pickup_locations %}<p>{% if availability.available %}{{ 'products.product.pickup_availability.pick_up_available_at_html' | t: location_name: availability.location.name }} — {{ availability.pick_up_time | escape }}{% else %}{{ 'products.product.pickup_availability.pick_up_unavailable_at_html' | t: location_name: availability.location.name }}{% endif %}</p>{% endfor %}
+          </aside>
+        {% endif %}
+        <a class="product-page__whatsapp" data-product-whatsapp data-message="{{ 'storefront.product_whatsapp_message' | t: title: product.title | escape }}" hidden>{{ 'storefront.product_whatsapp_question' | t }}</a>
+      </div>
+      {% if product.description != blank or section.settings.shipping_text != blank or shop.shipping_policy.body != blank or section.settings.pickup_text != blank or pickup_locations.size > 0 or section.settings.usage_text != blank or section.settings.additional_text != blank %}
+      <div class="product-page__accordions">
+        {% if product.description != blank %}<details open><summary>{{ 'products.product.description' | t }}</summary><div class="product-page__richtext">{{ product.description }}</div></details>{% endif %}
+        {% if section.settings.shipping_text != blank or shop.shipping_policy.body != blank or section.settings.pickup_text != blank or pickup_locations.size > 0 %}
+          <details><summary>{{ 'storefront.product_delivery' | t }}</summary><div class="product-page__richtext">
+            {% if section.settings.shipping_text != blank %}{{ section.settings.shipping_text }}{% elsif shop.shipping_policy.body != blank %}<p>{{ 'products.product.shipping_policy_html' | t: link: shop.shipping_policy.url }}</p>{% endif %}
+            {{ section.settings.pickup_text }}
+            {% for availability in pickup_locations %}<p>{% if availability.available %}{{ 'products.product.pickup_availability.pick_up_available_at_html' | t: location_name: availability.location.name }} — {{ availability.pick_up_time | escape }}{% else %}{{ 'products.product.pickup_availability.pick_up_unavailable_at_html' | t: location_name: availability.location.name }}{% endif %}</p>{% if availability.location.address %}{{ availability.location.address | format_address }}{% endif %}{% endfor %}
+          </div></details>
+        {% endif %}
+        {% if section.settings.usage_text != blank %}<details><summary>{{ 'storefront.product_usage' | t }}</summary><div class="product-page__richtext">{{ section.settings.usage_text }}</div></details>{% endif %}
+        {% if section.settings.additional_text != blank %}<details><summary>{{ 'storefront.product_additional' | t }}</summary><div class="product-page__richtext">{{ section.settings.additional_text }}</div></details>{% endif %}
+      </div>
+      {% endif %}
     </div>
-    {% if selected_variant.quantity_rule.min > 1 %}<small>{{ 'products.product.quantity.minimum_of' | t: quantity: selected_variant.quantity_rule.min }}</small>{% endif %}
-    <button class="theme-btn" type="submit" name="add" {% if product.available == false or selected_variant.available == false %}disabled{% endif %}>{% if product.available == false or selected_variant.available == false %}{{ 'products.product.sold_out' | t }}{% elsif selected_variant == blank %}{{ 'products.product.choose_options' | t }}{% else %}{{ 'products.product.add_to_cart' | t }}{% endif %}</button>
-    {% if form.errors %}<div role="alert" class="storefront-form-errors">{{ form.errors | default_errors }}</div>{% endif %}
-    {% if section.settings.show_dynamic_checkout and selected_variant.available %}{{ form | payment_button }}{% endif %}
-  {% endform %}
-  {% if product.description != blank %}<details open><summary>{{ 'products.product.description' | t }}</summary><div class="details-note">{{ product.description }}</div></details>{% endif %}
-  <details><summary>{{ 'storefront.shipping' | t }}</summary>{% if section.settings.shipping_text != blank %}{{ section.settings.shipping_text }}{% elsif shop.shipping_policy.body != blank %}{{ 'products.product.shipping_policy_html' | t: link: shop.shipping_policy.url }}{% else %}<p>{{ 'storefront.shipping_note' | t }}</p>{% endif %}</details>
-  {% assign pickup_locations = selected_variant.store_availabilities | where: 'pick_up_enabled', true %}
-  {% if pickup_locations.size > 0 or section.settings.pickup_text != blank %}<details><summary>{{ 'storefront.pickup' | t }}</summary>{{ section.settings.pickup_text }}{% for availability in pickup_locations %}<p>{% if availability.available %}{{ 'products.product.pickup_availability.pick_up_available_at_html' | t: location_name: availability.location.name }} — {{ availability.pick_up_time }}{% else %}{{ 'products.product.pickup_availability.pick_up_unavailable_at_html' | t: location_name: availability.location.name }}{% endif %}</p>{% if availability.location.address %}{{ availability.location.address | format_address }}{% endif %}{% endfor %}</details>{% endif %}
-</div></div></div></div></section>
+  </div>
+</section>
+{% stylesheet %}
+.product-page { color: var(--storefront-ink); background: #fff; }
+.product-page__layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "purchase gallery" "details details"; gap: 32px 40px; align-items: start; }
+.product-page__purchase { grid-area: purchase; min-width: 0; }
+.product-page__gallery { grid-area: gallery; min-width: 0; }
+.product-page__stage { display: grid; place-items: center; min-height: 340px; height: clamp(340px, 38vw, 480px); padding: 20px; background: #f7f8f4; border: 1px solid var(--storefront-border); border-radius: 10px; }
+.product-page__image { width: 100%; height: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.product-page [hidden] { display: none !important; }
+.product-page__image img { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+.product-page__thumbnails { display: flex; flex-wrap: wrap; gap: 10px; margin-block-start: 12px; }
+.product-page__thumbnails button { display: grid; place-items: center; width: 72px; height: 72px; padding: 4px; border: 1px solid var(--storefront-border); border-radius: 8px; background: #fff; }
+.product-page__thumbnails button[aria-pressed=true] { border: 2px solid var(--storefront-green); background: #f0f5ee; }
+.product-page__thumbnails img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.product-page__vendor { margin-block: 0 6px; color: #59665f; font-size: 14px; }
+.product-page h1 { font-size: clamp(25px, 2.6vw, 34px); line-height: 1.35; margin-block: 0 14px; overflow-wrap: anywhere; }
+.product-page__price { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.product-page__price .catalog-price { font-size: 25px; gap: 12px; }
+.product-page__price .catalog-price s { font-size: 16px; }
+.product-page__sale { border-radius: 5px; padding: 3px 8px; background: #eef4eb; color: var(--storefront-green); font-size: 12px; font-weight: 600; }
+.product-page__availability { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-block: 12px 0; color: #59665f; }
+.product-page__availability[data-available=true] { color: var(--storefront-green); }
+.product-page__availability::before { content: ''; flex-shrink: 0; width: 7px; height: 7px; background: currentColor; border-radius: 50%; }
+.product-page .catalog-product-form { max-width: none; margin-block: 20px 16px; gap: 16px; }
+.product-page .catalog-product-form select { width: 100%; }
+.product-page__quantity-field { display: grid; gap: 8px; }
+.product-page__quantity-field small { color: #59665f; }
+.product-page .catalog-quantity { width: fit-content; border: 1px solid var(--storefront-border); border-radius: 8px; gap: 0; }
+.product-page .catalog-quantity :is(button, input) { border: 0; border-radius: 0; width: 48px; min-height: 44px; padding: 8px; text-align: center; }
+.product-page .catalog-quantity input { appearance: textfield; -moz-appearance: textfield; }
+.product-page .catalog-quantity input::-webkit-inner-spin-button { appearance: none; }
+.product-page .catalog-quantity button:disabled { opacity: .4; }
+.product-page .product-page__add { width: 100%; min-height: 48px; background: var(--storefront-green); color: #fff; border: 1px solid var(--storefront-green); }
+.product-page .product-page__add:not(:disabled):is(:hover, :focus-visible) { background: #0d4232; }
+.product-page .product-page__add:disabled { background: #e6e9e7; color: #58635d; border-color: var(--storefront-border); }
+.product-page .catalog-card-feedback:empty { display: none; }
+.product-page__reassurance { border-block-start: 1px solid var(--storefront-border); padding-block-start: 12px; font-size: 13px; color: #59665f; }
+.product-page__reassurance p { margin-block: 0 8px; }
+.product-page__whatsapp { display: inline-flex; align-items: center; min-height: 44px; margin-block-start: 8px; color: var(--storefront-green); text-decoration: underline; text-underline-offset: 4px; }
+.product-page__accordions { grid-area: details; min-width: 0; }
+.product-page__accordions:empty { display: none; }
+.product-page details { border-block-start: 1px solid var(--storefront-border); padding-block: 16px; }
+.product-page summary { cursor: pointer; padding-block: 4px; font-weight: 600; min-height: 36px; }
+.product-page__richtext { padding-block-start: 12px; max-width: 85ch; overflow-wrap: anywhere; }
+.product-page__richtext :is(img, video, iframe, table) { max-width: 100%; }
+.product-page__richtext img { height: auto; }
+.product-page__richtext a { text-decoration: underline; text-underline-offset: 3px; }
+.product-page[aria-busy=true] [data-product-purchase] { opacity: .65; }
+@media (max-width: 991px) {
+  .product-page__layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "gallery" "purchase" "details"; gap: 24px; }
+  .product-page__stage { height: 340px; min-height: 0; }
+}
+@media (max-width: 600px) {
+  .product-page__stage { height: 300px; padding: 16px; }
+  .product-page__thumbnails button { width: 60px; height: 60px; }
+  .product-page__price .catalog-price { font-size: 23px; }
+}
+{% endstylesheet %}
 {% schema %}
 {
   "name": "t:storefront_editor.product",
@@ -40,7 +155,7 @@
       "type": "checkbox",
       "id": "show_vendor",
       "label": "t:storefront_editor.show_vendor",
-      "default": false
+      "default": true
     },
     {
       "type": "checkbox",
@@ -57,6 +172,16 @@
       "type": "richtext",
       "id": "pickup_text",
       "label": "t:storefront_editor.pickup_text"
+    },
+    {
+      "type": "richtext",
+      "id": "usage_text",
+      "label": "t:storefront_editor.product_usage"
+    },
+    {
+      "type": "richtext",
+      "id": "additional_text",
+      "label": "t:storefront_editor.product_additional"
     }
   ]
 }
