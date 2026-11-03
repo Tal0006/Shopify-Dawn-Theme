@@ -17,16 +17,17 @@
   }
   function openCart(opener) {
     const panel = drawer();
-    if (!panel) return;
+    if (!panel || typeof panel.showModal !== 'function') return false;
     if (!panel.open) {
       closedDrawers.delete(panel);
       cartReturnFocus = opener || document.activeElement;
       panel.inert = false;
-      panel.showModal();
+      try { panel.showModal(); } catch { return false; }
       panel.classList.add('mini-cart-content-toggle');
       panel.closest('.mini-cart').querySelector('.cart-toggle-btn').setAttribute('aria-expanded', 'true');
       panel.querySelector('.mini-cart-close').focus({preventScroll: true});
     }
+    return true;
   }
   function finishCartClose(panel) {
     // A queued native close event can arrive after the drawer has reopened.
@@ -121,6 +122,7 @@
     if (cardCartPending.has(form)) return;
     const button = form.querySelector('button[name=add]');
     if (!button || button.disabled) return;
+    const formData = window.fankeeCartSubmit?.consume(form) || new FormData(form);
     const shouldOpenDrawer = !!drawer();
     let drawerMessage = '';
     let drawerError = false;
@@ -137,7 +139,7 @@
     const operation = cardCartQueue.then(async () => {
       let added = false;
       try {
-        const data = new FormData(form);
+        const data = formData;
         const id = data.get('id');
         const quantity = Number(data.get('quantity') || 1);
         if (!Number.isInteger(quantity) || quantity < 1) throw Error('Invalid quantity');
@@ -146,13 +148,14 @@
         const sectionId = document.querySelector('.storefront-header')?.dataset.cartSection;
         const body = {items: [{id: String(id), quantity, ...(data.get('selling_plan') ? {selling_plan: data.get('selling_plan')} : {}), ...(Object.keys(properties).length ? {properties} : {})}], ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})};
         const response = await fetch(cartRoot() + 'cart/add.js', {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, credentials: 'same-origin', body: JSON.stringify(body)});
-        if (!response.ok) throw Error('Cart add rejected');
+        if (!response.ok) { const error = Error('Cart add rejected'); error.status = response.status; throw error; }
         added = true;
         const result = await response.json();
         const refreshed = await refreshCardCart(result.sections, sectionId);
         if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer().dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
-        else cardFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
-      } catch {
+        else cardFeedback(form, refreshed || !document.querySelector('.mini-cart-content') ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed && !!document.querySelector('.mini-cart-content'));
+      } catch (error) {
+        if (window.Shopify?.designMode) console.warn('[Cart] AJAX add failed', {message: error.message, status: error.status});
         if (added) {
           const refreshed = await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection);
           if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer()?.dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
@@ -165,11 +168,15 @@
         form.removeAttribute('aria-busy');
         button.textContent = label;
         cardCartPending.delete(form);
-        if (drawerMessage) { openCart(button); cartStatus(drawerMessage, drawerError); }
+        if (drawerMessage) {
+          if (openCart(button)) cartStatus(drawerMessage, drawerError);
+          else cardFeedback(form, feedback.dataset.success);
+        }
       }
     });
     cardCartQueue = operation.catch(() => {});
   }, true);
+  window.fankeeCartSubmit?.ready();
 
   // Delegation keeps header controls working after Theme Editor section reloads.
   document.addEventListener('click', (event) => {

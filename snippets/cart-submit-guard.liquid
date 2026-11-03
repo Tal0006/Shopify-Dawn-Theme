@@ -1,0 +1,73 @@
+{% doc %}
+  Captures product submissions before deferred storefront.js is ready.
+  Queues intent only; cart requests remain owned by storefront.js.
+  @example
+  {% render 'cart-submit-guard' %}
+{% enddoc %}
+<script>
+(() => {
+  if (window.fankeeCartSubmit) return;
+  let ready = false;
+  let failed = false;
+  const waiting = new Map();
+  const snapshots = new WeakMap();
+  function restore(entry) {
+    clearTimeout(entry.timer);
+    entry.button.disabled = false;
+    entry.button.textContent = entry.label;
+    entry.button.removeAttribute('aria-busy');
+    entry.form.removeAttribute('aria-busy');
+  }
+  function fail(entry) {
+    waiting.delete(entry.form);
+    restore(entry);
+    const feedback = entry.form.querySelector('[data-card-feedback]');
+    if (feedback) {
+      feedback.setAttribute('data-feedback-error', '');
+      feedback.textContent = feedback.dataset.error;
+    }
+  }
+  window.fankeeCartSubmit = {
+    consume(form) { const data = snapshots.get(form); snapshots.delete(form); return data; },
+    ready() {
+      ready = true;
+      failed = false;
+      for (const entry of waiting.values()) {
+        restore(entry);
+        if (!entry.form.isConnected) continue;
+        snapshots.set(entry.form, entry.data);
+        // The original submission already passed browser validation.
+        // Dispatch to the delegated AJAX handler; never call native form.submit().
+        entry.form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+      }
+      waiting.clear();
+    }
+  };
+  document.addEventListener('submit', event => {
+    const form = event.target;
+    if (ready || !(form instanceof HTMLFormElement) || !form.matches('[data-card-cart]')) return;
+    if (event.submitter && event.submitter.name !== 'add') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (waiting.has(form)) return;
+    const button = form.querySelector('button[name=add]');
+    if (!button || button.disabled) return;
+    const entry = {form, button, label: button.textContent, data: new FormData(form)};
+    waiting.set(form, entry);
+    if (failed) { fail(entry); return; }
+    form.setAttribute('aria-busy', 'true');
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = button.dataset.pendingLabel;
+    const feedback = form.querySelector('[data-card-feedback]');
+    if (feedback) feedback.textContent = '';
+    entry.timer = setTimeout(() => fail(entry), 15000);
+  }, true);
+  window.addEventListener('error', event => {
+    const source = event.target?.src || event.filename || '';
+    if (ready || !/\/storefront\.js(?:[?#]|$)/.test(source)) return;
+    failed = true;
+    for (const entry of [...waiting.values()]) fail(entry);
+  }, true);
+})();
+</script>
