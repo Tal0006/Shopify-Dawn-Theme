@@ -6,6 +6,9 @@
     {% if header_logo != blank %}{{ header_logo | image_url: width: 400 | image_tag: widths: '100, 200, 400', alt: shop.name }}{% else %}<span class="storefront-logo-text">{{ shop.name | escape }}</span>{% endif %}
   </a>
   <div class="mobail-menu d-lg-none"><button type="button" class="navbar-toggler open-btn" aria-label="{{ 'sections.header.menu' | t }}"><span class="icon-bar first-angle"></span><span class="icon-bar middle-angle"></span><span class="icon-bar last-angle"></span></button></div>
+    {% assign header_search_id = 'HeaderSearch-' | append: section.id %}
+    {% render 'predictive-search', search_id: header_search_id %}
+  <div class="storefront-header-secondary">
   <div id="navbar" class="collapse navbar-collapse navigation-holder">
     <button type="button" class="menu-close" aria-label="{{ 'accessibility.close' | t }}"><i class="ti-close" aria-hidden="true"></i></button>
     <ul class="nav navbar-nav mb-2 mb-lg-0">
@@ -14,8 +17,6 @@
     </ul>
   </div>
   <div class="storefront-header-tools">
-    {% assign header_search_id = 'HeaderSearch-' | append: section.id %}
-    {% render 'predictive-search', search_id: header_search_id %}
     {% if shop.customer_accounts_enabled %}<a class="storefront-account" href="{{ routes.account_url }}" aria-label="{{ 'customer.account.title' | t }}"><i class="ti-user" aria-hidden="true"></i></a>{% endif %}
     <div class="mini-cart">
       <button type="button" class="cart-toggle-btn" data-count-label="{{ 'general.cart.view' | t: count: '__COUNT__' | escape }}" aria-controls="MiniCart-{{ section.id }}" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><img src="{{ 'shopping-cart.png' | asset_url }}" width="24" height="24" alt=""></i><span class="cart-count">{{ cart.item_count }}</span></button>
@@ -34,6 +35,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 </div></div></nav></div></header>
 {% schema %}

@@ -1,13 +1,15 @@
 {% assign selected_count = 0 %}{% for block in section.blocks %}{% if block.settings.collection != blank %}{% assign selected_count = selected_count | plus: 1 %}{% endif %}{% endfor %}
 {% if selected_count > 0 or request.design_mode %}
-<section class="catalog-section container">
-  <h2>{% if section.settings.heading != blank %}{{ section.settings.heading | escape }}{% else %}{{ 'storefront.categories' | t }}{% endif %}</h2>
+<section class="catalog-section catalog-home container">
+  <header class="catalog-section-header"><h2>{% if section.settings.heading != blank %}{{ section.settings.heading | escape }}{% else %}{{ 'storefront.categories' | t }}{% endif %}</h2></header>
   <div class="catalog-categories">
     {% for block in section.blocks %}{% assign category = block.settings.collection %}
       {% if category != blank %}
         <a class="catalog-category" href="{{ category.url }}" {{ block.shopify_attributes }}>
           {% assign category_image = category.image | default: category.products.first.featured_image %}
-          {% if category_image != blank %}{{ category_image | image_url: width: 400 | image_tag: loading: 'lazy', widths: '150, 250, 400', sizes: '(min-width: 1000px) 20vw, 40vw', alt: category.title }}{% endif %}
+          <span class="catalog-category__media{% if category.image == blank %} catalog-category__media--product{% endif %}">
+            {% if category_image != blank %}{{ category_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '180, 300, 450, 600', sizes: '(min-width: 1200px) 268px, (min-width: 992px) 23vw, 46vw', alt: '' }}{% endif %}
+          </span>
           <span>{{ category.title | escape }}</span>
         </a>
       {% elsif request.design_mode %}<div class="catalog-editor-note" {{ block.shopify_attributes }}>{{ 'storefront.choose_collection' | t }}</div>{% endif %}

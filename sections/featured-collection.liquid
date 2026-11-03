@@ -1,12 +1,16 @@
 {% assign chosen_collection = section.settings.collection %}
 {% if chosen_collection != blank or request.design_mode %}
-<section class="catalog-section container" {{ section.shopify_attributes }}>
+<section class="catalog-section catalog-home container" {{ section.shopify_attributes }}>
   {% assign heading = section.settings.heading | default: chosen_collection.title %}
+  <header class="catalog-section-header">
+    <div>
   {% if heading != blank %}<h2>{{ heading | escape }}</h2>{% endif %}
   {% if section.settings.subtitle != blank %}<p>{{ section.settings.subtitle | escape }}</p>{% endif %}
+    </div>
+    {% if section.settings.show_view_all and chosen_collection != blank %}<a class="catalog-section-header__link" href="{{ chosen_collection.url }}">{{ 'sections.featured_collection.view_all' | t }}</a>{% endif %}
+  </header>
   {% if chosen_collection != blank %}
-    <div class="catalog-grid">{% for card_product in chosen_collection.products limit: section.settings.product_limit %}{% render 'product-card', card_product: card_product %}{% else %}<p>{{ 'sections.collection_template.empty' | t }}</p>{% endfor %}</div>
-    {% if section.settings.show_view_all %}<a class="theme-btn catalog-view-all" href="{{ chosen_collection.url }}">{{ 'sections.featured_collection.view_all' | t }}</a>{% endif %}
+    <div class="catalog-grid">{% for card_product in chosen_collection.products limit: section.settings.product_limit %}{% render 'product-card', card_product: card_product, refined_card: true %}{% else %}<p>{{ 'sections.collection_template.empty' | t }}</p>{% endfor %}</div>
   {% elsif request.design_mode %}<p class="catalog-editor-note">{{ 'storefront.choose_collection' | t }}</p>{% endif %}
 </section>
 {% endif %}

@@ -1,3 +1,10 @@
+{% doc %}
+  Renders a product card with its existing purchase actions.
+  @param {product} card_product - Product to display.
+  @param {boolean} [refined_card] - Show the homepage vendor detail.
+  @example
+  {% render 'product-card', card_product: product, refined_card: true %}
+{% enddoc %}
 {% if card_product != blank %}
   {% assign card_variant = card_product.selected_or_first_available_variant %}
   {% assign card_heading_tag = 'h3' %}{% if request.page_type == 'collection' or request.page_type == 'search' %}{% assign card_heading_tag = 'h2' %}{% endif %}
@@ -13,6 +20,7 @@
     </a>
     <div class="catalog-card__content">
       <{{ card_heading_tag }}><a href="{{ card_product.url }}">{{ card_product.title | escape }}</a></{{ card_heading_tag }}>
+      {% if refined_card and card_product.vendor != blank %}<p class="catalog-card__vendor">{{ card_product.vendor | escape }}</p>{% endif %}
       {% render 'product-price', card_product: card_product %}
       <p class="catalog-availability">{% if card_product.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</p>
       {% if card_product.available == false %}
