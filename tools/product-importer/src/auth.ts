@@ -38,7 +38,7 @@ export function createAuth(config:AuthConfig, now=Date.now) {
     session,
     require(req:Request,res:Response,next:NextFunction) {
       if(session(req)) return next();
-      if(req.path==='/api' || req.path.startsWith('/api/')) return res.status(401).json({error:'נדרשת התחברות'});
+      if(req.path.toLowerCase()==='/api' || req.path.toLowerCase().startsWith('/api/') || req.path==='/logout') return res.status(401).json({error:'גישה אינה מורשית'});
       res.redirect(303,'/login');
     },
     login(req:Request,res:Response) {

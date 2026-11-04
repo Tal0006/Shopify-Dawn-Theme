@@ -145,7 +145,7 @@ test('HTTP rejects foreign origins/hosts and requires CSRF before mutation',asyn
   await new Promise<void>(resolve => server.once('listening',resolve));
   const base = 'http://127.0.0.1:4311';
   try {
-    assert.equal((await fetch(base+'/api/session',{headers:{Origin:'https://attacker.example'}})).status,403);
+    assert.equal((await fetch(base+'/api/session',{headers:{Origin:'https://attacker.example'}})).status,401);
     const foreignHost = await new Promise<number>(resolve => {
       request(base+'/api/session',{headers:{Host:'attacker.example'}},response => {
         response.resume(); resolve(response.statusCode!);

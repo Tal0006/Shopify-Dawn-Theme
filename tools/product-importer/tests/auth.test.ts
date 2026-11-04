@@ -50,7 +50,7 @@ test('Authentication configuration fails closed and production requires HTTPS',(
 test('Public health is minimal; UI redirects and all APIs reject unauthenticated clients',async()=>{
   await serve(async base=>{
     const health=await fetch(base+'/health');assert.equal(health.status,200);assert.deepEqual(await health.json(),{status:'ok'});
-    for(const path of ['/','/index.html','/app.js','/.env']){
+    for(const path of ['/index.html','/app.js','/.env']){
       const response=await fetch(base+path,{redirect:'manual',headers:{Host}});
       assert.equal(response.status,303);assert.equal(response.headers.get('location'),'/login');
     }
@@ -181,4 +181,50 @@ test('Production origin rejections do not emit development diagnostics',async()=
     },{...adminEnv,NODE_ENV:'production',APP_ORIGIN:'https://importer.example'});
   }finally{console.warn=original;}
   assert.equal(messages.length,0);
+});
+
+test('Public root renders login HTML and login assets load without authentication',async()=>{
+  await serve(async base=>{
+    const root=await fetch(base+'/',{headers:{Host,'Sec-Fetch-Site':'cross-site'}});
+    assert.equal(root.status,200);assert.match(root.headers.get('content-type')!,/text\/html/);
+    assert.match(await root.text(),/action="\/login"/);assert.equal(root.headers.get('referrer-policy'),'same-origin');
+    for(const path of ['/login','/login.css','/style.css']){
+      assert.equal((await fetch(base+path,{headers:{Host,'Sec-Fetch-Site':'cross-site'}})).status,200);
+    }
+    assert.equal((await fetch(base+'/favicon.ico',{headers:{Host,'Sec-Fetch-Site':'cross-site'}})).status,204);
+    const api=await fetch(base+'/api/session',{headers:{Host,'Sec-Fetch-Site':'cross-site'}});
+    assert.equal(api.status,401);assert.deepEqual(await api.json(),{error:'גישה אינה מורשית'});
+  });
+});
+test('Render HTTPS root/login/API/logout routing preserves secure cookies and strict mutation origins',async()=>{
+  const render='https://shopify-dawn-theme.onrender.com';
+  const env={...adminEnv,NODE_ENV:'production',APP_ORIGIN:render,RENDER_EXTERNAL_URL:render};
+  const host=new URL(render).host;
+  const headers={Host:host,'X-Forwarded-Proto':'https'};
+  await serve(async base=>{
+    const anonymous=await fetch(base+'/',{headers:{...headers,'Sec-Fetch-Site':'cross-site'}});
+    assert.equal(anonymous.status,200);assert.match(await anonymous.text(),/type="password"/);
+    assert.deepEqual(await(await fetch(base+'/health')).json(),{status:'ok'});
+    const credentials={...headers,Origin:render,'Content-Type':'application/x-www-form-urlencoded'};
+    const wrong=await fetch(base+'/login',{method:'POST',headers:credentials,body:new URLSearchParams({username:'wrong',password:'wrong'})});
+    assert.equal(wrong.status,401);
+    const success=await fetch(base+'/login',{method:'POST',headers:credentials,body:new URLSearchParams({username:adminEnv.IMPORTER_USERNAME,password:adminEnv.IMPORTER_PASSWORD})});
+    assert.equal(success.status,303);
+    const cookie=success.headers.get('set-cookie')!;assert.match(cookie,/; Secure/);assert.match(cookie,/; HttpOnly/);assert.match(cookie,/SameSite=Strict/);
+    const Cookie=cookie.split(';')[0];
+    const ui=await fetch(base+'/',{headers:{...headers,Cookie}});
+    assert.equal(ui.status,200);const html=await ui.text();assert.match(html,/id="lookup"/);assert.doesNotMatch(html,/type="password"/);
+    const noSession=await fetch(base+'/api/preview',{method:'POST',headers:{...headers,Origin:render,'Content-Type':'application/json'},body:'{}'});
+    assert.equal(noSession.status,401);assert.deepEqual(await noSession.json(),{error:'גישה אינה מורשית'});
+    const {csrf}=await(await fetch(base+'/api/session',{headers:{...headers,Cookie}})).json();
+    const mutation={...headers,Cookie,Origin:render,'Content-Type':'application/json','X-CSRF-Token':csrf};
+    const preview=await fetch(base+'/api/preview',{method:'POST',headers:mutation,body:JSON.stringify({barcode:code,price:'15.90'})});
+    assert.equal(preview.status,200);
+    assert.equal((await fetch(base+'/logout',{method:'POST',headers:{...mutation,Origin:'https://evil.example'},body:'{}'})).status,403);
+    assert.equal((await fetch(base+'/logout',{method:'POST',headers:{...headers,Cookie,Origin:render,'Content-Type':'application/json'},body:'{}'})).status,403);
+    assert.equal((await fetch(base+'/logout',{method:'POST',headers:mutation,body:'{}'})).status,200);
+    const after=await fetch(base+'/',{headers:{...headers,Cookie}});
+    assert.equal(after.status,200);assert.match(await after.text(),/type="password"/);
+    assert.equal((await fetch(base+'/api/session',{headers:{...headers,Cookie}})).status,401);
+  },env);
 });

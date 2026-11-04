@@ -107,4 +107,4 @@ $('confirm').addEventListener('click',async()=>{
   finally{importing=false;disableForm(false);}
 });
 
-$('logout').addEventListener('click',async()=>{try{await post('/api/logout',{});location.replace('/login');}catch(error){message(error.message,true);}});
+$('logout').addEventListener('click',async()=>{try{await post('/logout',{});location.replace('/login');}catch(error){message(error.message,true);}});

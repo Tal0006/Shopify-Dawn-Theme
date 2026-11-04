@@ -63,7 +63,7 @@ Set these variables privately in Render's Environment panel:
 | SHOPIFY_STORE_DOMAIN | Required canonical store.myshopify.com hostname |
 | SHOPIFY_ADMIN_ACCESS_TOKEN | Shopify Admin token; or use both client credential variables below |
 | SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET | Alternative supported Shopify authentication |
-| APP_ORIGIN | Optional with Render's automatic RENDER_EXTERNAL_URL; required for a custom domain, e.g. https://importer.example.com |
+| APP_ORIGIN | Optional with Render's automatic RENDER_EXTERNAL_URL; required for a custom domain, e.g. https://shopify-dawn-theme.onrender.com |
 
 Render provides PORT and RENDER_EXTERNAL_URL. Binding is 0.0.0.0; local development
 still uses http://127.0.0.1:4310. An explicit APP_ORIGIN must exactly match the browser's
@@ -88,8 +88,12 @@ After a server update, reload /login before submitting an already-open form.
 Login credentials are checked only on the server. A random opaque session is stored
 server-side for eight hours; the browser receives a host-only HttpOnly, SameSite=Strict
 cookie, Secure in production. API writes, including logout, also require a session-bound
-CSRF token and the configured Origin. Anonymous API calls receive 401, while anonymous
-UI requests redirect to /login. Only login, login CSS, and minimal /health are public.
+CSRF token and the configured Origin. Anonymous API calls receive 401 JSON. GET / renders login HTML for anonymous visitors
+and importer HTML for authenticated sessions. GET /login, login styles and minimal /health
+are public. External-link navigation to these public pages is allowed; login POST and
+protected endpoints still enforce the configured origin. POST /logout revokes the session
+with CSRF protection; /api/logout remains a compatible alias. Other private UI requests
+redirect to /login.
 Failed login attempts are rate limited. Use the UI's logout button to revoke the session.
 
 Run **one instance/worker per store**. Sessions, previews, caches, and the existing import

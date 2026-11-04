@@ -32,37 +32,53 @@ export function createApp(importer: Importer, port:number, env:NodeJS.ProcessEnv
     next();
   });
   app.get('/health',(_req,res)=>res.json({status:'ok'}));
+  // Canonical host/TLS validation applies everywhere. Cross-site top-level GET
+  // navigation is allowed to public pages; it is not an authenticated mutation.
   app.use((req,res,next)=>{
     if(req.headers.host!==origin.host)return reject(req,res,'invalid host');
+    if(config.production && !req.secure)return reject(req,res,'HTTPS required',400);
+    next();
+  });
+  const checkOrigin:express.RequestHandler=(req,res,next)=>{
     if(req.headers.origin && req.headers.origin!==config.origin)
       return reject(req,res,req.headers.origin==='null'?'invalid origin (null)':'invalid origin');
     if(req.headers['sec-fetch-site']==='cross-site')return reject(req,res,'cross-site request');
-    if(config.production && !req.secure)return reject(req,res,'HTTPS required',400);
     next();
+  };
+  function serveLogin(res:express.Response) {
+    res.set('Referrer-Policy','same-origin');
+    return res.type('html').send(loginPage());
+  }
+  app.get('/',(req,res)=>{
+    if(!auth.session(req))return serveLogin(res);
+    return res.sendFile(fileURLToPath(new URL('../public/index.html',import.meta.url)));
   });
   app.get('/login', (req,res)=>{
     // no-referrer turns native form POST Origin into "null". Preserve the same-origin
     // browser context on this page only, rather than accepting opaque origins.
-    res.set('Referrer-Policy','same-origin');
-    return auth.session(req)?res.redirect(303,'/'):res.type('html').send(loginPage());
+    return auth.session(req)?res.redirect(303,'/'):serveLogin(res);
   });
-  app.get('/login.css',(_req,res)=>res.sendFile(fileURLToPath(new URL('../public/style.css',import.meta.url))));
-  app.post('/login',express.urlencoded({extended:false,limit:'4kb'}),(req,res)=>{
+  app.get(['/login.css','/style.css'],(_req,res)=>res.sendFile(fileURLToPath(new URL('../public/style.css',import.meta.url))));
+  app.get('/favicon.ico',(_req,res)=>res.status(204).end());
+  app.post('/login',checkOrigin,express.urlencoded({extended:false,limit:'4kb'}),(req,res)=>{
     if(req.headers.origin!==config.origin)return reject(req,res,req.headers.origin?'invalid origin':'missing origin');
     if(!req.is('application/x-www-form-urlencoded'))return reject(req,res,'invalid login content type');
     auth.login(req,res);
   });
   app.use(auth.require);
+  app.use(checkOrigin);
   app.use(express.json({limit:'4kb'}));
   app.get('/api/session',(req,res)=>res.json({csrf:auth.session(req)!.csrf}));
-  app.use('/api',(req,res,next)=>{
+  const requireCsrf:express.RequestHandler=(req,res,next)=>{
     if(['GET','HEAD','OPTIONS'].includes(req.method))return next();
     if(req.headers.origin!==config.origin)return reject(req,res,req.headers.origin?'invalid origin':'missing origin');
     if(!req.is('application/json'))return reject(req,res,'invalid API content type');
     if(!req.headers['x-csrf-token'])return reject(req,res,'missing CSRF token');
     if(!sameSecret(req.headers['x-csrf-token'],auth.session(req)!.csrf))return reject(req,res,'invalid CSRF token');
     next();
-  });
+  };
+  app.use('/api',requireCsrf);
+  app.post('/logout',requireCsrf,auth.logout);
   app.post('/api/logout',auth.logout);
   app.post('/api/preview',async(req,res)=>res.json(await importer.preview(req.body?.barcode,req.body?.price,req.body?.manualImageUrl)));
   app.post('/api/image-selection',async(req,res)=>res.json(await importer.selectImage(req.body?.previewId,req.body?.candidateIndex)));
