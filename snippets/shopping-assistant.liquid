@@ -1,0 +1,74 @@
+{% doc %}
+  Customer shopping-list dialog. Calls only the configured public assistant backend.
+  @example
+  {% render 'shopping-assistant' %}
+{% enddoc %}
+<fankee-shopping-assistant data-api-base="{{ settings.shopping_assistant_api_url | escape }}" dir="rtl">
+  <button type="button" class="shopping-assistant__launcher" data-launch hidden aria-haspopup="dialog" aria-controls="ShoppingAssistantDialog" aria-expanded="false">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false"><path d="M3 3h2l3 12h10l3-9H6M9 20h.01M18 20h.01"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+    <span>{{ settings.shopping_assistant_launcher | default: 'הכנת רשימת קניות' | escape }}</span>
+  </button>
+  <dialog id="ShoppingAssistantDialog" class="shopping-assistant__dialog" aria-labelledby="ShoppingAssistantTitle" aria-describedby="ShoppingAssistantSubtitle">
+    <div class="shopping-assistant__shell">
+      <header class="shopping-assistant__header">
+        <div><h2 id="ShoppingAssistantTitle">{{ settings.shopping_assistant_title | default: 'עוזר הקניות של פאנקי' | escape }}</h2><p id="ShoppingAssistantSubtitle">{{ 'shopping_assistant.subtitle' | t }}</p></div>
+        <button type="button" data-close aria-label="{{ 'shopping_assistant.close' | t | escape }}">×</button>
+      </header>
+      <div class="shopping-assistant__body">
+        <p data-status role="status" aria-live="polite" aria-atomic="true"></p>
+        <form data-input>
+          <label for="ShoppingAssistantMessage">{{ 'shopping_assistant.label' | t }}</label>
+          <textarea id="ShoppingAssistantMessage" name="message" rows="7" maxlength="4000" required aria-describedby="ShoppingAssistantHint" placeholder="{{ 'shopping_assistant.placeholder' | t | escape }}"></textarea>
+          <p id="ShoppingAssistantHint">{{ 'shopping_assistant.hint' | t }}</p>
+          <button type="submit" class="shopping-assistant__primary">{{ 'shopping_assistant.submit' | t }}</button>
+        </form>
+        <div data-results hidden tabindex="-1"></div>
+        <div data-confirm hidden tabindex="-1"><h3>{{ 'shopping_assistant.ready' | t }}</h3><p data-confirm-summary></p><button type="button" data-confirm-checkout class="shopping-assistant__primary">{{ 'shopping_assistant.confirm' | t }}</button><button type="button" data-back>{{ 'shopping_assistant.back' | t }}</button></div>
+      </div>
+      <footer data-summary hidden class="shopping-assistant__summary">
+        <p><strong>{{ 'shopping_assistant.subtotal' | t }}: <span data-total></span></strong></p>
+        <p class="shopping-assistant__note">{{ 'shopping_assistant.partial' | t }}</p>
+        <p data-blocked>{{ 'shopping_assistant.blocked' | t }}</p>
+        <div class="shopping-assistant__actions"><button type="button" data-review class="shopping-assistant__primary">{{ 'shopping_assistant.checkout' | t }}</button><button type="button" data-edit>{{ 'shopping_assistant.edit' | t }}</button></div>
+      </footer>
+    </div>
+  </dialog>
+  <script type="application/json" data-strings>{ {% assign sa_keys = 'subtitle,label,placeholder,hint,submit,loading,waking,close,matched,ambiguous,unavailable,not_found,choose,available,unavailable_short,quantity,unit,subtotal,partial,blocked,edit,remove,edit_item,checkout,ready,confirm,back,error,changed,expired,uncertain,results,empty,no_image' | split: ',' %}{% for sa_key in sa_keys %}{% assign sa_translation_key = 'shopping_assistant.' | append: sa_key %}{{ sa_key | json }}: {{ sa_translation_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
+</fankee-shopping-assistant>
+<script src="{{ 'shopping-assistant.js' | asset_url }}" defer></script>
+{% stylesheet %}
+fankee-shopping-assistant { --sa-green: var(--storefront-green, #135541); --sa-border: var(--storefront-border, #dce4df); color: var(--storefront-ink, #182b25); }
+fankee-shopping-assistant [hidden] { display: none !important; }
+.shopping-assistant__launcher { position: fixed; z-index: 1000001; inset-inline-end: 16px; inset-block-end: var(--sa-launch-bottom, calc(84px + env(safe-area-inset-bottom))); display: flex; align-items: center; gap: 8px; min-height: 44px; max-width: calc(100vw - 32px); padding: 10px 16px; border: 1px solid #fff; border-radius: 24px; background: var(--sa-green); color: #fff; box-shadow: 0 3px 16px #182b2526; font-size: 14px; cursor: pointer; }
+.shopping-assistant__dialog { position: fixed; inset: auto; inset-inline-end: 20px; inset-block-end: 20px; width: min(480px, calc(100vw - 40px)); max-width: none; height: min(760px, calc(100dvh - 40px)); max-height: calc(100dvh - 40px); margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--sa-border); border-radius: 16px; background: #fffefa; color: inherit; text-align: start; box-shadow: 0 12px 60px #182b2530; }
+.shopping-assistant__dialog::backdrop { background: #182b2566; }
+.shopping-assistant__shell { height: 100%; display: flex; flex-direction: column; }
+.shopping-assistant__header { display: flex; align-items: flex-start; gap: 12px; padding: 20px; border-block-end: 1px solid var(--sa-border); background: #fff; }
+.shopping-assistant__header h2 { margin: 0 0 8px; font-size: 22px; }
+.shopping-assistant__header p, .shopping-assistant__note { font-size: 13px; margin: 0; }
+.shopping-assistant__header [data-close] { flex: 0 0 44px; margin-inline-start: auto; font-size: 28px; }
+.shopping-assistant__body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; }
+.shopping-assistant__body label { display: block; font-weight: 700; margin-block-end: 8px; }
+.shopping-assistant__body textarea { width: 100%; padding: 12px; border: 1px solid var(--sa-border); border-radius: 8px; background: #fff; color: inherit; resize: vertical; font-size: 16px; }
+.shopping-assistant__body [data-status]:empty { display: none; }
+fankee-shopping-assistant button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--sa-border); border-radius: 8px; background: #fff; color: var(--sa-green); cursor: pointer; }
+fankee-shopping-assistant .shopping-assistant__primary, fankee-shopping-assistant .shopping-assistant__launcher { background: var(--sa-green); color: #fff; }
+fankee-shopping-assistant button:disabled { opacity: .55; cursor: default; }
+fankee-shopping-assistant :focus-visible { outline: 3px solid var(--sa-green); outline-offset: 3px; }
+.shopping-assistant__item { padding-block: 16px; border-block-end: 1px solid var(--sa-border); }
+.shopping-assistant__item h3 { font-size: 17px; margin: 0 0 8px; overflow-wrap: anywhere; }
+.shopping-assistant__card { display: flex; align-items: flex-start; gap: 12px; padding: 12px; margin-block: 8px; border: 1px solid var(--sa-border); border-radius: var(--storefront-radius, 8px); background: #fff; }
+.shopping-assistant__card img { flex: 0 0 64px; width: 64px; height: 76px; object-fit: contain; }
+.shopping-assistant__card > div { min-width: 0; flex: 1; }
+.shopping-assistant__card p { margin-block-end: 6px; font-size: 14px; }
+.shopping-assistant__card strong { display: block; overflow-wrap: anywhere; }
+.shopping-assistant__summary { padding: 12px 20px max(16px, env(safe-area-inset-bottom)); border-block-start: 1px solid var(--sa-border); background: #fff; max-height: 42%; overflow-y: auto; }
+.shopping-assistant__summary p { margin-block-end: 8px; font-size: 14px; }
+.shopping-assistant__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 599px) {
+ .shopping-assistant__dialog { inset-inline: 8px; inset-block-end: max(8px, env(safe-area-inset-bottom)); width: calc(100% - 16px); height: calc(100dvh - 24px - env(safe-area-inset-bottom)); max-height: calc(100dvh - 24px - env(safe-area-inset-bottom)); border-radius: 16px; }
+ .shopping-assistant__header, .shopping-assistant__body { padding: 14px; }
+ .shopping-assistant__header h2 { font-size: 20px; }
+ .shopping-assistant__launcher { font-size: 13px; padding: 8px 12px; }
+}
+{% endstylesheet %}

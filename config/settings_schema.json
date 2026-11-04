@@ -1476,5 +1476,34 @@
         "info": "t:storefront_editor.category_info"
       }
     ]
+  },
+  {
+    "name": "t:shopping_assistant_editor.name",
+    "settings": [
+      {
+        "type": "checkbox",
+        "id": "shopping_assistant_enabled",
+        "label": "t:shopping_assistant_editor.enabled",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "shopping_assistant_launcher",
+        "label": "t:shopping_assistant_editor.launcher",
+        "default": "הכנת רשימת קניות"
+      },
+      {
+        "type": "text",
+        "id": "shopping_assistant_title",
+        "label": "t:shopping_assistant_editor.title",
+        "default": "עוזר הקניות של פאנקי"
+      },
+      {
+        "type": "text",
+        "id": "shopping_assistant_api_url",
+        "label": "t:shopping_assistant_editor.url",
+        "default": "https://shopify-dawn-theme-1.onrender.com"
+      }
+    ]
   }
 ]
