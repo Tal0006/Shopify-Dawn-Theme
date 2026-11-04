@@ -8,11 +8,21 @@ import {CheckoutService} from './shopping/checkout-service.js';
 import {errorHandler} from './middleware/errors.js';
 import {rateLimit,concurrencyLimit} from './middleware/rate-limit.js';
 import {shoppingListRoutes} from './routes/shopping-list.js';
-export function createApp(config:Config,shop:StorefrontGateway=new ShopifyStorefrontClient(config)){
+import {WhatsAppClient} from './channels/whatsapp/whatsapp-client.js';
+import {MemoryWhatsAppSessionStore} from './channels/whatsapp/whatsapp-session.js';
+import {WhatsAppAdapter} from './channels/whatsapp/whatsapp-adapter.js';
+import {whatsappWebhook} from './channels/whatsapp/whatsapp-webhook.js';
+import type {WhatsAppTransport,WhatsAppSessionStore} from './channels/whatsapp/whatsapp-types.js';
+export function createApp(config:Config,shop:StorefrontGateway=new ShopifyStorefrontClient(config),whatsappDependencies:{client?:WhatsAppTransport;sessions?:WhatsAppSessionStore}={}){
  const app=express(),quotes=new QuoteService(shop,undefined,Date.now,config.debug),checkout=new CheckoutService(shop,quotes);
  app.disable('x-powered-by');app.set('trust proxy',config.trustProxy);
  app.use((_req,res,next)=>{res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'"});next();});
  app.get('/health',(_req,res)=>res.json({status:'ok'}));
+ if(config.whatsapp){
+  const adapter=new WhatsAppAdapter(quotes,checkout,whatsappDependencies.client||new WhatsAppClient(config.whatsapp),
+   whatsappDependencies.sessions||new MemoryWhatsAppSessionStore());
+  app.use('/webhooks/whatsapp',whatsappWebhook(config.whatsapp,adapter));
+ }
  app.use((req,res,next)=>{
   const origin=req.headers.origin;res.vary('Origin');
   if(origin&&!config.allowedOrigins.includes(origin))return res.status(403).json({code:'ORIGIN_DENIED',message:'מקור הבקשה אינו מורשה.'});

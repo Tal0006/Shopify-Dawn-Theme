@@ -1,7 +1,7 @@
 # Fankee Shopping Assistant MVP
 
 Independent public Node.js 22 / TypeScript / Express service. No imports from or changes to
-Product Importer or the Shopify theme. No UI, LLM, WhatsApp integration, Admin API, or payment page.
+Product Importer or the Shopify theme. No backend UI, LLM, Admin API, or payment page. Optional WhatsApp adapter shares the website shopping engine.
 
 ## Local setup
 
@@ -221,3 +221,103 @@ If at least one strong (score >= 0.85) same-intent candidate is found and every 
 Semantic scoring requires all high-weight query tokens that remain after excluding configured product-type and brand vocabulary. Qualifier values are derived from each query, not a fragrance allowlist. Multi-word descriptors require every constituent token; existing configured meaningful phrases additionally require the complete phrase. Qualifiers must appear in the product or variant title, never merely in vendor metadata. Normalized aliases and spelling rules still apply.
 
 A candidate missing any qualifier scores zero before relevance filtering. Such candidates cannot introduce ambiguity or block the all-unavailable state. Multiple qualifying products remain ambiguous; one qualifying strong available candidate may match under the existing pagination and variant safeguards. Exact-title matching retains priority.
+
+## WhatsApp Business Platform channel
+
+WhatsApp is an optional delivery adapter over the same in-process QuoteService, resolve logic,
+CheckoutService and Storefront client used by the website. No internal HTTP calls or second
+shopping engine. Website routes and request/response contracts are unchanged.
+
+### Configuration and Meta setup
+
+Keep WHATSAPP_ENABLED=false to run the website without any Meta credentials. To enable:
+- WHATSAPP_ENABLED=true
+- WHATSAPP_PHONE_NUMBER_ID: the Meta business phone-number ID (not its display phone number)
+- WHATSAPP_ACCESS_TOKEN: server-only token authorized for that number
+- WHATSAPP_VERIFY_TOKEN: your chosen unguessable webhook verification token
+- META_APP_SECRET: the Meta app secret used to verify inbound HMAC signatures
+- META_GRAPH_API_VERSION: an explicitly configured currently supported Graph version, including
+  the v prefix. There is deliberately no default version.
+
+Configure Render's environment, not browser/theme settings. Do not commit .env.
+In Meta, subscribe your app to the WhatsApp business account messages webhook and configure:
+https://<your-backend-host>/webhooks/whatsapp with your verify token. Complete Meta's business
+number/token setup separately. This implementation does not register numbers or subscribe apps
+on your behalf.
+
+GET /webhooks/whatsapp verifies hub.mode=subscribe and hub.verify_token and returns the numeric
+hub.challenge as plain text. Invalid verification returns 403.
+POST /webhooks/whatsapp authenticates x-hub-signature-256 against the exact raw body with
+HMAC-SHA256 and timing-safe comparison, then parses JSON. Invalid/missing signatures return 401;
+invalid JSON returns 400. The route is registered before general JSON parsing and website CORS.
+Only events for the configured phone-number ID are accepted. Status-only/unsupported events are
+acknowledged and ignored. Supported inbound types: text, interactive button_reply and list_reply.
+No receipt/status event initiates Shopify work. Bodies are capped at 256KB. Messages outside the
+last 24 hours or implausibly in the future are ignored.
+
+### Conversation flow
+
+Initial state is IDLE conceptually; a greeting/restart creates WAITING_FOR_LIST without Shopify
+access. A likely list sent as the first message also works directly. Commands:
+- היי / שלום / תפריט / הזמנה / התחלה: introduction and restart
+- שינוי / שינוי הרשימה: discard the active interaction and request a full updated list
+- ביטול: delete the active session
+- הסר מהרשימה: remove the currently prompted unresolved item and create a fresh quote
+- אישור: explicit confirmation, allowed only in WAITING_FOR_CONFIRMATION
+
+WAITING_FOR_RESOLUTION sends a Hebrew summary followed by options for the first unresolved
+item. The list has up to nine purchasable candidates plus a removal action. Longer product
+titles appear in descriptions and the summary; Meta field lengths are bounded. No unavailable
+variant is selectable. A customer may edit the complete list instead. Not-found and unavailable
+items can be removed but are never substituted. The shared parser still limits lists to
+4000 characters, 20 items, quantity 20 per variant and 100 total units.
+
+Selection IDs are opaque UUIDs stored in that customer's session with quote ID, revision,
+item index and trusted Shopify variant ID. Incoming option titles/prices are ignored. Old,
+foreign or expired choices cannot authorize another quote. Each new rendered revision replaces
+old choices. The summary and controls must be delivered before confirmation is enabled.
+
+WAITING_FOR_CONFIRMATION offers אישור, שינוי הרשימה, ביטול. Only explicit confirmation invokes
+the shared checkout service with server-held IDs/quantities. No cart is created during quote
+or resolution. QUOTE_CHANGED sends the new quote and requires another explicit confirmation.
+CHECKOUT_READY stores the returned Shopify checkout URL before sending it; repeating אישור
+resends that same URL without creating another cart. No URL shortener or custom payment page.
+CHECKOUT_UNCERTAIN blocks repeated cart mutation after uncertain failure; customer must request
+a new list. Backend prices, line totals and subtotal are used directly; no channel price math.
+
+### Queue, privacy and operational limits
+
+Validated messages are acknowledged promptly; processing runs asynchronously with four workers,
+a 100-message queue and per-customer serialization. A full queue returns 503 so Meta can redeliver.
+Dedup claims occur before processing; duplicate IDs are ignored. A per-customer limit of ten
+messages per minute bounds abuse. No automatic Meta-send retries are performed, including 429,
+network errors and ambiguous timeouts. Customer actions must be recent inbound messages; this
+MVP sends no proactive/template campaigns or messages outside the service conversation.
+
+The abstract WhatsAppSessionStore can be replaced with Redis/database. The current memory
+implementation holds at most 500 sessions (15-minute quote/session expiry), 10,000 dedup IDs
+(24-hour expiry) and 1,000 short-lived rate buckets. It stores only the current quote reference,
+revision, state, unresolved indices, opaque action mappings, latest message ID and optional
+checkout URL; no complete conversation history. Customer keys are hashed at rest in the map.
+The existing bounded quote service retains the current shopping data until its own expiry.
+Phone numbers and inbound messages exist transiently in the queue and outbound requests but
+are never written to normal logs. Errors log only a static failure label, never exception data.
+
+Render restarts lose sessions, deduplication, pending jobs and quotes. This queue is not durable:
+an acknowledged message may be lost during restart/deploy. Run one process/instance for MVP.
+Before scaling or requiring reliable delivery, replace sessions, dedup/rate limits, quote storage,
+queue and cart locks with shared durable implementations. Do not treat hashing as anonymization.
+No production Meta or Shopify calls are made by automated tests.
+
+### Validation and protocol references
+
+Run npm run build and npm test. tests/whatsapp.test.ts mocks both providers and covers raw
+verification, ACK timing, duplicate messages, greetings, quote rendering, opaque selections,
+unavailable/removal, confirmation, checkout URL, price reconfirmation, cancellation, privacy,
+per-customer serialization, send/cart failures, session expiry and website compatibility.
+
+Meta protocol references:
+- https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks
+- https://www.postman.com/meta/whatsapp-business-platform/request/r3ufenw/send-list-message
+- https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/webhooks/start/
+The archived SDK reference documents the wire protocol; no archived SDK dependency is installed.
