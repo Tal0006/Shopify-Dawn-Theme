@@ -28,16 +28,82 @@ Edit the existing .env privately; never put credentials into Liquid, theme setti
 - SHOPIFY_TRACK_INVENTORY=false initially; enable only after checking your inventory workflow.
   Location activation and inventory quantities remain manual in Shopify.
 - PORT=4310 by default.
+- IMPORTER_USERNAME and IMPORTER_PASSWORD are required, including locally. Use a unique password of at least 12 characters.
 
 ```powershell
 npm run dev
 ```
 
-Open **http://127.0.0.1:4310**, using that exact host.
-For a compiled run: npm run build, then npm start.
-The server binds to loopback, rejects foreign Host/Origin, and requires CSRF for API writes.
-It serves only public/ and never serves .env. It has no public/multi-user authentication:
-keep it on your own machine and run one instance per store.
+Open **http://127.0.0.1:4310** and sign in. The existing dev command reads your local
+.env; production does not need that file. The server listens on 0.0.0.0 and validates the
+configured application origin. For a local compiled run, use npm run build followed by
+node --env-file=.env dist/server.js.
+
+## Render deployment
+
+Create a Node Web Service with **Root Directory: tools/product-importer**.
+Use Node 22 (package.json pins 22.x).
+
+- Build Command: npm ci --include=dev && npm run build
+- Start Command: npm start (runs node dist/server.js)
+- Health Check Path: /health
+
+TypeScript compiles src/server.ts to dist/server.js (rootDir=src, outDir=dist).
+The public UI stays in public/ and is resolved correctly from the compiled server.
+Do not configure a static-site service. Do not upload .env.
+
+Set these variables privately in Render's Environment panel:
+
+| Variable | Requirement |
+| --- | --- |
+| NODE_ENV | production |
+| IMPORTER_USERNAME | Required single-admin username |
+| IMPORTER_PASSWORD | Required unique strong password, at least 12 characters |
+| CHEAPERSAL_API_KEY | Required metadata provider credential |
+| SHOPIFY_STORE_DOMAIN | Required canonical store.myshopify.com hostname |
+| SHOPIFY_ADMIN_ACCESS_TOKEN | Shopify Admin token; or use both client credential variables below |
+| SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET | Alternative supported Shopify authentication |
+| APP_ORIGIN | Optional with Render's automatic RENDER_EXTERNAL_URL; required for a custom domain, e.g. https://importer.example.com |
+
+Render provides PORT and RENDER_EXTERNAL_URL. Binding is 0.0.0.0; local development
+still uses http://127.0.0.1:4310. An explicit APP_ORIGIN must exactly match the browser's
+origin and must use HTTPS in production. No trailing paths or credentials are allowed.
+Production trusts one ingress proxy for HTTPS detection; keep the service behind Render's
+managed ingress.
+
+Optional provider and feature variables are documented below and listed in .env.example:
+PRODUCT_IMAGE_PROVIDER, PRODUCT_IMAGE_PROVIDER_ORDER, GOOGLE_IMAGE_PROVIDER,
+SERPAPI_API_KEY, BARCODE_LOOKUP_API_KEY, GO_UPC_API_KEY, PRODUCT_IMAGE_API_KEY,
+PRODUCT_IMAGE_API_URL, PRODUCT_IMAGE_PREFERRED_DOMAINS, SERPAPI_GL, SERPAPI_HL,
+SERPAPI_LOCATION, SHOPIFY_TRACK_INVENTORY. Blank API keys skip those optional paid providers.
+
+Local login accepts the exact http://127.0.0.1:4310 origin by default; localhost is a
+different origin. Blank/whitespace APP_ORIGIN falls back to RENDER_EXTERNAL_URL or the
+local default. The login page uses Referrer-Policy: same-origin so native form posts
+send their real Origin instead of null. All other pages retain no-referrer.
+Origin:null, missing POST Origin, foreign hosts and cross-site requests remain rejected.
+Development 403 diagnostics log only fixed rejection reasons, never request values.
+After a server update, reload /login before submitting an already-open form.
+
+Login credentials are checked only on the server. A random opaque session is stored
+server-side for eight hours; the browser receives a host-only HttpOnly, SameSite=Strict
+cookie, Secure in production. API writes, including logout, also require a session-bound
+CSRF token and the configured Origin. Anonymous API calls receive 401, while anonymous
+UI requests redirect to /login. Only login, login CSS, and minimal /health are public.
+Failed login attempts are rate limited. Use the UI's logout button to revoke the session.
+
+Run **one instance/worker per store**. Sessions, previews, caches, and the existing import
+lock are in memory. Restarts/deploys log the admin out and discard pending previews.
+Horizontal scaling requires shared session/preview storage and a distributed import lock;
+it is intentionally outside this single-admin deployment.
+
+Only public/ is served, behind login. Server source, .env and dist/ are never served.
+Browser code calls same-origin importer endpoints, not provider or Shopify Admin APIs.
+Provider error bodies/stacks are not returned, and credential-like fields/known secret
+values are removed from JSON responses as defense in depth. No environment dump is logged.
+
+Before deployment run npm install, npm run build, and npm test. All external APIs are
+blocked in automated tests; security tests use fake credentials and local HTTP only.
 
 ## Provider configuration
 

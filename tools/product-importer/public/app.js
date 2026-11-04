@@ -1,6 +1,7 @@
 const $=id=>document.getElementById(id);
 let csrf,previewId,lastPreview,generation=0,importing=false,selecting=false;
-const session=fetch('/api/session').then(r=>{if(!r.ok)throw Error('לא ניתן להתחבר לכלי');return r.json();}).then(data=>csrf=data.csrf);
+function checkAuth(r){if(r.status===401){location.replace('/login');throw Error('נדרשת התחברות מחדש');}return r;}
+const session=fetch('/api/session').then(checkAuth).then(r=>{if(!r.ok)throw Error('לא ניתן להתחבר לכלי');return r.json();}).then(data=>csrf=data.csrf);
 session.catch(error=>message(error.message,true));
 const sourceNames={'barcodelookup':'Barcode Lookup','go-upc':'Go-UPC','open-products-facts':'Open Products Facts',
   'upcitemdb':'UPCitemdb','serpapi':'Google / SerpAPI','authorized-api':'API מורשה','manual':'תמונה חלופית'};
@@ -16,6 +17,7 @@ function details(element,values){
 async function post(path,body){
   await session;
   const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(body)});
+  checkAuth(r);
   const data=await r.json();if(!r.ok)throw Error(data.error||'לא ניתן להשלים את הבקשה');return data;
 }
 function disableForm(value){for(const id of ['search','barcode','price','manual-image'])$(id).disabled=value;}
@@ -104,3 +106,5 @@ $('confirm').addEventListener('click',async()=>{
   }catch(error){message(error.message,true);}
   finally{importing=false;disableForm(false);}
 });
+
+$('logout').addEventListener('click',async()=>{try{await post('/api/logout',{});location.replace('/login');}catch(error){message(error.message,true);}});

@@ -1,3 +1,4 @@
+import {adminEnv,loginForTest} from './auth-helpers.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {BarcodeLookupImageProvider,GoUpcImageProvider,OpenProductsFactsImageProvider,SerpApiProductImageProvider,
@@ -188,13 +189,14 @@ test('image validation rejects length, tracking pixels, tiny dimensions and disg
 test('candidate selection HTTP endpoint enforces CSRF and server-held candidate index',async()=>{
   const service=new Importer({lookupByBarcode:async()=>metadata},gateway(),
     new CompositeProductImageProvider([new BarcodeLookupImageProvider('key',async()=>response(bl),valid)],valid),valid);
-  const server=createApp(service,4314).listen(4314,'127.0.0.1');
+  const server=createApp(service,4314,adminEnv).listen(4314,'127.0.0.1');
   await new Promise<void>(resolve=>server.once('listening',resolve));const origin='http://127.0.0.1:4314';
   try{
-    const {csrf}=await(await fetch(origin+'/api/session')).json();
-    const headers={Origin:origin,'Content-Type':'application/json','X-CSRF-Token':csrf};
+    const Cookie=await loginForTest(origin);
+    const {csrf}=await(await fetch(origin+'/api/session',{headers:{Cookie}})).json();
+    const headers={Cookie,Origin:origin,'Content-Type':'application/json','X-CSRF-Token':csrf};
     const p=await(await fetch(origin+'/api/preview',{method:'POST',headers,body:JSON.stringify({barcode:code,price:'15.90'})})).json();
-    assert.equal((await fetch(origin+'/api/image-selection',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'})).status,403);
+    assert.equal((await fetch(origin+'/api/image-selection',{method:'POST',headers:{Cookie,Origin:origin,'Content-Type':'application/json'},body:'{}'})).status,403);
     const selected=await(await fetch(origin+'/api/image-selection',{method:'POST',headers,body:JSON.stringify({previewId:p.id,candidateIndex:1,imageUrl:'https://untrusted.example/a'})})).json();
     assert.equal(selected.product.imageUrl,two);
     assert.equal((await fetch(origin+'/api/image-selection',{method:'POST',headers,body:JSON.stringify({previewId:p.id,candidateIndex:100})})).status,400);

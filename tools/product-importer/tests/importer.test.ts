@@ -1,3 +1,4 @@
+import {adminEnv,loginForTest} from './auth-helpers.js';
 import { request } from 'node:http';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -140,7 +141,7 @@ test('Shopify GraphQL errors are sanitized',async () => {
 });
 test('HTTP rejects foreign origins/hosts and requires CSRF before mutation',async () => {
   const service = new Importer({lookupByBarcode:async () => product},{currency:async () => 'ILS',findBarcode:async () => imported,create:async () => imported});
-  const server = createApp(service,4311).listen(4311,'127.0.0.1');
+  const server = createApp(service,4311,adminEnv).listen(4311,'127.0.0.1');
   await new Promise<void>(resolve => server.once('listening',resolve));
   const base = 'http://127.0.0.1:4311';
   try {
@@ -151,14 +152,15 @@ test('HTTP rejects foreign origins/hosts and requires CSRF before mutation',asyn
       }).end();
     });
     assert.equal(foreignHost,403);
-    assert.equal((await fetch(base+'/api/import',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:'{}'})).status,403);
-    const {csrf} = await (await fetch(base+'/api/session')).json();
-    const headers = {Origin:base,'Content-Type':'application/json','X-CSRF-Token':csrf};
+    const Cookie=await loginForTest(base);
+    assert.equal((await fetch(base+'/api/import',{method:'POST',headers:{Cookie,Origin:base,'Content-Type':'application/json'},body:'{}'})).status,403);
+    const {csrf} = await (await fetch(base+'/api/session',{headers:{Cookie}})).json();
+    const headers = {Cookie,Origin:base,'Content-Type':'application/json','X-CSRF-Token':csrf};
     const response = await fetch(base+'/api/preview',{method:'POST',headers,body:JSON.stringify({barcode:code,price:'15.90'})});
     assert.equal(response.status,200);
     const preview = await response.json();
     assert.equal((await (await fetch(base+'/api/import',{method:'POST',headers,body:JSON.stringify({previewId:preview.id})})).json()).duplicate,true);
-    assert.equal((await fetch(base+'/.env')).status,404);
-    assert.match((await fetch(base)).headers.get('content-security-policy')!,/frame-ancestors 'none'/);
+    assert.equal((await fetch(base+'/.env',{headers:{Cookie}})).status,404);
+    assert.match((await fetch(base,{headers:{Cookie}})).headers.get('content-security-policy')!,/frame-ancestors 'none'/);
   } finally { await new Promise<void>((resolve,reject) => server.close(e => e ? reject(e) : resolve())); }
 });
