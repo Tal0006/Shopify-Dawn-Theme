@@ -38,7 +38,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   const labels=Object.fromEntries(Object.entries(tr.group_delivery.status).map(([key,value])=>[key.toUpperCase(),value]));
   const markup=raw.slice(raw.indexOf('<fankee-group-delivery'),raw.indexOf('</fankee-group-delivery>')+25)
    .replace(/<script type="application\/json" data-group-labels>[\s\S]*?<\/script>/,'<script type="application/json" data-group-labels>'+JSON.stringify(labels)+'</script>')
-   .replace(/{{ section.settings.service_url \| escape }}/g,'https://groups.example.test')
+   .replace(/{{ group_delivery_service_url \| escape }}/g,'https://groups.example.test')
    .replace(/{{ routes.cart_url }}/g,'/he/cart').replace(/{{ section.id }}/g,'fixture').replace(/{{ request.locale.iso_code }}/g,'he')
    .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escape(key.split('.').reduce((a,k)=>a[k],tr).replace('{{ area }}','__AREA__').replace('{{ count }}','__COUNT__').replace('{{ amount }}','__AMOUNT__').replace('{{ target }}','__TARGET__')));
   await ev('document.querySelector("main").innerHTML='+JSON.stringify(markup));
@@ -167,6 +167,24 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    }
    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
    assert.ok(parseFloat(await ev('getComputedStyle(widget.querySelector("[data-progress-fill]")).transitionDuration'))<0.001);
+  });
+
+  await t.test('Blank theme configuration uses the public service origin; explicit configuration takes precedence',async()=>{
+   const configured=await ev('widget.origin.origin');
+   assert.equal(configured,'https://groups.example.test');
+   const fallback=raw.match(/assign group_delivery_service_url = section.settings.service_url \| default: '([^']+)'/)[1];
+   assert.equal(fallback,'https://fankee-group-delivery.onrender.com');
+   await ev('widget.remove();widget.dataset.serviceUrl='+JSON.stringify(fallback)+';document.querySelector("main").append(widget)');
+   await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.origin.origin'),fallback);
+   await ev('group.status="OPEN";quantity=1;widget.querySelector("[name=area]").value="Fixture area";void widget.perform(()=>widget.find())');
+   await wait('!widget.hasAttribute("aria-busy")');
+   assert.ok(await ev('requests.some(r=>r.url==='+JSON.stringify(fallback+'/api/v1/groups/find-or-create')+')'));
+   assert.equal(await ev('widget.querySelector("[data-group-panel]").hidden'),false);
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.found);
+   await ev('widget.remove();widget.dataset.serviceUrl="https://groups.example.test";document.querySelector("main").append(widget)');
+   await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.origin.origin'),configured);
   });
  }finally{
   ws?.close();chrome?.kill();

@@ -1,8 +1,9 @@
 {% comment %}
   Phase-one group pledges. Public service URL only; all prices and persistence are server-owned.
-  Assign page.group-delivery to a Shopify Page and configure the service origin in Theme Editor.
+  Assign page.group-delivery to a Shopify Page. Theme Editor may override the public service origin.
 {% endcomment %}
-<fankee-group-delivery class="container group-delivery" data-service-url="{{ section.settings.service_url | escape }}" data-cart-url="{{ routes.cart_url }}.js"
+{% assign group_delivery_service_url = section.settings.service_url | default: 'https://fankee-group-delivery.onrender.com' %}
+<fankee-group-delivery class="container group-delivery" data-service-url="{{ group_delivery_service_url | escape }}" data-cart-url="{{ routes.cart_url }}.js"
  data-error="{{ 'group_delivery.error' | t | escape }}" data-empty="{{ 'group_delivery.empty_cart' | t | escape }}" data-unavailable="{{ 'group_delivery.cart_unavailable' | t | escape }}"
  data-geo-error="{{ 'group_delivery.geo_error' | t | escape }}" data-geo-ready="{{ 'group_delivery.geo_ready' | t | escape }}" data-joined="{{ 'group_delivery.joined' | t | escape }}"
  data-found="{{ 'group_delivery.found' | t | escape }}" data-updated="{{ 'group_delivery.updated' | t | escape }}" data-area="{{ 'group_delivery.area' | t: area: '__AREA__' | escape }}"

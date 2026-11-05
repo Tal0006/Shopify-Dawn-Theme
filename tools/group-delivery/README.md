@@ -55,7 +55,7 @@ No Shopify Admin token is needed in Phase 1. Never put private tokens, admin cre
 
 1. Deploy the service and add the exact store domain(s) and any HTTPS preview origin to STOREFRONT_ORIGINS. Use a local development service for HTTP localhost previews.
 2. In Shopify, create a Page and assign the `group-delivery` page template.
-3. In Theme Editor, set the Group Delivery section's service origin to the deployed HTTPS service URL. This URL is public configuration, not a credential.
+3. The Group Delivery section uses its explicitly configured Service URL, otherwise the public https://fankee-group-delivery.onrender.com origin. Keep the Theme Editor setting to override this for another deployment. The fallback also applies to fresh draft and visitor-preview themes without saved section settings. This URL is public configuration, not a credential. The service still requires each exact storefront/preview origin in STOREFRONT_ORIGINS; a working fallback does not bypass CORS. Page selection continues to use the configured Shopify page, otherwise the published group-delivery page.
 4. Add a navigation link to that Page through Shopify's existing navigation editor if desired.
 5. Test with actual Storefront-published variants in a development theme before launch.
 
