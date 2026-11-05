@@ -1505,5 +1505,29 @@
         "default": "https://shopify-dawn-theme-1.onrender.com"
       }
     ]
+  },
+  {
+    "name": "t:group_delivery_entry_editor.settings",
+    "settings": [
+      {
+        "type": "page",
+        "id": "group_delivery_page",
+        "label": "t:group_delivery_entry_editor.page",
+        "info": "t:group_delivery_entry_editor.page_info"
+      },
+      {
+        "type": "checkbox",
+        "id": "group_delivery_navigation",
+        "label": "t:group_delivery_entry_editor.navigation",
+        "info": "t:group_delivery_entry_editor.navigation_info",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "group_delivery_footer",
+        "label": "t:group_delivery_entry_editor.footer",
+        "default": true
+      }
+    ]
   }
 ]

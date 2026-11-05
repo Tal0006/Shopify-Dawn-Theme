@@ -5,6 +5,7 @@
     <div class="storefront-footer__top"><div class="storefront-footer__brand">
     {% if section.settings.show_store_name %}<a class="storefront-footer-name" href="{{ routes.root_url }}">{{ shop.name | escape }}</a>{% endif %}
     {% if section.settings.brand_description != blank %}<p class="storefront-footer__description">{{ section.settings.brand_description | escape }}</p>{% endif %}
+    {% if settings.group_delivery_footer %}{% if section.settings.show_footer_links %}{% render 'group-delivery-entry', menu: section.settings.service_menu, context: 'footer' %}{% else %}{% render 'group-delivery-entry', context: 'footer' %}{% endif %}{% endif %}
     </div>
     {% if section.settings.show_footer_links %}<div class="storefront-footer-links">
   {% if section.settings.footer_link != blank %}<nav aria-label="{{ 'sections.header.menu' | t }}"><h3>{{ 'sections.header.menu' | t }}</h3><ul>{% for link in section.settings.footer_link.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}

@@ -3,7 +3,7 @@
  const home = document.querySelector('[data-storefront-home], [data-storefront-collection]') || (document.querySelector('[data-storefront-discovery]') && document);
  if (!home || !('IntersectionObserver' in window)) return;
  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
- const targets = '.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn, .trust-strip__list, .catalog-section-header, .catalog-category, .catalog-home .catalog-card, .collection-page .catalog-card';
+ const targets = '.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn, .trust-strip__list, .group-delivery-promo__surface, .catalog-section-header, .catalog-category, .catalog-home .catalog-card, .collection-page .catalog-card';
  let observer;
  const showAll = () => {
   observer?.disconnect();

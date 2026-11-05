@@ -14,6 +14,7 @@
     <ul class="nav navbar-nav mb-2 mb-lg-0">
       {% if section.settings.menu != blank %}{% render 'navigation-links', menu: section.settings.menu %}
       {% else %}<li><a href="{{ routes.root_url }}">{{ 'storefront.home' | t }}</a></li><li><a href="{{ settings.catalog_collection.url | default: routes.all_products_collection_url }}">{{ 'storefront.all_products' | t }}</a></li><li><a href="{{ routes.collections_url }}">{{ 'storefront.all_categories' | t }}</a></li>{% endif %}
+      {% if settings.group_delivery_navigation %}{% capture delivery_entry %}{% render 'group-delivery-entry', menu: section.settings.menu, context: 'navigation' %}{% endcapture %}{% assign delivery_entry = delivery_entry | strip %}{% if delivery_entry != blank %}<li>{{ delivery_entry }}</li>{% endif %}{% endif %}
     </ul>
   </div>
   <div class="storefront-header-tools">

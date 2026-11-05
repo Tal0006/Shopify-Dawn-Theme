@@ -3512,5 +3512,19 @@
   },
   "footer_design_editor": {
     "description": "Short store description (optional)"
+  },
+  "group_delivery_entry_editor": {
+    "name": "Group Delivery promotion",
+    "settings": "Group Delivery",
+    "enabled": "Show promotion",
+    "heading": "Intro heading",
+    "title": "Main heading",
+    "text": "Supporting text",
+    "cta": "Link label",
+    "page": "Group Delivery page",
+    "page_info": "Choose the existing page using the group-delivery template. When blank, the published group-delivery page is used.",
+    "navigation": "Show navigation shortcut",
+    "navigation_info": "Shown only when the page is absent from the main menu. Disable to manage the link exclusively in Shopify Navigation.",
+    "footer": "Show footer information link"
   }
 }

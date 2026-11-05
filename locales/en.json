@@ -818,5 +818,15 @@
     "invalid_cart": "An item in your cart cannot be included right now. Refresh your cart and try again.",
     "participant_one": "One customer has joined",
     "verified_cart": "Your verified cart"
+  },
+  "group_delivery_entry": {
+    "navigation": "Group Delivery",
+    "footer": "Outside our delivery area? Explore Group Delivery",
+    "heading": "Outside our delivery area?",
+    "title": "We can reach your area too",
+    "text": "Join a delivery group near you. Once the group reaches its target, we can open a special delivery.",
+    "approval": "Delivery requires store approval. No payment is taken when joining.",
+    "cta": "Explore Group Delivery",
+    "setup": "Choose the Group Delivery page in Theme settings, or publish the existing page with the group-delivery handle."
   }
 }

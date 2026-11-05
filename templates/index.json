@@ -134,11 +134,18 @@
         "package",
         "shield"
       ]
+    },
+    "group_delivery_promo": {
+      "type": "group-delivery-promo",
+      "settings": {
+        "enabled": true
+      }
     }
   },
   "order": [
     "hero",
     "trust_benefits",
+    "group_delivery_promo",
     "categories",
     "laundry",
     "cleaning",

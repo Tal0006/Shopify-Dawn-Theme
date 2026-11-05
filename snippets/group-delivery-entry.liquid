@@ -1,0 +1,37 @@
+{% doc %}
+  Optional Group Delivery entry, suppressed when the merchant menu already links to the page.
+  @param {linklist} menu - Existing menu to check, including its nested items.
+  @param {string} context - 'navigation' or 'footer', used for localized copy.
+  @example
+  {% render 'group-delivery-entry', menu: section.settings.menu, context: 'navigation' %}
+{% enddoc %}
+{% liquid
+ assign delivery_page = settings.group_delivery_page | default: pages['group-delivery']
+ assign delivery_present = false
+ for link in menu.links
+  if link.url == delivery_page.url
+   assign delivery_present = true
+  endif
+  for child in link.links
+   if child.url == delivery_page.url
+    assign delivery_present = true
+   endif
+   for grandchild in child.links
+    if grandchild.url == delivery_page.url
+     assign delivery_present = true
+    endif
+   endfor
+  endfor
+ endfor
+%}
+{% if delivery_page != blank and delivery_present == false %}
+<a class="group-delivery-entry group-delivery-entry--{{ context | escape }}" href="{{ delivery_page.url }}" {% if request.path == delivery_page.url %}aria-current="page"{% endif %}>{% if context == 'footer' %}{{ 'group_delivery_entry.footer' | t }}{% else %}{{ 'group_delivery_entry.navigation' | t }}{% endif %}</a>
+{% endif %}
+{% stylesheet %}
+.group-delivery-entry {overflow-wrap:anywhere;}
+.group-delivery-entry:focus-visible {outline:2px solid var(--storefront-accent);outline-offset:3px;}
+.storefront-header .group-delivery-entry--navigation {display:flex;align-items:center;min-height:44px;}
+.storefront-header .group-delivery-entry--navigation:is(:hover,:focus-visible,[aria-current=page]) {color:var(--storefront-accent);}
+.storefront-footer .group-delivery-entry--footer {display:inline-flex;align-items:center;min-height:44px;max-width:100%;font-size:14px;line-height:1.6;color:#d5e8eb;text-decoration:underline;text-underline-offset:4px;}
+.storefront-footer .group-delivery-entry--footer:focus-visible {outline-color:#b0e9ee;}
+{% endstylesheet %}
