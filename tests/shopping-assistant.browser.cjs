@@ -5,7 +5,7 @@ const root=path.join(__dirname,'..'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 test('Shopping Assistant browser flows',{timeout:90000},async t=>{
  const source=fs.readFileSync(path.join(root,'snippets/shopping-assistant.liquid'),'utf8');
  const strings=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8')).shopping_assistant;
- const css=source.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
+ const css=source.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
  const markup=source.replace(/{% doc %}[\s\S]*?{% enddoc %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'')
   .replace(/<script type="application\/json" data-strings>[\s\S]*?<\/script>/,'<script type="application/json" data-strings>'+JSON.stringify(strings)+'</script>')
   .replace(/<script src=[\s\S]*?<\/script>/,'')
@@ -114,6 +114,51 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
    await key('Escape','Escape',27);await wait('!app.dialog.open');
    assert.equal(await ev('document.activeElement===app.launcher'),true);assert.equal(await ev('window.scrollY'),y);
    assert.equal(await ev('(()=>{app.positionLauncher();const a=app.launcher.getBoundingClientRect(),b=document.querySelector(".a11y-launcher").getBoundingClientRect();return a.bottom<=b.top||a.right<=b.left||a.left>=b.right;})()'),true);
+  });
+  await t.test('Ambient layers respect reduced motion and remain within mobile bounds',async()=>{
+   await ev(`document.querySelector('main').id='MainContent';document.querySelector('main').setAttribute('data-storefront-home','');document.querySelector('main').innerHTML='<div class="hero-area"><h1 class="storefront-hero-heading">בדיקה</h1><div class="hero-btn"><a href="#" class="theme-btn">קנייה</a></div></div>';`);
+   await call('Emulation.setDeviceMetricsOverride',{width:1280,height:844,deviceScaleFactor:1,mobile:false});
+   assert.notEqual(await ev('getComputedStyle(document.querySelector("#MainContent"),"::before").animationName'),'none');
+   assert.ok(await ev('parseFloat(getComputedStyle(document.querySelector(".storefront-hero-heading")).animationDuration)<=0.35'));
+   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+   for(const selector of ['#MainContent','.hero-area'])for(const pseudo of ['::before','::after'])
+    assert.equal(await ev('getComputedStyle(document.querySelector('+JSON.stringify(selector)+'),'+JSON.stringify(pseudo)+').animationName'),'none');
+   assert.equal(await ev('getComputedStyle(document.querySelector(".hero-btn a")).transitionDuration'),'0s');
+   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+   await call('Emulation.setDeviceMetricsOverride',{width:320,height:844,deviceScaleFactor:1,mobile:true});
+   assert.equal(await ev('getComputedStyle(document.querySelector(".hero-area"),"::after").display'),'none');
+   assert.equal(await ev('document.documentElement.scrollWidth<=innerWidth'),true);
+   await ev('document.querySelector("main").removeAttribute("data-storefront-home");document.querySelector("main").innerHTML="Fixture";');
+  });
+  await t.test('Responsive proportions reserve launcher space and keep header/search/cards aligned',async()=>{
+   await ev(`app.dialog.close();window.scrollTo(0,0);document.body.insertBefore(app,document.querySelector('main'));
+    window.headerFixture=document.createElement('header');headerFixture.className='storefront-header';
+    headerFixture.innerHTML='<div class="site-header"><nav class="navigation"><div class="container-fluid"><div class="row"><a class="navbar-brand storefront-menu-logo"><img width="300" height="100" alt="Test fixture" src="data:image/svg+xml,%3Csvg xmlns=\\"http://www.w3.org/2000/svg\\" width=\\"300\\" height=\\"100\\">%3C/svg>"></a><div class="mobail-menu"><button class="navbar-toggler open-btn">תפריט</button></div><fankee-predictive-search><form role="search"><input type="search" aria-label="חיפוש"><button>חיפוש</button></form></fankee-predictive-search><div class="storefront-header-secondary"><div class="storefront-header-tools"><div class="mini-cart"><button class="cart-toggle-btn">סל</button></div></div></div></div></div></nav></div>';
+    document.body.insertBefore(headerFixture,app);document.querySelector('main').id='MainContent';document.querySelector('main').setAttribute('data-storefront-home','');
+    document.querySelector('main').innerHTML='<div class="hero-area"><h1 class="storefront-hero-heading">מוצרים לבית נקי</h1><p class="storefront-hero-subtitle">כל מה שצריך לבית</p><div class="hero-btn"><a class="theme-btn">לקנייה</a></div></div><section class="catalog-home catalog-section container"><header class="catalog-section-header"><h2>קטגוריות</h2></header><div class="catalog-categories"><a class="catalog-category">כביסה וטיפוח הבית</a><a class="catalog-category">מוצרי ניקיון</a></div></section>';`);
+   for(const width of [320,360,375,390,768,1440,1600]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<992});await sleep(60);
+    const metrics=await ev(`(()=>{
+     const rect=n=>{const r=n.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+     return {overflow:document.documentElement.scrollWidth>innerWidth,
+      launcher:rect(app.launcher),main:rect(document.querySelector('main')),row:rect(headerFixture.querySelector('.row')),
+      search:rect(headerFixture.querySelector('fankee-predictive-search')),logo:rect(headerFixture.querySelector('img')),
+      menu:rect(headerFixture.querySelector('.open-btn')),cart:rect(headerFixture.querySelector('.cart-toggle-btn')),
+      columns:getComputedStyle(document.querySelector('.catalog-categories')).gridTemplateColumns.split(' ').length,
+      card:rect(document.querySelector('.catalog-category')),position:getComputedStyle(app.launcher).position};
+    })()`);
+    assert.equal(metrics.overflow,false,'overflow at '+width);
+    assert.ok(metrics.logo.left>=0&&metrics.logo.right<=width);
+    assert.ok(metrics.cart.width>=44&&metrics.cart.height>=44);
+    if(width<992){
+     assert.equal(metrics.position,'static');assert.ok(metrics.launcher.bottom<=metrics.main.top+1,'launcher covers content at '+width);
+     assert.ok(metrics.launcher.height>=44);assert.equal(metrics.columns,2);
+     assert.ok(metrics.search.top>=metrics.logo.bottom-1);assert.ok(Math.abs(metrics.search.width-metrics.row.width)<=1);
+     assert.ok(metrics.menu.width>=44&&metrics.menu.height>=44);
+     assert.ok(metrics.card.left>=15&&metrics.card.right<=width-15);
+    }else assert.equal(metrics.position,'fixed');
+   }
+   await ev('headerFixture.remove();document.querySelector("main").removeAttribute("data-storefront-home");document.querySelector("main").innerHTML="Fixture";');
   });
   await t.test('Checkout has separate confirmation, price changes require reconfirmation',async()=>{
    await submit('matched');const before=await ev('calls.length');

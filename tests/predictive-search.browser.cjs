@@ -6,7 +6,7 @@ test('Header predictive search browser coverage',{timeout:90000},async t=>{
  const source=fs.readFileSync(path.join(root,'snippets/predictive-search.liquid'),'utf8');
  const translations=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8'));
  const escaped=value=>String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- const css=fs.readFileSync(path.join(root,'snippets/predictive-search-styles.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
+ const css=fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/predictive-search-styles.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
  const markup=source.replace(/{% doc %}[\s\S]*?{% enddoc %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'')
   .replace(/{% render 'predictive-search-styles' %}/g,'')
   .replace(/{{ routes.search_url }}/g,'/he/search').replace(/{{ routes.predictive_search_url }}/g,'/he/search/suggest')

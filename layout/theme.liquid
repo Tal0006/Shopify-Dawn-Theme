@@ -34,6 +34,8 @@
     <link href="{{ 'style.css' | asset_url }}" rel="stylesheet">
 
     {{ 'storefront.css' | asset_url | stylesheet_tag }}
+    {% render 'storefront-design' %}
+    {% if request.page_type == 'index' %}<script src="{{ 'storefront-motion.js' | asset_url }}" defer></script>{% endif %}
     {% if request.page_type == 'customers/account' or request.page_type == 'customers/login' or request.page_type contains 'customers/' %}{{ 'base.css' | asset_url | stylesheet_tag }}{% endif %}
     <script>window.themeStrings = {quantityIncrease: {{ 'products.product.quantity.increase' | t: product: product.title | json }}, quantityDecrease: {{ 'products.product.quantity.decrease' | t: product: product.title | json }}, required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}, previousSlide: {{ 'general.slider.previous_slide' | t | json }}, nextSlide: {{ 'general.slider.next_slide' | t | json }}};</script>
     {% render 'cart-submit-guard' %}
@@ -70,8 +72,9 @@
       <!-- Start header -->
 
       {% section 'header' %}
+      {% if settings.shopping_assistant_enabled %}{% render 'shopping-assistant' %}{% endif %}
 
-      <main id="MainContent" tabindex="-1">
+      <main id="MainContent" tabindex="-1"{% if request.page_type == 'index' %} data-storefront-home{% endif %}>
         {{ content_for_layout }}
       </main>
 
@@ -79,7 +82,6 @@
       {% render 'cart-toast' %}
     </div>
     {% render 'accessibility-menu' %}
-    {% if settings.shopping_assistant_enabled %}{% render 'shopping-assistant' %}{% endif %}
 
     <script src="{{ 'jquery.min.js' | asset_url }}" defer></script>
     <script src="{{ 'bootstrap.bundle.min.js' | asset_url }}" defer></script>
