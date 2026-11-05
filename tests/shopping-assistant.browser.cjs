@@ -6,7 +6,8 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
  const source=fs.readFileSync(path.join(root,'snippets/shopping-assistant.liquid'),'utf8');
  const strings=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8')).shopping_assistant;
  const trustCSS=fs.readFileSync(path.join(root,'sections/trust-benefits.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
- const css=trustCSS+source.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
+ const collectionCSS=['sections/main-collection.liquid','snippets/storefront-filters.liquid','sections/footer.liquid'].map(file=>fs.readFileSync(path.join(root,file),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]).join('\n');
+ const css=collectionCSS+trustCSS+source.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
  const markup=source.replace(/{% doc %}[\s\S]*?{% enddoc %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'')
   .replace(/<script type="application\/json" data-strings>[\s\S]*?<\/script>/,'<script type="application/json" data-strings>'+JSON.stringify(strings)+'</script>')
   .replace(/<script src=[\s\S]*?<\/script>/,'')
@@ -195,6 +196,72 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
    assert.equal(await ev('getComputedStyle(document.querySelector(".trust-strip__item")).transitionDuration'),'0s');
    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
    await ev('document.querySelector("main").innerHTML="Fixture"');
+  });
+  await t.test('Collection header, GET filters, sorting, chips and empty state stay responsive',async()=>{
+   await ev(`app.dialog.close();window.scrollTo(0,0);document.body.insertBefore(app,document.querySelector('main'));
+    document.querySelector('main').innerHTML='<section class="catalog-section container collection-page" data-storefront-collection><header class="collection-page__header collection-page__header--image"><div><h1>מוצרי ניקיון וטיפוח לבית עם שם קטגוריה עברי ארוך לבדיקת שבירת שורות</h1><details class="collection-page__description"><summary>פרטי הקטגוריה</summary><div class="catalog-description">תיאור החנות נשמר במלואו ללא שינוי.</div></details></div><img class="collection-page__image" width="180" height="130" alt="קטגוריה"></header><div class="collection-page__toolbar"><p class="collection-page__count">2 מוצרים מתוך 10</p><form class="catalog-filters" action="/collections/fixture" method="get"><div class="catalog-sort"><label for="FixtureSort">מיון</label><select id="FixtureSort" name="sort_by"><option value="manual">מומלץ</option><option value="price-ascending">מחיר עולה</option></select></div><p class="collection-filter-label">סינון (2)</p><details class="catalog-filter" open><summary>מותג</summary><label class="catalog-filter__option"><input type="checkbox" name="filter.p.vendor" value="סנו" checked><span>סנו (2)</span></label></details><details class="catalog-filter"><summary>מחיר</summary><label>ממחיר<input type="number" name="filter.v.price.gte" min="0" value="10"></label><label>עד מחיר<input type="number" name="filter.v.price.lte" min="0" value="30"></label></details><button class="theme-btn" type="submit">הצגת מוצרים</button></form><div class="catalog-active-filters"><a href="/collections/fixture?filter.v.price.gte=10">מותג: סנו <span aria-hidden="true">×</span></a><a href="/collections/fixture?filter.p.vendor=סנו">מחיר: ₪10–₪30 <span aria-hidden="true">×</span></a><a href="/collections/fixture">נקה סינון</a></div></div><div class="catalog-grid"><article class="catalog-card"><div class="catalog-card__content"><h3>מוצר בדיקה</h3><div class="catalog-price"><bdi>₪39.90</bdi><s>₪79.90</s></div><button class="theme-btn">הוספה לסל</button></div></article><article class="catalog-card catalog-card--sold-out"><div class="catalog-card__content"><h3>מוצר שאזל</h3><div class="catalog-price">₪29.90</div><button class="theme-btn" disabled>אזל מהמלאי</button></div></article></div></section>';`);
+   for(const width of [320,360,375,390,768,1024,1440,1600]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<992});
+    const m=await ev(`(()=>{
+      const scope=document.querySelector('.collection-page'),select=scope.querySelector('select'),button=scope.querySelector('button');
+      return {overflow:document.documentElement.scrollWidth>innerWidth,columns:getComputedStyle(scope.querySelector('.catalog-grid')).gridTemplateColumns.split(' ').length,
+       tap:Math.min(select.getBoundingClientRect().height,button.getBoundingClientRect().height),
+       titleClipped:scope.querySelector('h1').scrollWidth>scope.querySelector('h1').clientWidth,
+       chips:[...scope.querySelectorAll('.catalog-active-filters a')].every(a=>a.scrollWidth<=a.clientWidth)};
+    })()`);
+    assert.equal(m.overflow,false,'overflow at '+width);assert.equal(m.titleClipped,false);
+    assert.ok(m.chips);assert.ok(m.tap>=44);if(width<992)assert.equal(m.columns,2);
+   }
+   assert.equal(await ev('document.querySelector(".collection-page__description").open'),false);
+   await click('.collection-page__description summary');assert.equal(await ev('document.querySelector(".collection-page__description").open'),true);
+   await ev('document.querySelector("#FixtureSort").value="price-ascending"');
+   const selectState=await ev('(()=>{const s=document.querySelector("#FixtureSort");return {html:s.outerHTML,value:s.value,disabled:s.disabled,form:s.form?.outerHTML.slice(0,100)}})()');
+   const values=await ev('Object.fromEntries(new FormData(document.querySelector(".catalog-filters")))');
+   assert.deepEqual(values,{sort_by:'price-ascending','filter.p.vendor':'סנו','filter.v.price.gte':'10','filter.v.price.lte':'30'},JSON.stringify(selectState));
+   assert.equal(await ev('document.querySelector(".catalog-filters").method'),'get');
+   assert.equal(await ev('document.querySelectorAll(".catalog-active-filters a").length'),3);
+   await ev(`document.querySelector('.catalog-grid').outerHTML='<div class="collection-page__empty" role="status"><h2>לא מצאנו מוצרים שמתאימים לסינון שבחרת</h2><a class="theme-btn" href="/collections/fixture">נקה סינון</a></div>'`);
+   assert.ok((await ev('document.querySelector(".collection-page__empty").textContent')).includes('נקה סינון'));
+   await ev('document.querySelector("main").innerHTML="Fixture"');
+  });
+  await t.test('Footer links, newsletter and social targets remain responsive and accessible',async()=>{
+   const footerSource=fs.readFileSync(path.join(root,'sections/footer.liquid'),'utf8');
+   assert.match(footerSource,/{% form 'customer'/);
+   assert.match(footerSource,/name="contact\[tags\]" value="newsletter"/);
+   assert.match(footerSource,/form.posted_successfully\?/);
+   assert.match(footerSource,/section.settings.whatsapp != blank/);
+   assert.match(footerSource,/facebook_url != blank/);assert.match(footerSource,/instagram_url != blank/);
+   const social={whatsapp:'https://wa.me/fixture',facebook:'https://facebook.example.test/store',instagram:'https://instagram.example.test/store'};
+   const renderSocial=urls=>Object.entries(urls).filter(([,url])=>url).map(([key,url])=>'<li><a aria-label="'+key+'" href="'+url+'"><svg width="24" height="24" aria-hidden="true"><path d="M2 2h20v20H2z"/></svg></a></li>').join('');
+   const html='<footer class="footer-area storefront-footer" dir="rtl" id="FooterFixture"><div class="container storefront-footer-inner"><div class="storefront-footer__top"><div class="storefront-footer__brand"><a class="storefront-footer-name" href="/">פאנקי</a><p class="storefront-footer__description">מוצרי ניקיון לבית ולמשפחה</p><ul class="storefront-footer-social" role="list">'+renderSocial(social)+'</ul></div><div class="storefront-footer-links"><nav aria-label="קניות"><h3>קניות</h3><ul><li><a href="/collections/fixture">קטגוריות מוצרי ניקיון לבית</a></li></ul></nav><nav aria-label="שירות לקוחות"><h3>שירות לקוחות</h3><ul><li><a href="/pages/contact">יצירת קשר</a></li><li><a href="/policies/shipping-policy">משלוחים והחזרות</a></li></ul></nav><nav aria-label="מדיניות"><h3>מדיניות</h3><ul><li><a href="/policies/privacy-policy">פרטיות ותנאי שימוש באתר</a></li></ul></nav></div><div class="newslatter-area"><h2>עדכונים מפאנקי</h2><p class="storefront-footer__newsletter-text">עדכונים מהחנות</p><form id="FooterSignup"><input type="hidden" name="contact[tags]" value="newsletter"><label for="FooterFixtureEmail">כתובת המייל שלכם</label><input id="FooterFixtureEmail" name="contact[email]" type="email" required autocomplete="email"><button type="submit">הרשמה</button><p role="status" hidden>נרשמתם בהצלחה</p></form></div></div><ul class="storefront-footer__trust"><li>תשלום מאובטח</li><li>איסוף עצמי</li><li>משלוח חינם מעל ₪150</li></ul><div class="storefront-footer__bottom"><p class="storefront-footer-copyright">© פאנקי</p><a class="storefront-footer-statement" href="/pages/accessibility">הצהרת נגישות</a></div></div></footer>';
+   await ev('app.dialog.close();document.body.insertAdjacentHTML("beforeend",'+JSON.stringify(html)+');(()=>{const root=document.querySelector("#FooterFixture"),group=document.createElement("div");group.className="storefront-footer__social-group";const title=document.createElement("h3");title.textContent="עקבו אחרינו";group.append(title,root.querySelector(".storefront-footer-social"));root.querySelector(".storefront-footer__top").insertBefore(group,root.querySelector(".newslatter-area"));})()');
+   for(const width of [320,360,375,390,768,1024,1440,1600]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<992});
+    const m=await ev(`(()=>{
+     const footer=document.querySelector('#FooterFixture');
+     return {overflow:document.documentElement.scrollWidth>innerWidth,
+      targets:[...footer.querySelectorAll('.storefront-footer-social a')].every(a=>a.getBoundingClientRect().width>=44&&a.getBoundingClientRect().height>=44),
+      clipped:[...footer.querySelectorAll('a,input,button')].some(n=>n.scrollWidth>n.clientWidth),
+      height:footer.getBoundingClientRect().height,
+      clearance:innerWidth<992||[...footer.querySelectorAll('a,input,button')].every(n=>{const a=n.getBoundingClientRect(),b=app.launcher.getBoundingClientRect();return a.left>=b.right||a.right<=b.left||a.top>=b.bottom||a.bottom<=b.top;}),
+      label:footer.querySelector('input[type=email]').labels.length,
+      buttonHeight:footer.querySelector('button').getBoundingClientRect().height};
+    })()`);
+    assert.equal(m.overflow,false,'overflow at '+width);assert.equal(m.clipped,false,'clipping at '+width);
+    assert.ok(m.targets);assert.equal(m.label,1);assert.ok(m.buttonHeight>=44);assert.equal(m.clearance,true,'launcher overlap at '+width);if(width>=1024)assert.ok(m.height<500,'desktop footer too tall: '+m.height);
+   }
+   assert.deepEqual(await ev('[...document.querySelectorAll("#FooterFixture .storefront-footer-social a")].map(a=>a.href)'),Object.values(social));
+   assert.equal(await ev('document.querySelector("#FooterFixture a[href*=privacy]").getAttribute("href")'),'/policies/privacy-policy');
+   await ev('document.querySelector("#FooterFixtureEmail").value="invalid"');
+   assert.equal(await ev('document.querySelector("#FooterSignup").checkValidity()'),false);
+   await ev('document.querySelector("#FooterFixtureEmail").value="customer@example.test";window.newsletterPost=null;document.querySelector("#FooterSignup").addEventListener("submit",e=>{e.preventDefault();newsletterPost=Object.fromEntries(new FormData(e.target));e.target.querySelector("[role=status]").hidden=false},{once:true});document.querySelector("#FooterSignup").requestSubmit()');
+   assert.deepEqual(await ev('newsletterPost'),{'contact[tags]':'newsletter','contact[email]':'customer@example.test'});
+   assert.equal(await ev('document.querySelector("#FooterSignup [role=status]").hidden'),false);
+   const empty=renderSocial({whatsapp:'',facebook:'',instagram:''});assert.equal(empty,'');
+   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+   assert.equal(await ev('getComputedStyle(document.querySelector("#FooterFixture button"),"::before").display'),'none');
+   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+   await ev('document.querySelector("#FooterFixture").remove();document.querySelector("main").innerHTML="Fixture"');
   });
   await t.test('Checkout has separate confirmation, price changes require reconfirmation',async()=>{
    await submit('matched');const before=await ev('calls.length');

@@ -1,8 +1,20 @@
-<footer class="footer-area storefront-footer" dir="rtl">
-  <div class="container storefront-footer-inner">
-    {% if section.settings.show_store_name %}<a class="storefront-footer-name" href="{{ routes.root_url }}">{{ shop.name | escape }}</a>{% endif %}
     {% assign facebook_url = section.settings.facebook | default: settings.social_facebook_link %}
     {% assign instagram_url = section.settings.instagram | default: settings.social_instagram_link %}
+<footer class="footer-area storefront-footer" dir="rtl">
+  <div class="container storefront-footer-inner">
+    <div class="storefront-footer__top"><div class="storefront-footer__brand">
+    {% if section.settings.show_store_name %}<a class="storefront-footer-name" href="{{ routes.root_url }}">{{ shop.name | escape }}</a>{% endif %}
+    {% if section.settings.brand_description != blank %}<p class="storefront-footer__description">{{ section.settings.brand_description | escape }}</p>{% endif %}
+    </div>
+    {% if section.settings.show_footer_links %}<div class="storefront-footer-links">
+  {% if section.settings.footer_link != blank %}<nav aria-label="{{ 'sections.header.menu' | t }}"><h3>{{ 'sections.header.menu' | t }}</h3><ul>{% for link in section.settings.footer_link.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}
+  {% if section.settings.service_menu != blank %}<nav aria-label="{{ 'storefront.customer_service' | t }}"><h3>{{ 'storefront.customer_service' | t }}</h3><ul>{% for link in section.settings.service_menu.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}
+  {% if section.settings.show_policies %}<nav aria-label="{{ 'storefront.policies' | t }}"><h3>{{ 'storefront.policies' | t }}</h3><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}</ul></nav>{% endif %}
+</div>{% elsif section.settings.show_policies %}
+    <nav class="storefront-footer-policies" aria-label="{{ 'storefront.policies' | t }}"><h3>{{ 'storefront.policies' | t }}</h3><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}</ul></nav>
+    {% endif %}
+    {% if section.settings.whatsapp != blank or facebook_url != blank or instagram_url != blank %}
+    <div class="storefront-footer__social-group"><h3>{% if section.settings.follow_title != blank %}{{ section.settings.follow_title | escape }}{% else %}{{ 'storefront.follow' | t }}{% endif %}</h3>
     {% if section.settings.whatsapp != blank or facebook_url != blank or instagram_url != blank %}
     <ul class="storefront-footer-social" role="list" aria-label="{% if section.settings.follow_title != blank %}{{ section.settings.follow_title | escape }}{% else %}{{ 'storefront.follow' | t }}{% endif %}">
       {% if section.settings.whatsapp != blank %}<li><a data-store-whatsapp href="{{ section.settings.whatsapp | escape }}" aria-label="{{ 'storefront.whatsapp' | t }}"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M20.52 3.48A11.9 11.9 0 0 0 12.05 0C5.46 0 .1 5.36.1 11.95c0 2.1.55 4.15 1.6 5.96L0 24l6.24-1.64a11.9 11.9 0 0 0 5.8 1.48h.01c6.59 0 11.95-5.36 11.95-11.95 0-3.19-1.24-6.19-3.48-8.41ZM12.05 21.82a9.9 9.9 0 0 1-5.05-1.38l-.36-.22-3.7.97.99-3.61-.24-.37a9.88 9.88 0 0 1-1.52-5.26c0-5.48 4.46-9.94 9.95-9.94 2.65 0 5.15 1.04 7.02 2.92a9.86 9.86 0 0 1 2.91 7.03c0 5.48-4.46 9.86-10 9.86Zm5.45-7.43c-.3-.15-1.77-.87-2.05-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.9-.8-1.5-1.77-1.68-2.07-.17-.3-.02-.46.13-.61l.45-.52c.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.49s1.07 2.89 1.22 3.09c.15.2 2.1 3.2 5.1 4.49.72.31 1.28.5 1.72.64.72.23 1.38.2 1.9.12.58-.09 1.77-.73 2.02-1.44.25-.72.25-1.33.17-1.45-.07-.13-.27-.2-.57-.35Z"/></svg></a></li>{% endif %}
@@ -10,30 +22,110 @@
       {% if instagram_url != blank %}<li><a href="{{ instagram_url | escape }}" aria-label="{{ 'storefront.instagram' | t }}"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.22.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.05.41 2.22.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.22-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.05.36-2.22.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.22-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.05-.41-2.22-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.22.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.05-.36 2.22-.41 1.27-.06 1.65-.07 4.85-.07ZM12 0C8.74 0 8.33.01 7.05.07c-1.28.06-2.15.26-2.91.56a5.88 5.88 0 0 0-2.12 1.39A5.88 5.88 0 0 0 .63 4.14C.33 4.9.13 5.77.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.28.26 2.15.56 2.91.31.79.72 1.46 1.39 2.12a5.88 5.88 0 0 0 2.12 1.39c.76.3 1.63.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.28-.06 2.15-.26 2.91-.56a5.88 5.88 0 0 0 2.12-1.39 5.88 5.88 0 0 0 1.39-2.12c.3-.76.5-1.63.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.28-.26-2.15-.56-2.91a5.88 5.88 0 0 0-1.39-2.12 5.88 5.88 0 0 0-2.12-1.39c-.76-.3-1.63-.5-2.91-.56C15.67.01 15.26 0 12 0Zm0 5.84a6.16 6.16 0 1 0 0 12.32 6.16 6.16 0 0 0 0-12.32ZM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm6.41-11.84a1.44 1.44 0 1 0 0 2.88 1.44 1.44 0 0 0 0-2.88Z"/></svg></a></li>{% endif %}
     </ul>
     {% endif %}
-    {% if section.settings.show_footer_links %}<div class="storefront-footer-links">
-  {% if section.settings.footer_link != blank %}<nav aria-label="{{ 'sections.header.menu' | t }}"><h3>{{ 'sections.header.menu' | t }}</h3><ul>{% for link in section.settings.footer_link.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}
-  {% if section.settings.service_menu != blank %}<nav aria-label="{{ 'storefront.customer_service' | t }}"><h3>{{ 'storefront.customer_service' | t }}</h3><ul>{% for link in section.settings.service_menu.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}
-  {% if section.settings.show_policies %}<nav aria-label="{{ 'storefront.policies' | t }}"><h3>{{ 'storefront.policies' | t }}</h3><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}</ul></nav>{% endif %}
-</div>{% elsif section.settings.show_policies %}
-    <nav class="storefront-footer-policies" aria-label="{{ 'storefront.policies' | t }}"><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}</ul></nav>
-    {% endif %}
     {% if section.settings.show_footer_links and section.settings.tiktok != blank %}<a href="{{ section.settings.tiktok | escape }}">{{ 'storefront.tiktok' | t }}</a>{% endif %}
+    </div>
+    {% elsif section.settings.show_footer_links and section.settings.tiktok != blank %}
+      <div class="storefront-footer__social-group"><h3>{{ 'storefront.follow' | t }}</h3><a href="{{ section.settings.tiktok | escape }}">{{ 'storefront.tiktok' | t }}</a></div>
+    {% endif %}
     {% if section.settings.show_newsletter %}  <div class="newslatter-area"><h2>{% if section.settings.newsletter_title != blank %}{{ section.settings.newsletter_title | escape }}{% else %}{{ 'storefront.newsletter_title' | t }}{% endif %}</h2>
+    <p class="storefront-footer__newsletter-text">{{ 'footer_design.newsletter_support' | t }}</p>
     {% assign newsletter_form_id = 'FooterNewsletter-' | append: section.id %}
     {% form 'customer', id: newsletter_form_id, class: 'storefront-validated-form' %}
       <input type="hidden" name="contact[tags]" value="newsletter">
       <label for="FooterEmail-{{ section.id }}">{{ 'newsletter.label' | t }}</label>
       <input id="FooterEmail-{{ section.id }}" type="email" name="contact[email]" placeholder="{{ 'newsletter.label' | t }}" autocomplete="email" required {% if form.errors %}aria-invalid="true" aria-describedby="FooterErrors-{{ section.id }}"{% endif %}>
       <button type="submit">{{ 'newsletter.button_label' | t }}</button>
-      {% if form.errors %}<div class="storefront-form-errors" id="FooterErrors-{{ section.id }}">{{ form.errors | default_errors }}</div>{% endif %}
+      {% if form.errors %}<div role="alert" class="storefront-form-errors" id="FooterErrors-{{ section.id }}">{{ form.errors | default_errors }}</div>{% endif %}
       {% if form.posted_successfully? %}<p role="status">{{ 'newsletter.success' | t }}</p>{% endif %}
     {% endform %}
   </div>{% endif %}
+    </div>
+    <ul class="storefront-footer__trust" role="list">{% assign footer_facts = 'secure,pickup,shipping' | split: ',' %}{% for fact in footer_facts %}{% assign fact_key = 'product_trust.' | append: fact %}<li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg>{{ fact_key | t }}</li>{% endfor %}</ul>
+    <div class="storefront-footer__bottom">
     {% if section.settings.show_payment_icons and shop.enabled_payment_types != blank %}<ul class="paymets" aria-label="{{ 'sections.footer.payment' | t }}">{% for type in shop.enabled_payment_types %}<li>{{ type | payment_type_svg_tag }}</li>{% endfor %}</ul>{% endif %}
     {% if section.settings.accessibility_statement_page != blank %}<a class="storefront-footer-statement" href="{{ section.settings.accessibility_statement_page.url }}">{{ 'accessibility_preferences.statement' | t }}</a>{% elsif request.design_mode %}<p class="storefront-footer-copyright">יש לבחור עמוד הצהרת נגישות בהגדרות התחתית.</p>{% endif %}
     {% if section.settings.show_copyright %}<p class="storefront-footer-copyright">© {{ 'now' | date: '%Y' }} {{ shop.name | escape }}</p>{% endif %}
+    </div>
   </div>
 </footer>
+
+{% stylesheet %}
+.storefront-footer { background: linear-gradient(125deg, #0e343d, #124b54); color: #e9f5f6; border-block-start: 1px solid #629aa654; text-align: start; }
+.storefront-footer .storefront-footer-inner { display: block; padding-block: 24px 14px; }
+.storefront-footer__top { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,240px),1fr)); gap: 20px; align-items: start; }
+.storefront-footer__brand { min-width: 0; }
+.storefront-footer .storefront-footer-name { display: inline-block; color: #fff; font-size: 23px; font-weight: 600; margin-block-end: 12px; }
+.storefront-footer__description { margin: 0 0 16px; max-width: 36ch; font-size: 14px; line-height: 1.7; color: #c8dfe3; overflow-wrap: anywhere; }
+.storefront-footer .storefront-footer-social { justify-content: flex-start; flex-wrap: wrap; gap: 8px; }
+.storefront-footer .storefront-footer-social a { width: 44px; height: 44px; border: 1px solid #6fa2ad66; background: #ffffff0a; color: #e9f5f6; transition: transform 200ms var(--storefront-ease,ease), background-color 200ms ease, box-shadow 200ms ease; }
+.storefront-footer .storefront-footer-social a:active { transform: translateY(1px); }
+.storefront-footer .storefront-footer-links { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 20px; min-width: 0; }
+.storefront-footer .storefront-footer-links h3 { display: block; font-size: 16px; line-height: 1.5; font-weight: 600; margin-block: 0 8px; color: #fff; }
+.storefront-footer .storefront-footer-links ul, .storefront-footer .storefront-footer-policies ul { display: grid; justify-content: stretch; gap: 0; }
+.storefront-footer .storefront-footer-links a, .storefront-footer .storefront-footer-policies a { display: inline-flex; align-items: center; min-height: 36px; max-width: 100%; color: #d5e8eb; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; text-underline-offset: 4px; }
+.storefront-footer .newslatter-area { max-width: none; min-width: 0; padding: 18px; border: 1px solid #79a9b54d; border-radius: 14px; background: #ffffff09; box-shadow: 0 4px 14px #001d2114; }
+.storefront-footer .newslatter-area h2 { font-size: 19px; line-height: 1.4; font-weight: 600; color: #fff; margin-block-end: 8px; }
+.storefront-footer__newsletter-text { color: #c8dfe3; font-size: 13px; margin-block-end: 12px; }
+.storefront-footer .newslatter-area input { color: #173b44; background: #f7fcfd; border: 1px solid #badfe6; border-radius: 10px; font-size: 16px; }
+.storefront-footer .newslatter-area button { position: relative; isolation: isolate; overflow: hidden; background: var(--storefront-cart-base,#0b6571); border: 1px solid #73c6d1; border-radius: 10px; color: #fff; transition: transform 150ms ease, box-shadow 200ms ease; }
+.storefront-footer .newslatter-area button::before { content: ''; position: absolute; inset: 0; background: #087b88; z-index: -1; transform: translateX(100%); transition: transform 220ms var(--storefront-ease,ease); }
+.storefront-footer .newslatter-area button:active { transform: scale(.985); }
+.storefront-footer .storefront-form-errors { color: #ffd6dc; }
+.storefront-footer .newslatter-area [role=status] { color: #c1f1dc; }
+.storefront-footer__trust { display: flex; flex-wrap: wrap; gap: 10px 24px; padding-block: 12px; margin-block-start: 16px !important; border-block-start: 1px solid #6f9da64d; font-size: 14px; color: #d0e5e8; }
+.storefront-footer__trust li { display: inline-flex; align-items: center; gap: 6px; }
+.storefront-footer__trust svg { color: #9ddde3; flex: 0 0 16px; }
+.storefront-footer__bottom { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding-block-start: 8px; border-block-start: 1px solid #6f9da64d; }
+.storefront-footer .storefront-footer-copyright { order: -1; color: #bdd7dc; }
+.storefront-footer .storefront-footer-statement { min-height: 44px; display: inline-flex; align-items: center; color: #d5e8eb; font-size: 13px; text-decoration: underline; }
+.storefront-footer ul.paymets { margin-inline-start: auto; justify-content: flex-start; gap: 6px; }
+.storefront-footer ul.paymets svg { max-width: 44px; height: 28px; }
+.storefront-footer :is(a,button,input):focus-visible { outline: 2px solid #b0e9ee; outline-offset: 3px; }
+@media (hover:hover) and (pointer:fine) {
+ .storefront-footer .storefront-footer-social a:hover { transform: translateY(-2px); background: #ffffff15; box-shadow: 0 3px 12px #80d9e026; }
+ .storefront-footer .newslatter-area button:hover::before { transform: none; }
+ .storefront-footer .storefront-footer-links a:hover { color: #fff; text-decoration: underline; }
+}
+@media (max-width: 599px) {
+ .storefront-footer .storefront-footer-inner { padding-block: 20px 14px; }
+ .storefront-footer__top { grid-template-columns: minmax(0,1fr); gap: 16px; }
+ .storefront-footer .storefront-footer-links { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+ .storefront-footer .storefront-footer-links a, .storefront-footer .storefront-footer-policies a { min-height: 44px; }
+ .storefront-footer .newslatter-area { padding: 14px; }
+ .storefront-footer .newslatter-area form { grid-template-columns: minmax(0,1fr); }
+ .storefront-footer__trust { gap: 10px 16px; margin-block-start: 14px !important; }
+ .storefront-footer ul.paymets { margin-inline-start: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+ .storefront-footer .storefront-footer-social a, .storefront-footer .newslatter-area button { transition: none; }
+ .storefront-footer .storefront-footer-social a:is(:hover,:active), .storefront-footer .newslatter-area button:active { transform: none; }
+ .storefront-footer .newslatter-area button::before { display: none; transition: none; }
+}
+html[data-a11y-paused] .storefront-footer .newslatter-area button::before { display: none; }
+html[data-a11y-paused] .storefront-footer .storefront-footer-social a:is(:hover,:active) { transform: none; }
+
+.storefront-footer__social-group h3, .storefront-footer .storefront-footer-policies h3 { margin: 0 0 10px; font-size: 16px; line-height: 1.5; font-weight: 600; color: #fff; }
+.storefront-footer__social-group { min-width: 0; }
+.storefront-footer .storefront-footer-social svg { width: 25px; height: 25px; }
+.storefront-footer__trust li + li { border-inline-start: 1px solid #7babb654; padding-inline-start: 20px; }
+@media (min-width: 992px) {
+ .storefront-footer .storefront-footer-inner { padding-inline-end: max(var(--page-padding), calc(216px - max(0px, (100vw - var(--storefront-width)) / 2))); }
+ .storefront-footer__top { grid-template-columns: minmax(0,1fr) minmax(0,1.35fr); }
+ .storefront-footer__top:has(.storefront-footer__social-group) { grid-template-columns: minmax(0,.9fr) minmax(0,1.4fr) minmax(140px,.65fr); }
+ .storefront-footer__top:not(:has(.storefront-footer-links, .storefront-footer-policies)) { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .storefront-footer .storefront-footer-policies ul { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 14px; }
+ .storefront-footer .newslatter-area { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(180px,1fr) minmax(260px,1.2fr); gap: 0 20px; padding: 12px 16px; }
+ .storefront-footer .newslatter-area h2, .storefront-footer__newsletter-text { grid-column: 1; }
+ .storefront-footer .newslatter-area form { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+ .storefront-footer__newsletter-text { margin-block-end: 0; }
+}
+@media (max-width: 599px) {
+ .storefront-footer__social-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+ .storefront-footer__social-group h3 { margin: 0; font-size: 15px; }
+ .storefront-footer__trust { font-size: 13px; }
+ .storefront-footer__trust li + li { padding-inline-start: 0; border-inline-start: 0; }
+}
+{% endstylesheet %}
 {% schema %}
 {
   "name": "t:storefront_editor.footer",
@@ -119,6 +211,11 @@
       "type": "page",
       "id": "accessibility_statement_page",
       "label": "עמוד הצהרת נגישות"
+    },
+    {
+      "type": "textarea",
+      "id": "brand_description",
+      "label": "t:footer_design_editor.description"
     }
   ]
 }
