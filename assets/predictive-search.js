@@ -21,6 +21,9 @@
       this.input.setAttribute('aria-controls', this.listId);
       this.input.setAttribute('autocomplete', 'off');
       this.ensureList();
+      this.setAttribute('data-search-enhanced', '');
+      this.clearButton = this.querySelector('[data-search-clear]');
+      this.updateClear();
       try { this.nativeSupported = JSON.parse(document.getElementById('shopify-features')?.textContent || '{}').predictiveSearch !== false; }
       catch { this.nativeSupported = true; }
       const options = {signal: this.listeners.signal};
@@ -28,6 +31,9 @@
       this.input.addEventListener('compositionstart', () => { this.composing = true; this.cancel(); this.close(); }, options);
       this.input.addEventListener('compositionend', () => { this.composing = false; this.schedule(); }, options);
       this.input.addEventListener('focus', () => { if (!this.ignoreFocus && this.query().length >= 2) this.schedule(); }, options);
+      this.clearButton?.addEventListener('click', () => {
+        this.input.value = ''; this.input.dispatchEvent(new Event('input', {bubbles: true})); this.input.focus();
+      }, options);
       this.addEventListener('keydown', event => this.keydown(event), options);
       this.addEventListener('focusout', event => {
         if (event.relatedTarget && this.contains(event.relatedTarget)) return;
@@ -47,6 +53,7 @@
     disconnectedCallback() {
       clearTimeout(this.blurTimer); this.cancel(); this.listeners?.abort(); this.listeners = null;
     }
+    updateClear() { if (this.clearButton) this.clearButton.hidden = !this.input.value.length; }
     query() { return this.input.value.trim(); }
     options() { return [...this.results.querySelectorAll('[role=option]')]; }
     ensureList() {
@@ -57,14 +64,14 @@
     }
     cancel() { clearTimeout(this.timer); this.timer = null; this.request?.abort(); this.request = null; this.sequence = (this.sequence || 0) + 1; }
     schedule() {
-      this.cancel(); this.close(); this.select(-1);
+      this.updateClear(); this.cancel(); this.close(); this.select(-1);
       if (this.composing || [...this.query()].length < 2) { this.status.textContent = ''; return; }
       const query = this.query();
       const link = new URL(this.dataset.searchUrl, location.origin);
       link.searchParams.set('q', query); link.searchParams.set('type', 'product'); link.searchParams.set('options[prefix]', 'last');
       this.all.href = link.href;
       const sequence = this.sequence;
-      this.timer = setTimeout(() => { this.timer = null; this.search(query, sequence); }, 300);
+      this.timer = setTimeout(() => { this.timer = null; this.search(query, sequence); }, 150);
     }
     // Storefront-only request boundary. A future app-proxy adapter can replace it without UI changes.
     async fetchResults(query, signal, native = this.nativeSupported) {

@@ -1,16 +1,20 @@
 {% doc %}
   Server-rendered product suggestions shared by predictive and normal-search routes.
   @param {product[]} products - Shopify product results.
+  @param {collection[]} [collections] - Collections supplied by Shopify, when present.
   @example
   {% render 'predictive-search-products', products: predictive_search.resources.products %}
 {% enddoc %}
 {% render 'predictive-search-styles' %}
 <div data-predictive-fragment>
-  {% if products.size > 0 %}
-    <ul class="predictive-search__list" role="listbox" aria-label="{{ 'storefront.predictive.products' | t | escape }}">
+  {% if products.size > 0 or collections.size > 0 %}
+    <div role="listbox" class="predictive-search__groups" aria-label="{{ 'storefront.predictive.results' | t | escape }}">
+    {% if products.size > 0 %}
+    <h3 class="predictive-search__heading">{{ 'storefront.predictive.products' | t }}</h3>
+    <ul class="predictive-search__list" role="group" aria-label="{{ 'storefront.predictive.products' | t | escape }}">
       {% for product in products limit: 6 %}
         <li role="presentation">
-          <a href="{{ product.url }}" class="predictive-search__option" role="option" aria-selected="false">
+          <a href="{{ product.url }}" class="predictive-search__option{% unless product.available %} predictive-search__option--unavailable{% endunless %}" role="option" aria-selected="false">
             <span class="predictive-search__image">
               {% if product.featured_image != blank %}
                 {{ product.featured_image | image_url: width: 108 | image_tag: loading: 'lazy', widths: '54, 108', sizes: '54px', alt: '' }}
@@ -20,12 +24,22 @@
               <span class="predictive-search__title">{{ product.title | escape }}</span>
               {% if product.vendor != blank %}<span class="predictive-search__meta">{{ product.vendor | escape }}</span>{% endif %}
               {% render 'product-price', card_product: product %}
-              <span class="predictive-search__meta">{% if product.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</span>
+              {% render 'product-card-badges', card_product: product %}
             </div>
           </a>
         </li>
       {% endfor %}
     </ul>
+    {% endif %}
+    {% if collections.size > 0 %}
+      <h3 class="predictive-search__heading">{{ 'storefront.predictive.collections' | t }}</h3>
+      <ul class="predictive-search__list" role="group" aria-label="{{ 'storefront.predictive.collections' | t | escape }}">
+        {% for collection in collections limit: 3 %}
+          <li role="presentation"><a href="{{ collection.url }}" class="predictive-search__option predictive-search__option--collection" role="option" aria-selected="false">{{ collection.title | escape }}</a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    </div>
   {% else %}
     <p class="predictive-search__empty">{{ 'storefront.predictive.empty' | t }}<small>{{ 'storefront.predictive.hint' | t }}</small></p>
     <ul class="predictive-search__list" role="listbox" aria-label="{{ 'storefront.predictive.products' | t | escape }}"></ul>

@@ -38,7 +38,7 @@ test('Header predictive search browser coverage',{timeout:90000},async t=>{
   await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/'});
   await wait('document.readyState==="complete"');
   await ev(`window.widget=document.querySelector('fankee-predictive-search');window.input=widget.querySelector('input[name=q]');window.calls=[];window.mode='products';window.delay=0;window.activations=[];window.submitted=false;
-  window.fragment=q=>'<div data-predictive-fragment>'+(q==='empty'?'<p class="predictive-search__empty">לא נמצאו מוצרים<small>נסו לחפש לפי שם המוצר או המותג</small></p><ul role="listbox"></ul>':'<ul role="listbox" class="predictive-search__list">'+[0,1].map(i=>'<li role="presentation"><a role="option" href="/products/'+i+'" class="predictive-search__option"><span class="predictive-search__image">□</span><div><span class="predictive-search__title">'+q.replace(/[<>&]/g,'')+' מוצר '+i+'</span><div class="catalog-price"><bdi>15.90 ₪</bdi><s>20.00 ₪</s></div><span class="predictive-search__meta">'+(i?'אזל מהמלאי':'במלאי')+'</span></div></a></li>').join('')+'</ul>')+'</div>';
+  window.fragment=q=>'<div data-predictive-fragment>'+(q==='empty'?'<p class="predictive-search__empty">לא מצאנו מוצרים עבור החיפוש הזה<small>נסו לחפש בשם מוצר, מותג או קטגוריה</small></p><ul role="listbox"></ul>':'<ul role="listbox" class="predictive-search__list">'+[0,1].map(i=>'<li role="presentation"><a role="option" href="/products/'+i+'" class="predictive-search__option"><span class="predictive-search__image">□</span><div><span class="predictive-search__title">'+q.replace(/[<>&]/g,'')+' מוצר '+i+'</span><div class="catalog-price"><bdi>15.90 ₪</bdi><s>20.00 ₪</s></div><span class="predictive-search__meta">'+(i?'אזל מהמלאי':'במלאי')+'</span></div></a></li>').join('')+'</ul>')+'</div>';
   window.fetch=async(url,options={})=>{const u=new URL(url);calls.push({url:String(url),signal:options.signal});if(mode==='offline')throw Error('Offline');if(mode==='417'&&u.pathname.endsWith('/suggest'))return new Response('',{status:417});const q=u.searchParams.get('q');await new Promise(r=>setTimeout(r,q==='older'?800:delay));return new Response(fragment(q),{status:200});};
   widget.addEventListener('click',e=>{const a=e.target.closest('a[role=option]');if(a){e.preventDefault();activations.push(a.getAttribute('href'));}});
   widget.querySelector('form').addEventListener('submit',e=>{submitted=!e.defaultPrevented;e.preventDefault();});
@@ -47,7 +47,7 @@ test('Header predictive search browser coverage',{timeout:90000},async t=>{
   await ev(fs.readFileSync(path.join(root,'assets/predictive-search.js'),'utf8'));
   await t.test('Two characters, debounce and Hebrew locale normal-search fallback',async()=>{
    await ev('typeQuery("ס")');await sleep(360);assert.equal(await ev('calls.length'),0);
-   await ev('typeQuery("סנ");typeQuery("סנו")');await sleep(140);assert.equal(await ev('calls.length'),0);
+   await ev('typeQuery("סנ");typeQuery("סנו");window.debouncePending=widget.timer!==null;window.inputCalls=calls.length');assert.equal(await ev('debouncePending'),true);assert.equal(await ev('inputCalls'),0);
    await wait('widget.querySelectorAll("[role=option]").length===2&&widget.querySelector("[data-search-loading]").hidden');
    const url=new URL(await ev('calls[0].url'));assert.equal(url.pathname,'/he/search');assert.equal(url.searchParams.get('q'),'סנו');assert.equal(url.searchParams.get('section_id'),'predictive-search');assert.equal(url.searchParams.get('type'),'product');
    assert.equal(await ev('input.getAttribute("aria-expanded")'),'true');assert.ok(await ev('widget.textContent.includes("15.90 ₪")'));
@@ -72,7 +72,7 @@ test('Header predictive search browser coverage',{timeout:90000},async t=>{
   });
   await t.test('No results, loading, error and all-results URL remain usable',async()=>{
    await ev('delay=250;typeQuery("empty")');await wait('!widget.querySelector("[data-search-loading]").hidden');assert.equal(await ev('widget.querySelector("[data-search-results]").getAttribute("aria-busy")'),'true');
-   await wait('widget.querySelector("[data-search-results]").textContent.includes("לא נמצאו מוצרים")');
+   await wait('widget.querySelector("[data-search-results]").textContent.includes("לא מצאנו מוצרים עבור החיפוש הזה")');
    const u=new URL(await ev('widget.querySelector("[data-search-all]").href'));assert.equal(u.pathname,'/he/search');assert.equal(u.searchParams.get('q'),'empty');
    await ev('delay=0;mode="offline";typeQuery("failed")');await wait('widget.querySelector("[data-search-results]").textContent.includes("לא ניתן לטעון")');assert.equal(await ev('input.disabled'),false);
   });
@@ -87,6 +87,68 @@ test('Header predictive search browser coverage',{timeout:90000},async t=>{
    await ev('typeQuery("mobile")');await wait('widget.querySelector("[data-search-results]").textContent.includes("mobile")');
    if(process.env.PREDICTIVE_SCREENSHOT_PATH){const image=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.PREDICTIVE_SCREENSHOT_PATH,Buffer.from(image.data,'base64'));}
    await ev('document.getElementById("outside").focus()');await wait('input.getAttribute("aria-expanded")==="false"');
+  });
+
+  await t.test('Clear button is accessible, cancels pending search, and restores input focus',async()=>{
+   await ev('typeQuery("clear-me")');
+   assert.equal(await ev('widget.querySelector("[data-search-clear]").hidden'),false);
+   assert.ok(await ev('widget.querySelector("[data-search-clear]").getAttribute("aria-label").length>0'));
+   await ev('widget.querySelector("[data-search-clear]").click()');
+   assert.equal(await ev('input.value'),'');
+   assert.equal(await ev('document.activeElement===input'),true);
+   assert.equal(await ev('widget.querySelector("[data-search-clear]").hidden'),true);
+   assert.equal(await ev('input.getAttribute("aria-expanded")'),'false');
+   await sleep(220);
+   assert.equal(await ev('calls.some(c=>new URL(c.url).searchParams.get("q")==="clear-me")'),false);
+  });
+  await t.test('Product and supplied collection groups share one keyboard listbox',async()=>{
+   await ev(`
+    window.originalFragment=fragment;
+    window.fragment=q=>{
+     const doc=new DOMParser().parseFromString(originalFragment(q),'text/html');
+     const list=doc.querySelector('[role=listbox]');
+     const options=[...doc.querySelectorAll('[role=option]')];
+     if(options.length){
+      options[0].querySelector('div').insertAdjacentHTML('beforeend','<div class="catalog-card__badges"><span class="catalog-card__badge catalog-card__badge--sale">20% discount</span></div>');
+      options[1].classList.add('predictive-search__option--unavailable');
+      options[1].querySelector('.predictive-search__title').textContent='Long Hebrew product title '.repeat(10);
+     }
+     if(q==='groups'){
+      list.setAttribute('role','group');list.setAttribute('aria-label','Products');
+      const box=doc.createElement('div');box.setAttribute('role','listbox');
+      list.before(box);box.append(list);
+      box.insertAdjacentHTML('beforeend','<h3 class="predictive-search__heading">Categories</h3><ul role="group" aria-label="Categories"><li role="presentation"><a role="option" class="predictive-search__option predictive-search__option--collection" href="/collections/cleaning">Cleaning</a></li></ul>');
+     }
+     return doc.body.innerHTML;
+    };
+    mode='products';typeQuery('groups');
+   `);
+   await wait('!widget.panel.hidden&&!widget.results.hasAttribute("aria-busy")&&widget.querySelectorAll("[role=option]").length===3');
+   assert.equal(await ev('widget.querySelectorAll("[role=listbox]").length'),1);
+   assert.equal(await ev('widget.querySelectorAll("[role=group]").length'),2);
+   await ev('key("ArrowDown");key("ArrowDown");key("ArrowDown");key("Enter")');
+   assert.equal(await ev('activations.at(-1)'),'/collections/cleaning');
+   assert.equal(await ev('document.getElementById(input.getAttribute("aria-activedescendant")).getAttribute("aria-selected")'),'true');
+  });
+  await t.test('Premium result rows stay contained at seven widths and respect reduced motion',async()=>{
+   for(const width of [320,360,375,390,768,1440,1600]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:800,deviceScaleFactor:1,mobile:false});
+    await ev('typeQuery("groups")');await wait('!widget.panel.hidden&&!widget.results.hasAttribute("aria-busy")&&widget.querySelectorAll("[role=option]").length===3');
+    const m=await ev(`(()=>{
+     const panel=widget.querySelector('[data-search-panel]'),r=panel.getBoundingClientRect();
+     const images=[...widget.querySelectorAll('.predictive-search__image')];
+     return {page:document.documentElement.scrollWidth,viewport:innerWidth,left:r.left,right:r.right,overflow:panel.scrollWidth>panel.clientWidth,dir:getComputedStyle(panel).direction,heights:[...widget.querySelectorAll('[role=option], [data-search-clear]')].map(n=>n.getBoundingClientRect().height),targets:[...widget.querySelectorAll('[role=option], [data-search-clear]')].every(n=>n.getBoundingClientRect().height>=44),thumbs:images.every(n=>Math.abs(n.getBoundingClientRect().width-54)<0.5)};
+    })()`);
+    assert.ok(m.page<=m.viewport+1,JSON.stringify({width,...m}));
+    assert.ok(m.left>=0&&m.right<=m.viewport+1,JSON.stringify({width,...m}));
+    assert.equal(m.overflow,false);assert.equal(m.dir,'rtl');assert.equal(m.targets,true,JSON.stringify({width,...m}));assert.equal(m.thumbs,true,JSON.stringify({width,...m}));
+    await ev('key("Escape")');assert.equal(await ev('input.getAttribute("aria-expanded")'),'false');
+   }
+   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+   await ev('typeQuery("groups")');await wait('!widget.panel.hidden&&!widget.results.hasAttribute("aria-busy")&&widget.querySelectorAll("[role=option]").length===3');
+   assert.equal(await ev('getComputedStyle(widget.querySelector("[data-search-panel]")).animationName'),'none');
+   assert.equal(await ev('getComputedStyle(widget.querySelector(".predictive-search__spinner")).animationName'),'none');
+   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
   });
   await t.test('Theme Editor disconnect aborts requests and reconnect adds one listener set',async()=>{
    await ev('typeQuery("disconnect")');await wait('calls.some(c=>new URL(c.url).searchParams.get("q")==="disconnect")');

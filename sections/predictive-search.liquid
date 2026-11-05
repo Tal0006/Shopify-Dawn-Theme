@@ -5,7 +5,7 @@
   /search?q=soap&type=product&section_id=predictive-search
 {% endcomment %}
 {% if predictive_search.performed %}
-  {% render 'predictive-search-products', products: predictive_search.resources.products %}
+  {% render 'predictive-search-products', products: predictive_search.resources.products, collections: predictive_search.resources.collections %}
 {% elsif search.performed %}
   {% paginate search.results by 6 %}
     {% render 'predictive-search-products', products: search.results %}

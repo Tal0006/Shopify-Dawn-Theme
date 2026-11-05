@@ -24,4 +24,46 @@
     .storefront-header-tools fankee-predictive-search form[role=search] { min-block-size: 44px; }
     .predictive-search__panel { inline-size: 100%; }
   }
+
+  .predictive-search__panel { box-sizing: border-box; max-inline-size: 100%; border-color: var(--storefront-border-soft, #cfe4e8); border-radius: 16px; background: #fffffffa; box-shadow: 0 12px 32px #164c6026; animation: predictive-open 180ms var(--storefront-ease, ease-out); }
+  .predictive-search__heading { margin: 0; padding: 12px 14px 4px; font-size: 13px; line-height: 1.5; font-weight: 600; color: var(--storefront-accent, #086b7b); }
+  .predictive-search__list { padding: 4px 6px 6px; }
+  .predictive-search__option { gap: 10px; padding: 10px 8px; border-radius: 10px; transition: background-color 160ms ease, color 160ms ease; }
+  .predictive-search__option:hover, .predictive-search__option[aria-selected=true] { background: #eaf7f9; color: var(--storefront-ink); }
+  .predictive-search__option:focus-visible, .predictive-search__all:focus-visible { outline-color: var(--storefront-accent, #086b7b); }
+  .predictive-search__image { box-sizing: border-box; background: #f3f9fa; border: 1px solid #e5eff2; border-radius: 9px; }
+  .predictive-search__image img { inline-size: 100%; block-size: 100%; object-fit: contain; }
+  .predictive-search__content { min-width: 0; }
+  .predictive-search__title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; }
+  .predictive-search__meta { color: #536975; }
+  .predictive-search__option .catalog-price { display: flex; flex-wrap: wrap; align-items: baseline; margin-block: 3px; font-size: 15px; font-weight: 600; }
+  .predictive-search__option .catalog-price s { color: #657680; font-size: 12px; font-weight: 400; }
+  .predictive-search__option .catalog-card__badges { display: none; position: static; min-height: 0; margin-block-start: 3px; gap: 4px; }
+  .predictive-search__option .catalog-card__badges:has(> span) { display: flex; flex-wrap: wrap; }
+  .predictive-search__option .catalog-card__badge { display: inline-flex; padding: 2px 7px; border-radius: 20px; color: #095564; background: #e7f5f6; font-size: 11px; font-weight: 600; line-height: 1.4; }
+  .predictive-search__option .catalog-card__badge--sale { color: #fff; background: #a6314d; }
+  .predictive-search__option .catalog-card__badge--quiet { color: #49555d; background: #e9edf0; }
+  .predictive-search__option--unavailable .predictive-search__image { opacity: .65; }
+  .predictive-search__option--unavailable .predictive-search__title { color: #536975; }
+  .predictive-search__option--collection { grid-template-columns: minmax(0, 1fr); min-block-size: 44px; font-weight: 500; }
+  .predictive-search__all { border-color: var(--storefront-border-soft, #cfe4e8); background: #f5fbfc; color: var(--storefront-accent, #086b7b); }
+  .predictive-search__empty { line-height: 1.6; font-weight: 500; }
+  .predictive-search__empty small { margin-block-start: 4px; font-weight: 400; }
+  .predictive-search__spinner { border-block-start-color: var(--storefront-accent, #086b7b); }
+  .storefront-header fankee-predictive-search form[role=search] { transition: border-color 180ms ease, box-shadow 180ms ease; }
+  .storefront-header fankee-predictive-search form[role=search]:focus-within { border-color: var(--storefront-accent, #086b7b); box-shadow: var(--storefront-glow, 0 0 0 3px #0ba7b51a); }
+  .storefront-header fankee-predictive-search button { flex-shrink: 0; }
+  .storefront-header fankee-predictive-search .predictive-search__clear[hidden] { display: none; }
+  .predictive-search__clear:focus-visible { outline: 2px solid var(--storefront-accent, #086b7b); outline-offset: -3px; border-radius: 8px; }
+  fankee-predictive-search[data-search-enhanced] input::-webkit-search-cancel-button { -webkit-appearance: none; }
+  @keyframes predictive-open { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 767px) {
+    .predictive-search__panel { border-radius: 12px; }
+    .predictive-search__option { min-block-size: 88px; }
+    .predictive-search__option--collection { min-block-size: 48px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .predictive-search__panel { animation: none; }
+    .predictive-search__option, .storefront-header fankee-predictive-search form[role=search] { transition: none; }
+  }
 {% endstylesheet %}

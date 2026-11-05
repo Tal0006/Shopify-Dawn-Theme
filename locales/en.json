@@ -621,11 +621,14 @@
     "predictive": {
       "loading": "Searching products…",
       "error": "Suggestions are unavailable. You can open all results.",
-      "empty": "No products found",
-      "hint": "Try a product name or brand",
-      "count": "{{ count }} products found",
+      "empty": "No products found for this search",
+      "hint": "Try a product name, brand or category",
+      "count": "{{ count }} search results",
       "all": "View all results",
-      "products": "Product suggestions"
+      "products": "Products",
+      "collections": "Categories",
+      "results": "Search results",
+      "clear": "Clear search"
     },
     "drawer_close": "Close shopping cart",
     "drawer_empty": "Your cart is empty",
