@@ -1,0 +1,28 @@
+{% doc %}
+  Compact bundle choice; shared Shopify variant pricing, no nested purchase form.
+  @param {product} bundle_product - Configured product.
+  @param {variant} bundle_variant - Explicit safe variant.
+  @param {string} bundle_id - Unique section identity.
+  @param {boolean} [main_product] - Tracks the current product variant.
+  @example
+  {% render 'bundle-product', bundle_product: product, bundle_variant: product.selected_or_first_available_variant, bundle_id: section.id, main_product: true %}
+{% enddoc %}
+{% assign choice_id = 'BundleChoice-' | append: bundle_id | append: '-' | append: bundle_product.id %}
+{% assign choice_safe = true %}
+{% if bundle_variant.quantity_rule.min > 1 or bundle_variant.quantity_rule.increment > 1 %}{% assign choice_safe = false %}{% endif %}
+<article class="bundle-item{% unless bundle_variant.available and choice_safe %} bundle-item--quiet{% endunless %}" {% if main_product %}data-bundle-main{% endif %}>
+  <label class="bundle-item__check" for="{{ choice_id }}">
+    <input id="{{ choice_id }}" type="checkbox" name="bundle_variant" value="{{ bundle_variant.id }}" data-price="{{ bundle_variant.price }}" {% if main_product %}data-bundle-main-choice{% endif %} {% if bundle_variant.available and choice_safe %}checked{% else %}disabled{% endif %}>
+    <span class="sr-only">{{ 'bundle.select' | t: title: bundle_product.title | escape }}</span>
+  </label>
+  <div class="bundle-item__image">
+    {% if bundle_product.featured_image %}
+      {{ bundle_product.featured_image | image_url: width: 160 | image_tag: loading: 'lazy', widths: '80, 160', sizes: '80px', alt: '' }}
+    {% endif %}
+  </div>
+  <div class="bundle-item__content">
+    <h3><a href="{{ bundle_product.url }}">{{ bundle_product.title | escape }}</a></h3>
+    <div data-bundle-price>{% render 'product-price', card_product: bundle_product, variant: bundle_variant %}</div>
+    <p data-bundle-availability>{% unless choice_safe %}{{ 'bundle.options_required' | t }}{% elsif bundle_variant.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endunless %}</p>
+  </div>
+</article>

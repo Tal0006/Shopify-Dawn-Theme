@@ -1,0 +1,82 @@
+{% comment %}
+  Merchant-only product companions: custom.frequently_bought_together (list.product_reference).
+  Hide unsafe companion choices; Shopify owns prices, availability and cart validation.
+{% endcomment %}
+{% liquid
+  assign companions = product.metafields.custom.frequently_bought_together.value | uniq: 'id'
+  assign main_variant = product.selected_or_first_available_variant
+  assign companion_count = 0
+  assign bundle_total = 0
+  if main_variant.available and main_variant.quantity_rule.min <= 1 and main_variant.quantity_rule.increment <= 1
+    assign bundle_total = main_variant.price
+  endif
+%}
+{% capture companion_cards %}
+  {% for companion in companions %}
+    {% if companion.id == product.id or companion.variants.size != 1 or companion.selling_plan_groups.size > 0 %}{% continue %}{% endif %}
+    {% assign companion_variant = companion.selected_or_first_available_variant %}
+    {% if companion_variant.quantity_rule.min > 1 or companion_variant.quantity_rule.increment > 1 %}{% continue %}{% endif %}
+    {% render 'bundle-product', bundle_product: companion, bundle_variant: companion_variant, bundle_id: section.id %}
+    {% if companion_variant.available %}{% assign bundle_total = bundle_total | plus: companion_variant.price %}{% endif %}
+    {% assign companion_count = companion_count | plus: 1 %}
+    {% if companion_count == 3 %}{% break %}{% endif %}
+  {% endfor %}
+{% endcapture %}
+{% if companion_count > 0 and product.selling_plan_groups.size == 0 %}
+<section class="container bundle-section" data-bundle data-product-id="{{ product.id }}" data-currency="{{ cart.currency.iso_code | default: shop.currency }}" data-locale="{{ request.locale.iso_code }}" data-in-stock="{{ 'products.product.inventory_in_stock' | t | escape }}" data-sold-out="{{ 'products.product.sold_out' | t | escape }}" data-options-required="{{ 'bundle.options_required' | t | escape }}" aria-labelledby="BundleHeading-{{ section.id }}">
+  <header class="catalog-section-header"><h2 id="BundleHeading-{{ section.id }}">{% if section.settings.heading != blank %}{{ section.settings.heading | escape }}{% else %}{{ 'bundle.heading' | t }}{% endif %}</h2><p>{{ 'bundle.subtitle' | t }}</p></header>
+  <form method="post" action="{{ routes.cart_add_url }}" data-card-cart data-bundle-cart>
+    <input type="hidden" name="id" value="{{ main_variant.id }}">
+    <div class="bundle-section__items">
+      {% render 'bundle-product', bundle_product: product, bundle_variant: main_variant, bundle_id: section.id, main_product: true %}
+      {{ companion_cards }}
+    </div>
+    <div class="bundle-section__summary">
+      <p role="status" aria-live="polite" aria-atomic="true">{{ 'bundle.total' | t }} <bdi data-bundle-total>{{ bundle_total | money }}</bdi><small>{{ 'bundle.quantity' | t }}</small></p>
+      <button type="submit" class="theme-btn" name="add" disabled data-pending-label="{{ 'storefront.cart_adding' | t | escape }}" aria-describedby="BundleFeedback-{{ section.id }}">{{ 'bundle.add' | t }}</button>
+    </div>
+    <p id="BundleFeedback-{{ section.id }}" class="catalog-card-feedback" role="status" aria-live="polite" aria-atomic="true" data-card-feedback data-success="{{ 'bundle.success' | t | escape }}" data-error="{{ 'bundle.error' | t | escape }}" data-refresh-error="{{ 'bundle.refresh_error' | t | escape }}"></p>
+    <noscript><p>{{ 'bundle.javascript' | t }}</p></noscript>
+  </form>
+</section>
+<script src="{{ 'frequently-bought-together.js' | asset_url }}" defer></script>
+{% endif %}
+{% stylesheet %}
+.bundle-section { margin-block: 28px; }
+/* Keep the purchase controls outside the existing fixed-control rail. */
+body:has(.a11y-launcher:not([hidden])) .bundle-section { padding-inline-end: max(var(--page-padding, 16px), calc(76px - max(0px, (100vw - var(--storefront-width, 1200px)) / 2))); }
+@media (min-width: 992px) {
+ body:has(fankee-shopping-assistant [data-launch]:not([hidden])) .bundle-section { padding-inline-end: max(var(--page-padding, 16px), calc(216px - max(0px, (100vw - var(--storefront-width, 1200px)) / 2))); }
+}
+.bundle-section .catalog-section-header { margin-block-end: 16px; }
+.bundle-section .catalog-section-header p { color: var(--storefront-muted, #536975); margin: 4px 0 0; }
+.bundle-section__items { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; }
+.bundle-item { display: grid; grid-template-columns: 36px 64px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; padding: 14px 10px; border: 1px solid var(--storefront-border-soft, #cfe4e8); border-radius: 14px; background: #fff; box-shadow: var(--storefront-shadow); }
+.bundle-item--quiet { background: #f6f9fa; }
+.bundle-item--quiet .bundle-item__image { opacity: .6; }
+.bundle-item__check { display: grid; place-items: center; min-width: 44px; min-height: 44px; cursor: pointer; margin: 0; }
+.bundle-item input { width: 18px; height: 18px; accent-color: var(--storefront-accent, #086b7b); }
+.bundle-item input:focus-visible { outline: 2px solid var(--storefront-accent, #086b7b); outline-offset: 4px; }
+.bundle-item__image { height: 80px; border-radius: 10px; background: #f5fafb; }
+.bundle-item__image img { width: 100%; height: 100%; object-fit: contain; }
+.bundle-item__content { min-width: 0; }
+.bundle-item h3 { font-size: 14px; line-height: 1.5; margin: 0 0 5px; overflow-wrap: anywhere; }
+.bundle-item h3 a { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: inherit; }
+.bundle-item .catalog-price { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 15px; }
+.bundle-item .catalog-price s { font-size: 12px; color: #657680; }
+.bundle-item p { margin: 5px 0 0; font-size: 12px; color: #536975; }
+.bundle-section__summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-block-start: 16px; padding: 14px 16px; border: 1px solid var(--storefront-border-soft, #cfe4e8); border-radius: 14px; background: #f2fafb; }
+.bundle-section__summary p { font-size: 18px; font-weight: 600; margin: 0; }
+.bundle-section__summary .theme-btn { min-width: 220px; }
+.bundle-section__summary small { display: block; font-size: 12px; color: #536975; font-weight: 400; margin-block-start: 3px; }
+@media (max-width: 767px) {
+ .bundle-section { margin-block: 22px; }
+ .bundle-section__items { grid-template-columns: 1fr; gap: 10px; }
+ .bundle-item { padding: 10px; grid-template-columns: 36px 64px minmax(0, 1fr); }
+ .bundle-section__summary { align-items: stretch; }
+ .bundle-section__summary .theme-btn { width: 100%; min-width: 0; }
+}
+{% endstylesheet %}
+{% schema %}
+{"name":"t:storefront_editor.bundle","enabled_on":{"templates":["product"]},"settings":[{"type":"text","id":"heading","label":"t:storefront_editor.heading"}],"presets":[{"name":"t:storefront_editor.bundle"}]}
+{% endschema %}

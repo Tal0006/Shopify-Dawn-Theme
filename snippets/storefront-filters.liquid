@@ -2,7 +2,7 @@
 <form class="catalog-filters" method="get" action="{{ filter_url }}">
   {% if is_search %}<input type="hidden" name="q" value="{{ search.terms | escape }}"><input type="hidden" name="type" value="product"><input type="hidden" name="options[prefix]" value="last">{% endif %}
   <div class="catalog-sort">
-    <label for="Sort-{{ section.id }}">{{ 'products.facets.sort_by_label' | t }}</label>
+    <label for="Sort-{{ section.id }}">{% if collection_mode %}{{ 'collection_page.sort' | t }}{% else %}{{ 'products.facets.sort_by_label' | t }}{% endif %}</label>
     <select name="sort_by" id="Sort-{{ section.id }}">
       {% for option in results.sort_options %}
         {% assign sort_key = 'storefront.sort.' | append: option.value %}
@@ -10,6 +10,7 @@
       {% endfor %}
     </select>
   </div>
+  {% if collection_mode and results.filters.size > 0 %}<p class="collection-filter-label">{{ 'collection_page.filter' | t }}{% if active_count > 0 %} <bdi>({{ active_count }})</bdi>{% endif %}</p>{% endif %}
   {% for filter in results.filters %}
     <details class="catalog-filter" {% if filter.active_values.size > 0 or filter.min_value.value != blank or filter.max_value.value != blank %}open{% endif %}>
       <summary>{% if filter.type == 'price_range' %}{{ 'storefront.price' | t }}{% elsif filter.param_name == 'filter.v.availability' %}{{ 'storefront.availability' | t }}{% elsif filter.param_name == 'filter.p.vendor' %}{{ 'products.product.vendor' | t }}{% elsif filter.param_name == 'filter.p.product_type' %}{{ 'storefront.product_type' | t }}{% else %}{{ filter.label | escape }}{% endif %}</summary>
@@ -30,10 +31,18 @@
   {% endfor %}
   <button type="submit" class="theme-btn">{{ 'products.facets.apply' | t }}</button>
 </form>
+{% if collection_mode == blank or collection_mode == false or active_count > 0 %}
 <div class="catalog-active-filters">
   {% for filter in results.filters %}
-    {% for value in filter.active_values %}<a href="{{ value.url_to_remove }}">{{ 'products.facets.clear_filter' | t }}: {% if filter.param_name == 'filter.v.availability' %}{% if value.value == '1' %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}{% else %}{{ value.label | escape }}{% endif %}</a>{% endfor %}
-    {% if filter.type == 'price_range' and filter.min_value.value != blank or filter.type == 'price_range' and filter.max_value.value != blank %}<a href="{{ filter.url_to_remove }}">{{ 'products.facets.clear_filter' | t }}: {{ 'storefront.price' | t }}</a>{% endif %}
+    {% for value in filter.active_values %}<a href="{{ value.url_to_remove }}">{{ 'products.facets.clear_filter' | t }}: {% if filter.param_name == 'filter.v.availability' %}{% if value.value == '1' %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}{% else %}{% if collection_mode %}{{ filter.label | escape }}: {% endif %}{{ value.label | escape }}{% endif %}{% if collection_mode %}<span aria-hidden="true">×</span>{% endif %}</a>{% endfor %}
+    {% if filter.type == 'price_range' and filter.min_value.value != blank or filter.type == 'price_range' and filter.max_value.value != blank %}<a href="{{ filter.url_to_remove }}">{{ 'products.facets.clear_filter' | t }}: {{ 'storefront.price' | t }}{% if collection_mode %}: <bdi>{{ filter.min_value.value | default: 0 | money }}–{{ filter.max_value.value | default: filter.range_max | money }}</bdi><span aria-hidden="true">×</span>{% endif %}</a>{% endif %}
   {% endfor %}
   <a href="{{ reset_url }}">{{ 'products.facets.clear_all' | t }}</a>
 </div>
+
+{% endif %}
+
+{% stylesheet %}
+.collection-filter-label { margin: 8px 0; align-self: center; font-size: 13px; font-weight: 600; }
+@media (max-width: 991px) { .collection-filter-label { grid-column: 1 / -1; margin: 0; } }
+{% endstylesheet %}

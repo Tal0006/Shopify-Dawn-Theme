@@ -190,11 +190,22 @@
         const properties = Object.fromEntries([...data].filter(([key]) => /^properties\[.+\]$/.test(key)).map(([key, value]) => [key.slice(11, -1), value]));
         if (!id || !/^\d+$/.test(String(id))) throw Error('Missing variant');
         const sectionId = document.querySelector('.storefront-header')?.dataset.cartSection;
-        const body = {items: [{id: String(id), quantity, ...(data.get('selling_plan') ? {selling_plan: data.get('selling_plan')} : {}), ...(Object.keys(properties).length ? {properties} : {})}], ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})};
+        const bundled = form.hasAttribute('data-bundle-cart');
+        let items = [{id: String(id), quantity, ...(data.get('selling_plan') ? {selling_plan: data.get('selling_plan')} : {}), ...(Object.keys(properties).length ? {properties} : {})}];
+        if (bundled) {
+          const ids = [...new Set(data.getAll('bundle_variant').map(String))];
+          if (!ids.length || ids.length > 4 || ids.some(value => !/^\d+$/.test(value))) throw Error('Invalid bundle selection');
+          items = ids.map(value => ({id: value, quantity: 1}));
+        }
+        const body = {items, ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})};
         const response = await fetch(cartRoot() + 'cart/add.js', {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, credentials: 'same-origin', body: JSON.stringify(body)});
         if (!response.ok) { const error = Error('Cart add rejected'); error.status = response.status; throw error; }
-        added = true;
+        added = !bundled;
         const result = await response.json();
+        if (bundled && (!Array.isArray(result.items) || items.some(item => !result.items.some(line => String(line.variant_id || line.id) === item.id && Number(line.quantity) >= item.quantity)))) {
+          throw Error('Incomplete bundle response');
+        }
+        added = true;
         const refreshed = await refreshCardCart(result.sections, sectionId);
         if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer().dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
         else addFeedback(form, refreshed || !document.querySelector('.mini-cart-content') ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed && !!document.querySelector('.mini-cart-content'));
@@ -205,7 +216,10 @@
           if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer()?.dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
           else addFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
         }
-        else addFeedback(form, feedback.dataset.error, true);
+        else {
+          if (form.hasAttribute('data-bundle-cart')) await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection);
+          addFeedback(form, feedback.dataset.error, true);
+        }
       } finally {
         button.disabled = false;
         button.removeAttribute('aria-busy');

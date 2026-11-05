@@ -108,6 +108,7 @@
       if (purchase.querySelector('.shopify-payment-button')) window.Shopify?.PaymentButton?.init();
       purchase.querySelector('[data-product-variant]')?.focus({preventScroll: true});
       status.textContent = page.dataset.variantUpdated;
+      document.dispatchEvent(new CustomEvent('storefront:variant:updated', {detail: {page, variantId: id}}));
     } catch (error) {
       if (!controller.signal.aborted && page.isConnected) {
         select.value = select.dataset.currentVariant;

@@ -31,7 +31,7 @@
           </div>
         {% endif %}
       </div>
-      <div class="product-page__purchase" data-product-purchase>
+      <div class="product-page__purchase" data-product-purchase data-selected-variant="{{ selected_variant.id }}" data-selected-price="{{ selected_variant.price }}" data-selected-available="{{ selected_variant.available }}" data-selected-unit-safe="{% if selected_variant.quantity_rule.min > 1 or selected_variant.quantity_rule.increment > 1 %}false{% else %}true{% endif %}">
         {% if section.settings.show_vendor and product.vendor != blank %}<p class="product-page__vendor">{{ product.vendor | escape }}</p>{% endif %}
         <h1>{{ product.title | escape }}</h1>
         <div class="product-page__price">{% render 'product-price', card_product: product, variant: selected_variant %}{% if selected_variant.compare_at_price > selected_variant.price %}<span class="product-page__sale">{{ 'products.product.on_sale' | t }}</span>{% endif %}</div>

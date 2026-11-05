@@ -1,13 +1,84 @@
-<section class="catalog-section container">
-  <h1>{{ collection.title | escape }}</h1>
-  {% if collection.description != blank %}<div class="catalog-description">{{ collection.description }}</div>{% endif %}
-  {% render 'storefront-filters', results: collection, filter_url: collection.url, reset_url: collection.url %}
-  <p>{{ 'products.facets.product_count' | t: product_count: collection.products_count, count: collection.all_products_count }}</p>
+{% assign collection_active_count = 0 %}
+{% for filter in collection.filters %}
+  {% assign collection_active_count = collection_active_count | plus: filter.active_values.size %}
+  {% if filter.type == 'price_range' %}{% if filter.min_value.value != blank or filter.max_value.value != blank %}{% assign collection_active_count = collection_active_count | plus: 1 %}{% endif %}{% endif %}
+{% endfor %}
+<section class="catalog-section container collection-page" data-storefront-collection>
+  <header class="collection-page__header{% if collection.image != blank %} collection-page__header--image{% endif %}">
+    <div>
+      <h1>{{ collection.title | escape }}</h1>
+      {% if collection.description != blank %}
+        {% assign collection_description_length = collection.description | strip_html | size %}
+        {% if collection_description_length > 320 %}
+          <details class="collection-page__description"><summary>{{ 'collection_page.description' | t }}</summary><div class="catalog-description">{{ collection.description }}</div></details>
+        {% else %}<div class="catalog-description">{{ collection.description }}</div>{% endif %}
+      {% endif %}
+    </div>
+    {% if collection.image != blank %}{{ collection.image | image_url: width: 480 | image_tag: class: 'collection-page__image', widths: '160, 320, 480', sizes: '(min-width: 992px) 180px, 88px', loading: 'eager', alt: collection.title }}{% endif %}
+  </header>
+  <div class="collection-page__toolbar">
+    <p class="collection-page__count">{{ 'products.facets.product_count' | t: product_count: collection.products_count, count: collection.all_products_count }}</p>
+    {% render 'storefront-filters', results: collection, filter_url: collection.url, reset_url: collection.url, collection_mode: true, active_count: collection_active_count %}
+  </div>
   {% paginate collection.products by section.settings.product_limit %}
-    <div class="catalog-grid">{% for card_product in collection.products %}{% render 'product-card', card_product: card_product %}{% else %}<p>{{ 'sections.collection_template.empty' | t }}</p>{% endfor %}</div>
+    {% if collection.products_count > 0 %}
+      <div class="catalog-grid">{% for card_product in collection.products %}{% render 'product-card', card_product: card_product %}{% endfor %}</div>
+    {% else %}
+      <div class="collection-page__empty" role="status">
+        {% if collection_active_count > 0 %}<h2>{{ 'collection_page.no_matches' | t }}</h2><a class="theme-btn" href="{{ collection.url }}">{{ 'collection_page.clear' | t }}</a>
+        {% else %}<h2>{{ 'sections.collection_template.empty' | t }}</h2><a class="theme-btn" href="{{ routes.collections_url }}">{{ 'collection_page.categories' | t }}</a>{% endif %}
+      </div>
+    {% endif %}
     {% render 'catalog-pagination', paginate: paginate %}
   {% endpaginate %}
 </section>
+
+{% stylesheet %}
+.collection-page { padding-block: clamp(20px, 3vw, 36px); }
+.collection-page__header { padding: clamp(18px, 3vw, 28px); margin-block-end: 20px; border: 1px solid var(--storefront-border-soft, #cfdfe4); border-radius: 16px; background: linear-gradient(130deg, #fff, #ecf8fa); box-shadow: var(--storefront-shadow); }
+.collection-page__header--image { display: grid; grid-template-columns: minmax(0,1fr) 180px; gap: 20px; align-items: center; }
+.collection-page__header h1 { margin: 0 0 10px; font-size: clamp(25px,3vw,36px); line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.collection-page__image { width: 180px; height: 130px; object-fit: contain; border-radius: 12px; }
+.collection-page .catalog-description { line-height: 1.75; overflow-wrap: anywhere; max-width: 80ch; }
+.collection-page .catalog-description :is(img,video,iframe,table) { max-width: 100%; }
+.collection-page .catalog-description img { height: auto; }
+.collection-page__description summary { min-height: 44px; padding-block: 8px; cursor: pointer; color: var(--storefront-accent); }
+.collection-page__toolbar { margin-block-end: 20px; padding: 14px; border: 1px solid var(--storefront-border-soft); border-radius: 12px; background: #fff; }
+.collection-page__count { margin: 0 0 12px; font-size: 14px; color: #4c636a; }
+.collection-page .catalog-filters { margin-block: 0 12px; align-items: flex-start; gap: 12px; }
+.collection-page .catalog-sort { display: grid; gap: 4px; min-width: 180px; flex: 0 1 220px; }
+.collection-page .catalog-sort select { width: 100%; min-height: 44px; border-radius: 10px; border-color: var(--storefront-border-soft); background: #f6fbfc; }
+.collection-page .catalog-filter { padding: 8px 12px; min-width: 140px; flex: 1 1 150px; border-color: var(--storefront-border-soft); background: #f8fcfd; border-radius: 10px; }
+.collection-page .catalog-filter summary { min-height: 44px; padding-block: 8px; cursor: pointer; overflow-wrap: anywhere; font-weight: 600; }
+.collection-page .catalog-filter[open] { background: #edf8fa; }
+.collection-page .catalog-filter__option { min-height: 44px; gap: 8px; }
+.collection-page .catalog-filter__option:has(input:checked) { font-weight: 600; color: #095564; }
+.collection-page .catalog-filter input { accent-color: var(--storefront-accent); }
+.collection-page .catalog-filter input[type=number] { width: 100%; min-width: 0; }
+.collection-page .catalog-filters > .theme-btn, .collection-page__empty .theme-btn { background: var(--storefront-accent); color: #fff; border: 1px solid var(--storefront-accent); }
+.collection-page .theme-btn::before { background: #095564; }
+.collection-page .catalog-filters :focus-visible { outline: 2px solid var(--storefront-accent); outline-offset: 2px; }
+.collection-page .catalog-active-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
+.collection-page .catalog-active-filters a { display: inline-flex; gap: 6px; align-items: center; min-height: 40px; max-width: 100%; padding: 7px 12px; border: 1px solid var(--storefront-border-soft); border-radius: 24px; background: #edf8fa; color: #095564; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.collection-page .catalog-grid { gap: clamp(12px,1.5vw,20px); align-items: stretch; }
+.collection-page__empty { text-align: center; padding: 28px 16px; border: 1px solid var(--storefront-border-soft); border-radius: 14px; background: #f5fbfc; }
+.collection-page__empty h2 { font-size: 21px; line-height: 1.5; margin-block-end: 16px; }
+@media (max-width: 991px) {
+ .collection-page__header--image { grid-template-columns: minmax(0,1fr) 88px; gap: 12px; }
+ .collection-page__image { width: 88px; height: 88px; }
+ .collection-page .catalog-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .collection-page .catalog-filters { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .collection-page .catalog-sort { grid-column: 1 / -1; min-width: 0; }
+ .collection-page .catalog-filter { min-width: 0; }
+ .collection-page .catalog-filters > .theme-btn { grid-column: 1 / -1; min-height: 44px; }
+}
+@media (max-width: 599px) {
+ .collection-page__header { padding: 16px; margin-block-end: 14px; }
+ .collection-page__toolbar { padding: 10px; margin-block-end: 16px; }
+ .collection-page .catalog-active-filters a { min-height: 44px; padding-inline: 10px; }
+ .collection-page__header h1 { font-size: 25px; }
+}
+{% endstylesheet %}
 {% schema %}
 {
   "name": "t:storefront_editor.collection_page",

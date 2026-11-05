@@ -18,11 +18,16 @@
     "recently_viewed": {
       "type": "recently-viewed",
       "settings": {}
+    },
+    "bought_together": {
+      "type": "frequently-bought-together",
+      "settings": {}
     }
   },
   "order": [
     "main",
     "single_product_V3xA3Q",
+    "bought_together",
     "recommendations",
     "recently_viewed"
   ]
