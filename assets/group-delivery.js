@@ -15,9 +15,10 @@
    this.storageKey='fankee-group-delivery:'+this.origin.origin;
    try{const saved=JSON.parse(sessionStorage.getItem(this.storageKey)||'null');this.receipt=/^[a-f0-9]{64}$/.test(saved?.memberToken)&&/^[a-f0-9-]{36}$/.test(saved?.publicId)?saved:null;}catch{this.receipt=null;}
    const options={signal:this.lifecycle.signal};
-   this.querySelector('[data-find-group]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.find());},options);
-   this.querySelector('[data-join-group]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.join());},options);
-   this.querySelector('[data-refresh]').addEventListener('click',()=>{void this.perform(()=>this.refresh());},options);
+   this.querySelector('[data-find-group]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.find(),event.submitter);},options);
+   this.querySelector('[data-join-group]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.join(),event.submitter);},options);
+   this.querySelector('[data-share]').addEventListener('click',()=>this.share(),options);
+   this.querySelector('[data-refresh]').addEventListener('click',event=>{void this.perform(()=>this.refresh(),event.currentTarget);},options);
    this.querySelector('[name=area]').addEventListener('input',()=>{this.coords=null;this.invalidateSearch();},options);
    this.querySelector('[data-geolocate]').addEventListener('click',()=>{
     if(!navigator.geolocation){this.message.textContent=this.dataset.geoError;return;}
@@ -31,10 +32,10 @@
    void this.perform(async()=>{await this.cart();if(this.receipt)this.show((await this.api('/groups/'+this.receipt.publicId)).group);});
   }
   disconnectedCallback(){this.lifecycle?.abort();this.requests?.forEach(request=>request.abort());this.lifecycle=null;}
-  async perform(action){
-   if(this.busy)return;const lifecycle=this.lifecycle,focus=document.activeElement;this.busy=true;this.setAttribute('aria-busy','true');this.querySelectorAll('form').forEach(form=>form.inert=true);this.message.textContent='';
-   try{await action();}catch(error){if(this.lifecycle===lifecycle&&this.isConnected&&error.name!=='AbortError')this.message.textContent=error.message===this.dataset.empty?this.dataset.empty:error.code==='ALREADY_JOINED'?this.dataset.duplicate:error.code==='CART_UNAVAILABLE'?this.dataset.unavailable:this.dataset.error;}
-   finally{if(this.lifecycle!==lifecycle)return;this.busy=false;this.removeAttribute('aria-busy');this.querySelectorAll('form').forEach(form=>form.inert=false);this.controls();if(focus?.isConnected&&this.contains(focus)&&!focus.disabled&&document.activeElement===document.body)focus.focus({preventScroll:true});}
+  async perform(action,trigger){
+   if(this.busy)return;const lifecycle=this.lifecycle,focus=document.activeElement;this.busy=true;const loading=trigger||(focus?.matches('button')&&this.contains(focus)?focus:null);loading?.setAttribute('aria-busy','true');this.setAttribute('aria-busy','true');this.querySelectorAll('form').forEach(form=>form.inert=true);this.message.textContent='';
+   try{await action();}catch(error){if(this.lifecycle===lifecycle&&this.isConnected&&error.name!=='AbortError')this.message.textContent=error.message===this.dataset.empty?this.dataset.empty:error.code==='ALREADY_JOINED'?this.dataset.duplicate:['CART_UNAVAILABLE','SHOPIFY_UNAVAILABLE'].includes(error.code)?this.dataset.shopifyError:error.code==='INVALID_CART'?this.dataset.invalidCart:error.code==='GROUP_NOT_OPEN'?this.dataset.closed:this.dataset.error;}
+   finally{if(this.lifecycle!==lifecycle)return;this.busy=false;loading?.removeAttribute('aria-busy');this.removeAttribute('aria-busy');this.querySelectorAll('form').forEach(form=>form.inert=false);this.controls();if(focus?.isConnected&&this.contains(focus)&&!focus.disabled&&document.activeElement===document.body)focus.focus({preventScroll:true});}
   }
   invalidateSearch(){this.foundPlace=null;if(!this.receipt||this.receipt.publicId!==this.group?.publicId){this.group=null;this.querySelector('[data-group-panel]').hidden=true;this.querySelector('[data-validated-pledge]').hidden=true;}this.controls();}
   controls(){
@@ -42,6 +43,9 @@
    const joined=this.receipt&&this.group?.publicId===this.receipt.publicId;
    this.querySelector('[data-contact-fields]').disabled=!!joined;
    this.querySelector('[data-contact-fields]').hidden=!!joined;
+   this.querySelector('[data-validated-pledge]').dataset.joined=String(!!joined);
+   this.querySelector('[data-pledge-label]').textContent=joined?this.dataset.pledgeLabel:this.dataset.estimate;
+   this.querySelector('[data-share]').disabled=!this.group;
    const button=this.querySelector('[data-join-button]');
    button.textContent=joined?this.dataset.updateLabel:this.dataset.joinLabel;
    button.disabled=!this.group||!['OPEN','THRESHOLD_REACHED'].includes(this.group.status);
@@ -63,6 +67,7 @@
     const response=await fetch(url,{credentials:'same-origin',signal:controller.signal});
     if(!response.ok)throw Error();const cart=await response.json();
     if(cart.currency!=='ILS'||!Number.isSafeInteger(cart.total_price)||!Array.isArray(cart.items))throw Error();
+    this.querySelector('[data-empty-cart]').hidden=cart.items.length>0;
     this.querySelector('[data-current-cart]').textContent=this.currency.format(cart.total_price/100);
     if(cart.items.some(item=>item.selling_plan_allocation||Object.keys(item.properties||{}).length))throw Object.assign(Error(),{code:'CART_UNAVAILABLE'});
     this.lines=cart.items.map(item=>({variantId:String(item.variant_id||item.id),quantity:item.quantity}));
@@ -96,6 +101,13 @@
    }
   }
   pledge(result){if(Number.isSafeInteger(result.validatedPledgeAgorot)&&result.validatedPledgeAgorot>=0){const pledge=this.querySelector('[data-validated-pledge]');pledge.hidden=false;pledge.querySelector('bdi').textContent=this.currency.format(result.validatedPledgeAgorot/100);}}
+  share(){
+   if(!this.group)return;
+   // Share only the storefront path and public aggregates, without URL parameters or receipts.
+   const page=new URL(location.pathname,location.origin);
+   const text=this.dataset.shareText.replace('__AREA__',this.group.areaName).replace('__AMOUNT__',this.currency.format(this.group.pledgedTotalAgorot/100)).replace('__TARGET__',this.currency.format(this.group.thresholdAgorot/100));
+   window.open('https://wa.me/?text='+encodeURIComponent(text+'\n'+page.href),'_blank','noopener,noreferrer');
+  }
   async refresh(){if(this.group)this.show((await this.api('/groups/'+this.group.publicId)).group);}
   show(group){
    if(!group||!Object.hasOwn(this.labels,group.status)||typeof group.publicId!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(group.publicId)||typeof group.areaName!=='string'||!['thresholdAgorot','pledgedTotalAgorot','remainingAmountAgorot','progressPercent','participantCount'].every(key=>Number.isSafeInteger(group[key])&&group[key]>=0)||group.thresholdAgorot===0||!Number.isFinite(Date.parse(group.expiresAt)))throw Error();
@@ -106,8 +118,13 @@
    const percent=Math.max(0,Math.min(100,group.progressPercent));this.querySelector('[role=progressbar]').setAttribute('aria-valuenow',String(percent));
    this.querySelector('[data-progress-fill]').style.transform='scaleX('+(percent/100)+')';
    this.querySelector('[data-percent]').textContent=percent+'%';
+   const success=group.status==='THRESHOLD_REACHED',almost=group.status==='OPEN'&&percent>=80&&percent<100;
+   this.querySelector('[data-group-panel]').dataset.milestone=percent>=100?'success':percent>=80?'almost':percent>=50?'middle':'normal';
+   this.querySelector('[data-milestone-message]').hidden=!success&&!almost;
+   this.querySelector('[data-milestone-title]').textContent=success?this.dataset.reached:almost?this.dataset.almost:'';
+   this.querySelector('[data-milestone-detail]').textContent=success?this.dataset.waiting:almost?this.dataset.remaining.replace('__AMOUNT__',this.currency.format(group.remainingAmountAgorot/100)):'';
    this.querySelector('[data-remaining]').textContent=this.dataset.remaining.replace('__AMOUNT__',this.currency.format(group.remainingAmountAgorot/100));
-   this.querySelector('[data-participants]').textContent=this.dataset.count.replace('__COUNT__',group.participantCount);
+   this.querySelector('[data-participants]').textContent=group.participantCount===1?this.dataset.countOne:this.dataset.count.replace('__COUNT__',group.participantCount);
    const time=this.querySelector('[data-expiry]');time.dateTime=group.expiresAt;time.textContent=new Intl.DateTimeFormat(this.dataset.locale||'he').format(new Date(group.expiresAt));
    if(!['OPEN','THRESHOLD_REACHED'].includes(group.status))this.message.textContent=this.dataset.closed;
    this.controls();

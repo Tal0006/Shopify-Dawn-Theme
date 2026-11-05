@@ -8,7 +8,7 @@
  data-found="{{ 'group_delivery.found' | t | escape }}" data-updated="{{ 'group_delivery.updated' | t | escape }}" data-area="{{ 'group_delivery.area' | t: area: '__AREA__' | escape }}"
  data-count="{{ 'group_delivery.participants' | t: count: '__COUNT__' | escape }}" data-remaining="{{ 'group_delivery.remaining' | t: amount: '__AMOUNT__' | escape }}"
  data-update-label="{{ 'group_delivery.update' | t | escape }}" data-join-label="{{ 'group_delivery.join' | t | escape }}" data-closed="{{ 'group_delivery.closed' | t | escape }}" data-setup="{{ 'group_delivery.setup' | t | escape }}"
- data-duplicate="{{ 'group_delivery.duplicate' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}" data-locale="{{ request.locale.iso_code }}">
+ data-duplicate="{{ 'group_delivery.duplicate' | t | escape }}" data-almost="{{ 'group_delivery.almost' | t | escape }}" data-reached="{{ 'group_delivery.reached' | t | escape }}" data-waiting="{{ 'group_delivery.waiting' | t | escape }}" data-share-text="{{ 'group_delivery.share_text' | t: area: '__AREA__', amount: '__AMOUNT__', target: '__TARGET__' | escape }}" data-shopify-error="{{ 'group_delivery.shopify_error' | t | escape }}" data-invalid-cart="{{ 'group_delivery.invalid_cart' | t | escape }}" data-count-one="{{ 'group_delivery.participant_one' | t | escape }}" data-estimate="{{ 'group_delivery.verified_cart' | t | escape }}" data-pledge-label="{{ 'group_delivery.your_pledge' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}" data-locale="{{ request.locale.iso_code }}">
  <header><p class="group-delivery__eyebrow">{{ 'group_delivery.heading' | t }}</p><h1>{{ 'group_delivery.intro' | t }}</h1><h2>{{ 'group_delivery.promise' | t }}</h2><p>{{ 'group_delivery.description' | t }}</p></header>
  <p class="group-delivery__notice">{{ 'group_delivery.notice' | t }}</p>
  <form data-find-group>
@@ -17,17 +17,17 @@
   <p id="GroupLocationHint-{{ section.id }}" class="group-delivery__hint">{{ 'group_delivery.location_hint' | t }}</p>
   <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-geolocate>{{ 'group_delivery.geolocate' | t }}</button><button class="theme-btn" type="submit">{{ 'group_delivery.find' | t }}</button></div>
  </form>
- <p>{{ 'group_delivery.current_cart' | t }} <bdi data-current-cart>—</bdi></p>
+ <div class="group-delivery__cart">{{ 'group_delivery.current_cart' | t }} <bdi data-current-cart>—</bdi></div><div class="group-delivery__notice" data-empty-cart hidden><strong>{{ 'group_delivery.empty_heading' | t }}</strong><p>{{ 'group_delivery.empty_cart' | t }}</p><a href="{{ routes.all_products_collection_url }}">{{ 'group_delivery.shop' | t }}</a></div>
  <p class="group-delivery__hint">{{ 'group_delivery.valuation' | t }}</p>
  <section class="group-delivery__panel" data-group-panel hidden aria-labelledby="GroupTitle-{{ section.id }}">
   <h2 id="GroupTitle-{{ section.id }}" data-group-title></h2>
   <p class="group-delivery__status" data-group-state></p>
   <div class="group-delivery__totals"><bdi data-pledged></bdi><span>{{ 'group_delivery.of' | t }}</span><bdi data-threshold></bdi></div>
   <div class="group-delivery__progress" role="progressbar" aria-label="{{ 'group_delivery.progress' | t | escape }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-progress-fill></span></div>
-  <p><span data-percent></span> · <span data-remaining></span></p>
-  <p data-participants></p>
-  <p class="group-delivery__hint">{{ 'group_delivery.expires' | t }} <time data-expiry></time></p>
-  <p data-validated-pledge hidden>{{ 'group_delivery.your_pledge' | t }} <bdi></bdi></p>
+  <div class="group-delivery__summary"><span><bdi data-percent></bdi> {{ 'group_delivery.complete' | t }}</span><span data-remaining></span></div><div class="group-delivery__milestone" data-milestone-message hidden role="status" aria-live="polite"><strong data-milestone-title></strong><p data-milestone-detail></p></div>
+  <div class="group-delivery__stats"><p class="group-delivery__people"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m3 11v-3a6 6 0 0 0-3-5"/></svg> <span data-participants></span></p>
+  <p class="group-delivery__hint">{{ 'group_delivery.expires' | t }} <time data-expiry></time></p></div>
+  <p class="group-delivery__pledge" data-validated-pledge hidden><span data-pledge-label>{{ 'group_delivery.verified_cart' | t }}</span> <bdi></bdi></p>
   <form data-join-group>
    <fieldset data-contact-fields><legend>{{ 'group_delivery.contact' | t }}</legend>
     <label for="GroupEmail-{{ section.id }}">{{ 'group_delivery.email' | t }}</label><input id="GroupEmail-{{ section.id }}" type="email" name="email" required maxlength="254" autocomplete="email">
@@ -35,7 +35,7 @@
    </fieldset>
    <button class="theme-btn" type="submit" data-join-button disabled>{{ 'group_delivery.join' | t }}</button>
   </form>
-  <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-refresh>{{ 'group_delivery.refresh' | t }}</button><button type="button" class="group-delivery__secondary" disabled>{{ 'group_delivery.share_soon' | t }}</button></div>
+  <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-refresh>{{ 'group_delivery.refresh' | t }}</button><button type="button" class="group-delivery__secondary" data-share disabled>{{ 'group_delivery.share' | t }}</button></div>
  </section>
  <p data-group-message role="status" aria-live="polite" aria-atomic="true"></p>
  <noscript><p>{{ 'group_delivery.javascript' | t }}</p></noscript>
@@ -78,6 +78,51 @@ body:has(.a11y-launcher:not([hidden])) .group-delivery {padding-inline-end:max(1
  .group-delivery__panel h2 {font-size:20px;}
 }
 @media(prefers-reduced-motion:reduce) {.group-delivery__progress span {transition:none;}}
+
+.group-delivery {padding-block-end:env(safe-area-inset-bottom,0px);}
+.group-delivery input {transition:border-color 180ms,box-shadow 180ms;}
+.group-delivery input:focus {border-color:var(--storefront-accent);box-shadow:0 0 0 4px #12a7bb16;}
+.group-delivery .theme-btn {position:relative;isolation:isolate;overflow:hidden;background:var(--storefront-accent,#086b7b);color:#fff;border:1px solid transparent;border-radius:12px;padding:12px 18px;box-shadow:0 5px 14px #089bad24;transition:transform 140ms,box-shadow 220ms,background-color 220ms;}
+.group-delivery .theme-btn::before {content:"";position:absolute;inset:0;z-index:-1;background:#098a9b;transform:translateX(101%);transition:transform 250ms var(--storefront-ease,ease);pointer-events:none;}
+.group-delivery .theme-btn:active:not(:disabled) {transform:scale(.985);}
+.group-delivery__cart {display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 18px;background:#edf8fa;border:1px solid var(--storefront-border-soft);border-radius:12px;}
+.group-delivery__cart bdi {font-size:23px;font-weight:600;}
+.group-delivery__panel h2 {margin:0 0 10px;}
+.group-delivery__status {display:inline-flex;background:#e7f6f7;border:1px solid #c5e7eb;border-radius:30px;padding:5px 12px;font-size:13px;margin:0 0 18px;}
+.group-delivery__totals [data-pledged] {font-size:clamp(27px,5vw,36px);}
+.group-delivery__totals span,.group-delivery__totals [data-threshold] {font-size:16px;color:#536975;font-weight:400;}
+.group-delivery__progress {height:14px;background:#e7eff1;margin-block:14px 10px;}
+.group-delivery__panel[data-milestone=middle] [data-progress-fill] {background:#078594;}
+.group-delivery__panel[data-milestone=almost] [data-progress-fill] {background:#0797a5;}
+.group-delivery__panel[data-milestone=success] [data-progress-fill] {background:#087d68;}
+.group-delivery__summary,.group-delivery__stats {display:flex;justify-content:space-between;align-items:center;gap:8px 16px;flex-wrap:wrap;font-size:14px;}
+.group-delivery__summary [data-percent] {font-weight:600;color:var(--storefront-accent);}
+.group-delivery__stats {margin-block:12px;border-block:1px solid var(--storefront-border-soft);}
+.group-delivery__people {font-weight:500;color:#095564;}
+.group-delivery__milestone {margin-block:14px;padding:12px 14px;border-radius:12px;background:#e9f8f5;color:#075c52;}
+.group-delivery__milestone p {margin:4px 0 0;font-size:14px;}
+.group-delivery__pledge {display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px;background:#edf8fa;border-inline-start:3px solid var(--storefront-accent);border-radius:10px;font-size:14px;}
+.group-delivery__pledge bdi {font-size:22px;font-weight:600;}
+.group-delivery button[aria-busy=true] {cursor:wait;box-shadow:none;}
+.group-delivery button[aria-busy=true]::after {content:"";display:inline-block;width:14px;height:14px;margin-inline-start:8px;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;animation:group-delivery-spin 700ms linear infinite;vertical-align:middle;}
+@keyframes group-delivery-spin {to {rotate:360deg;}}
+@media(hover:hover) and (pointer:fine) {
+ .group-delivery .theme-btn:hover:not(:disabled) {transform:translateY(-1px);box-shadow:0 8px 20px #089bad35;}
+ .group-delivery .theme-btn:hover:not(:disabled)::before {transform:translateX(0);}
+}
+@media(max-width:599px) {
+ .group-delivery [data-find-group] .theme-btn {width:100%;}
+ .group-delivery__summary {font-size:13px;}
+ .group-delivery__stats {gap:0 12px;}
+ .group-delivery__stats p {margin-block:8px;}
+}
+@media(prefers-reduced-motion:reduce) {
+ .group-delivery .theme-btn::before {display:none;}
+ .group-delivery .theme-btn:is(:hover,:active) {transform:none;}
+ .group-delivery button[aria-busy=true]::after {animation:none;}
+}
+.group-delivery__people {display:flex;align-items:center;gap:7px;}
+.group-delivery__pledge[data-joined=true] {background:#e5f5f0;border-inline-start-color:#087d68;}
 {% endstylesheet %}
 {% schema %}
 {"name":"t:storefront_editor.group_delivery","settings":[{"type":"url","id":"service_url","label":"t:storefront_editor.group_delivery_url"}],"presets":[{"name":"t:storefront_editor.group_delivery"}]}

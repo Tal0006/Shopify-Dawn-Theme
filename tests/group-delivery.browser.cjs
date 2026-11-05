@@ -40,7 +40,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    .replace(/<script type="application\/json" data-group-labels>[\s\S]*?<\/script>/,'<script type="application/json" data-group-labels>'+JSON.stringify(labels)+'</script>')
    .replace(/{{ section.settings.service_url \| escape }}/g,'https://groups.example.test')
    .replace(/{{ routes.cart_url }}/g,'/he/cart').replace(/{{ section.id }}/g,'fixture').replace(/{{ request.locale.iso_code }}/g,'he')
-   .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escape(key.split('.').reduce((a,k)=>a[k],tr).replace('{{ area }}','__AREA__').replace('{{ count }}','__COUNT__').replace('{{ amount }}','__AMOUNT__')));
+   .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escape(key.split('.').reduce((a,k)=>a[k],tr).replace('{{ area }}','__AREA__').replace('{{ count }}','__COUNT__').replace('{{ amount }}','__AMOUNT__').replace('{{ target }}','__TARGET__')));
   await ev('document.querySelector("main").innerHTML='+JSON.stringify(markup));
   await ev(`
    sessionStorage.clear();window.requests=[];window.geoCalls=0;window.apiFailure=false;window.quantity=1;
@@ -111,6 +111,36 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    const before=await ev('requests.length');
    await ev('widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('requests.length'),before+1);
+  });
+
+  await t.test('Milestones, clamping, safe share and known errors',async()=>{
+   await ev('window.done=null;const button=widget.querySelector("[data-refresh]");void widget.perform(()=>new Promise(resolve=>window.done=resolve),button)');
+   assert.equal(await ev('widget.querySelector("[data-refresh]").getAttribute("aria-busy")'), 'true');
+   assert.equal(await ev('widget.querySelector("[data-join-group]").inert'), true);
+   await ev('done()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.querySelector("[data-refresh]").hasAttribute("aria-busy")'),false);
+   for(const [progress,state] of [[0,'normal'],[50,'middle'],[80,'almost'],[99,'almost'],[120,'success']]){
+    await ev('widget.show({...group,status:"OPEN",progressPercent:'+progress+'})');
+    assert.equal(await ev('widget.querySelector("[data-group-panel]").dataset.milestone'),state);
+    assert.equal(await ev('widget.querySelector("[role=progressbar]").getAttribute("aria-valuenow")'),String(Math.min(100,progress)));
+   }
+   await ev('widget.show({...group,status:"OPEN",progressPercent:80,participantCount:1})');
+   assert.equal(await ev('widget.querySelector("[data-milestone-message]").hidden'),false);
+   assert.equal(await ev('widget.querySelector("[data-participants]").textContent'),tr.group_delivery.participant_one);
+   await ev('widget.show({...group,status:"THRESHOLD_REACHED",progressPercent:100})');
+   assert.equal(await ev('widget.querySelector("[data-milestone-title]").textContent'),tr.group_delivery.reached);
+   assert.equal(await ev('widget.querySelector("[data-milestone-detail]").textContent'),tr.group_delivery.waiting);
+   await ev('window.open=(...args)=>window.shared=args;history.replaceState(null,"","/?memberToken=private#secret");widget.querySelector("[data-share]").click()');
+   const shared=await ev('shared');const text=new URL(shared[0]).searchParams.get('text');
+   assert.ok(text.includes('500'));assert.ok(!/memberToken|private|secret|fixture@example|__TARGET__/.test(text));
+   assert.equal(shared[2],'noopener,noreferrer');
+   for(const [code,key] of [['INVALID_CART','invalid_cart'],['SHOPIFY_UNAVAILABLE','shopify_error'],['GROUP_NOT_OPEN','closed'],['INVALID_ORIGIN','error']]){
+    await ev('widget.perform(async()=>{throw Object.assign(Error(),{code:'+JSON.stringify(code)+'})})');
+    assert.equal(await ev('widget.message.textContent'),tr.group_delivery[key]);
+   }
+   await ev('(async()=>{widget.show({...group,status:"EXPIRED"});quantity=0;await widget.perform(()=>widget.cart())})()');
+   assert.equal(await ev('widget.querySelector("[data-empty-cart]").hidden'),false);
+   assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),true);
   });
   await t.test('Mobile and desktop RTL fit, keyboard targets are usable, progress respects reduced motion',async()=>{
    for(const width of [320,360,375,390,768,1440,1600]){
