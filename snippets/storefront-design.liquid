@@ -9,6 +9,9 @@
  --storefront-glass: rgb(255 255 255 / 86%);
  --storefront-border-soft: #cfdfe4;
  --storefront-accent: #086b7b;
+ --storefront-cart-base: #0b6571;
+ --storefront-cart-highlight: #087b88;
+ --storefront-cart-shadow: 0 4px 12px #0b657122;
  --storefront-shadow: 0 4px 18px rgb(27 67 78 / 8%);
  --storefront-shadow-raised: 0 10px 26px rgb(27 67 78 / 15%);
  --storefront-glow: 0 0 0 3px rgb(14 145 165 / 18%);
@@ -167,5 +170,27 @@ html[data-a11y-paused] [data-storefront-home] :is(.storefront-hero-heading, .sto
  .catalog-card:not(.catalog-card--sold-out):hover, [data-storefront-home] .catalog-home .catalog-card:not(.catalog-card--sold-out):hover,
  .catalog-card:not(.catalog-card--sold-out):hover .catalog-card__image img { transform: none; }
 }
+
+/* Shared quick-add and product-page action: direct text survives existing AJAX labels. */
+[data-card-cart] button.theme-btn[name=add] { position: relative; isolation: isolate; overflow: hidden; background: var(--storefront-cart-base); border: 1px solid var(--storefront-cart-base); color: #fff; border-radius: 12px; box-shadow: var(--storefront-cart-shadow); transition: transform 140ms var(--storefront-ease), box-shadow 200ms var(--storefront-ease), background-color 200ms var(--storefront-ease); }
+[data-card-cart] button.theme-btn[name=add]::before { content: ''; display: block; position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; border: 0; border-radius: inherit; z-index: -1; pointer-events: none; background: linear-gradient(110deg, var(--storefront-cart-base), var(--storefront-cart-highlight)); opacity: 1; transform: translateX(100%); transition: transform 250ms var(--storefront-ease); }
+[data-card-cart] button.theme-btn[name=add]:focus-visible { background: var(--storefront-cart-base); outline: 3px solid var(--storefront-accent); outline-offset: 3px; }
+[data-card-cart] button.theme-btn[name=add]:not(:disabled):active { transform: scale(.985); box-shadow: none; }
+[data-card-cart] button.theme-btn[name=add]:disabled:not([aria-busy=true]) { background: #edf1f2; border-color: #d4dfe2; color: #526169; box-shadow: none; cursor: not-allowed; opacity: 1; }
+[data-card-cart] button.theme-btn[name=add]:disabled::before { transform: translateX(100%); }
+[data-card-cart] button.theme-btn[name=add][aria-busy=true] { background: var(--storefront-cart-base); color: #fff; opacity: .8; cursor: progress; }
+[data-card-feedback]:not(:empty):not([data-feedback-error]) { padding: 8px 10px; border-radius: 8px; background: #edf8f6; color: #185d53; }
+@media (hover: hover) and (pointer: fine) {
+ [data-card-cart] button.theme-btn[name=add]:not(:disabled):hover { background: var(--storefront-cart-base); transform: translateY(-1px); box-shadow: 0 7px 18px #0b65712e; }
+ [data-card-cart] button.theme-btn[name=add]:not(:disabled):hover::before { transform: translateX(0); }
+ [data-card-cart] button.theme-btn[name=add]:not(:disabled):active { transform: scale(.985); }
+}
+@media (prefers-reduced-motion: reduce) {
+ [data-card-cart] button.theme-btn[name=add] { transition: background-color 150ms ease; }
+ [data-card-cart] button.theme-btn[name=add]::before { display: none; transition: none; }
+ [data-card-cart] button.theme-btn[name=add]:not(:disabled):is(:hover,:active) { transform: none; background: var(--storefront-cart-highlight); }
+}
+html[data-a11y-paused] [data-card-cart] button.theme-btn[name=add]::before { display: none; }
+html[data-a11y-paused] [data-card-cart] button.theme-btn[name=add]:is(:hover,:active) { transform: none; }
 {% endstylesheet %}
 

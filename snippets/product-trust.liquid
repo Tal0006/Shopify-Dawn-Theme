@@ -1,0 +1,17 @@
+{% doc %}
+  Compact product purchase reassurance using confirmed store benefits.
+  @example
+  {% render 'product-trust' %}
+{% enddoc %}
+<ul class="product-trust" role="list" aria-label="{{ 'product_trust.label' | t | escape }}">
+  {% assign product_trust_keys = 'shipping,area,pickup,secure' | split: ',' %}
+  {% for key in product_trust_keys %}{% assign translation_key = 'product_trust.' | append: key %}
+    <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg><span>{{ translation_key | t }}</span></li>
+  {% endfor %}
+</ul>
+{% stylesheet %}
+.product-trust { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px 12px; margin: 16px 0; padding: 12px 0; border-block: 1px solid var(--storefront-border-soft, #cfdfe4); list-style: none; }
+.product-trust li { display: flex; align-items: flex-start; gap: 6px; min-width: 0; font-size: 12px; line-height: 1.5; color: #4c636a; }
+.product-trust svg { flex: 0 0 16px; margin-block-start: 1px; color: var(--storefront-accent, #086b7b); }
+.product-trust span { overflow-wrap: anywhere; }
+{% endstylesheet %}

@@ -720,5 +720,12 @@
   },
   "trust_strip": {
     "label": "Why shop with Fankee"
+  },
+  "product_trust": {
+    "label": "Shopping information",
+    "shipping": "Free shipping over ₪150",
+    "area": "Delivery in southern Israel",
+    "pickup": "Local pickup",
+    "secure": "Secure payment"
   }
 }

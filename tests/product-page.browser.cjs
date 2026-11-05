@@ -121,6 +121,34 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
       assert.ok(await ev('new DOMMatrixReadOnly(getComputedStyle(document.querySelector("#CardFixtures .catalog-card")).transform).m42<=-2'));
     }
   });
+  await t.test('Shared teal slide, disabled/loading states and product layout remain safe at all widths',async()=>{
+    await ev('page.querySelector("h1").textContent="מרכך כביסה מרוכז בניחוח בייבי עם כותרת עברית ארוכה לבדיקת תצוגה";page.querySelector("button[name=add]").textContent="הוספה לסל"');
+    for(const width of [320,360,375,390,768,1440,1600]){
+      await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<992});
+      assert.equal(await ev('document.documentElement.scrollWidth<=innerWidth'),true);
+      assert.ok(await ev('(()=>{const b=page.querySelector("button[name=add]");return b.scrollWidth<=b.clientWidth&&b.getBoundingClientRect().height>=44})()'));
+      assert.equal(await ev('getComputedStyle(page.querySelector("button[name=add]")).color'),'rgb(255, 255, 255)');
+    }
+    await ev('page.querySelector("button[name=add]").scrollIntoView({block:"center"})');
+    const button='page.querySelector("button[name=add]")';
+    await ev(button+'.focus()');
+    assert.equal(await ev('getComputedStyle('+button+').outlineStyle'),'solid');
+    await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:0,y:0});await sleep(280);
+    if(await ev('matchMedia("(hover:hover) and (pointer:fine)").matches')){
+      assert.ok(await ev('new DOMMatrixReadOnly(getComputedStyle('+button+',"::before").transform).m41>0'));
+      const point=await ev('(()=>{const r='+button+'.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()');
+      await call('Input.dispatchMouseEvent',{type:'mouseMoved',...point});await sleep(280);
+      assert.ok(await ev('Math.abs(new DOMMatrixReadOnly(getComputedStyle('+button+',"::before").transform).m41)<1'));
+    }
+    await ev(button+'.disabled=true');await sleep(240);
+    assert.equal(await ev('getComputedStyle('+button+').backgroundColor'),'rgb(237, 241, 242)');
+    await ev(button+'.setAttribute("aria-busy","true")');await sleep(240);
+    assert.equal(await ev('getComputedStyle('+button+').backgroundColor'),'rgb(11, 101, 113)');
+    await ev(button+'.disabled=false;'+button+'.removeAttribute("aria-busy")');
+    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+    assert.equal(await ev('getComputedStyle('+button+',"::before").display'),'none');
+    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+  });
  }finally{
   ws?.close();chrome?.kill();
   await new Promise(r=>server.close(r));await sleep(500);
