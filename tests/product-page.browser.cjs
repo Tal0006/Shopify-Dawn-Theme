@@ -7,7 +7,7 @@ const productHTML=function productHTML(id='11'){
 const alternate=id==='22',min=alternate?2:1,step=alternate?2:1;
 return `<section class="product-page section-padding" data-product-page data-section-id="product-main" data-product-id="100" data-product-url="/products/fixture" data-variant-error="Variant error" data-variant-updated="Variant updated"><div class="container"><p class="sr-only" data-product-status role="status"></p><div class="product-page__layout"><div class="product-page__gallery" data-product-gallery><div class="product-page__stage">${['a','b'].map(image=>`<div class="product-page__image" data-product-image="${image}" ${image===(alternate?'b':'a')?'':'hidden'}><img width="80" height="120" alt="Product" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='120'%3E%3Crect x='10' y='10' width='60' height='100' fill='%23135541'/%3E%3C/svg%3E"></div>`).join('')}</div><div class="product-page__thumbnails">${['a','b'].map(image=>`<button type="button" data-product-image-target="${image}" aria-pressed="${image===(alternate?'b':'a')}">${image}</button>`).join('')}</div></div><div data-product-purchase class="product-page__purchase"><p class="product-page__vendor">Brand</p><h1>Product title</h1><div class="product-page__price"><div class="catalog-price">${alternate?'29.90':'15.90'}</div></div><p class="product-page__availability" data-available="true">Available</p><form data-card-cart class="catalog-product-form storefront-validated-form" action="/he/cart/add"><label>Size / Scent<select name="id" data-product-variant data-current-variant="${id}"><option value="11" ${!alternate?'selected':''}>Size: 1 / Scent: Baby</option><option value="22" ${alternate?'selected':''}>Size: 2 / Scent: Lavender</option><option value="33" disabled>Unavailable</option></select></label><div data-quantity-controls class="catalog-quantity"><button type="button" data-quantity-change="-1" disabled>-</button><input name="quantity" type="number" min="${min}" step="${step}" max="8" value="${min}"><button type="button" data-quantity-change="1">+</button></div><button name="add" class="theme-btn product-page__add" data-pending-label="Adding">Add</button><p data-card-feedback data-error="Add error" data-success="Added" data-refresh-error="Stale"></p></form><a data-product-whatsapp data-message="Question: Product title" hidden>WhatsApp</a></div><div class="product-page__accordions"><details open><summary>Description</summary><div>Real product content</div></details></div></div></div></section>`;
 };
-const css=fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'sections/single-product.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/cart-drawer.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
+const css=fs.readFileSync(path.join(root,'snippets/product-card-badges.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'sections/single-product.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/cart-drawer.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
 const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width=device-width"><style>'+['bootstrap.min.css','style.css','storefront.css'].map(file=>fs.readFileSync(path.join(root,'assets',file),'utf8')).join('')+css+'</style></head><body><header class="storefront-header" data-cart-section="header"><button class="open-btn">Menu</button><nav class="navigation-holder"><button class="menu-close">Close</button></nav><div class="mini-cart"><button class="cart-toggle-btn" data-count-label="Cart __COUNT__"><span class="cart-count">0</span></button><dialog class="mini-cart-content cart-drawer" aria-labelledby="cart-title" data-cart-added="Added"><button class="mini-cart-close">Close</button><p data-cart-status></p><div class="mini-cart-items"><h2 id="cart-title">Cart</h2></div></dialog></div></header><main>'+productHTML()+'</main><footer><a data-store-whatsapp href="https://wa.me/123456789">Chat</a></footer></body></html>';
  const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/html;charset=utf-8');res.end(html);});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
@@ -92,6 +92,34 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
     assert.ok(result.gallery<result.info);assert.equal(result.overflow,false);
     await ev('page.querySelector("summary").click()');assert.equal(await ev('page.querySelector("details").open'),false);
     if(process.env.PRODUCT_SCREENSHOT_PATH){const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.PRODUCT_SCREENSHOT_PATH,Buffer.from(shot.data,'base64'));}
+  });
+  await t.test('Product-card regular/sale/sold-out states and long Hebrew titles fit small screens',async()=>{
+    const cards=[{title:'מרכך כביסה בייבי',old:'',price:'39.90 ₪',badge:''},
+      {title:'חומר ניקוי מרוכז בניחוח מלון בוטיק לבית עם תיאור עברי ארוך במיוחד שלא צריך להרחיב את הכרטיס',old:'79.90 ₪',price:'39.90 ₪',badge:'50% הנחה'},
+      {title:'מוצר שאזל מהמלאי',old:'',price:'29.90 ₪',badge:'אזל מהמלאי',sold:true}];
+    const html='<section class="catalog-home catalog-section container" id="CardFixtures"><div class="catalog-grid">'+cards.map((c,i)=>'<article class="catalog-card '+(c.sold?'catalog-card--sold-out':'')+'"><a class="catalog-card__image" href="#fixture"><img alt="אריזת מוצר" width="100" height="160" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22160%22%3E%3Crect x=%2220%22 y=%2210%22 width=%2260%22 height=%22140%22 fill=%22%23086b7b%22/%3E%3C/svg%3E"><div class="catalog-card__badges">'+(c.badge?'<span class="catalog-card__badge '+(c.sold?'catalog-card__badge--quiet':'catalog-card__badge--sale')+'">'+c.badge+'</span>':'')+'</div></a><div class="catalog-card__content"><h3><a href="#fixture">'+c.title+'</a></h3><div class="catalog-price"><bdi>'+c.price+'</bdi>'+(c.old?'<s><bdi>'+c.old+'</bdi></s>':'')+'</div><p class="catalog-availability">'+(c.sold?'אזל מהמלאי':'זמין במלאי')+'</p><button class="theme-btn" '+(c.sold?'disabled':'')+'>'+(c.sold?'אזל מהמלאי':'הוספה לסל')+'</button></div></article>').join('')+'</div></section>';
+    await ev('document.querySelector("main").insertAdjacentHTML("beforeend",'+JSON.stringify(html)+')');
+    for(const width of [320,360,375,390,1440]){
+      await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<992});
+      const metrics=await ev(`[...document.querySelectorAll('#CardFixtures .catalog-card')].map(c=>{
+        const image=c.querySelector('img'),badge=c.querySelector('.catalog-card__badge'),button=c.querySelector('button');
+        return {buttonFit:button.scrollWidth<=button.clientWidth,tap:button.getBoundingClientRect().height,
+         title:c.querySelector('h3').getBoundingClientRect().height,
+         packagingClear:!badge||badge.getBoundingClientRect().bottom<=image.getBoundingClientRect().top,
+         fit:getComputedStyle(image).objectFit,sold:button.disabled};
+      })`);
+      assert.ok(metrics.every(m=>m.buttonFit&&m.tap>=44&&m.packagingClear&&m.fit==='contain'),'card bounds at '+width);
+      assert.ok(metrics.every(m=>m.title<=49));assert.equal(metrics[2].sold,true);
+      assert.equal(await ev('document.documentElement.scrollWidth<=innerWidth'),true);
+    }
+    assert.equal(await ev('document.querySelectorAll("#CardFixtures .catalog-card:first-child s").length'),0);
+    assert.equal(await ev('document.querySelectorAll("#CardFixtures .catalog-card:nth-child(2) s").length'),1);
+    await ev('document.querySelector("#CardFixtures .catalog-card").scrollIntoView({block:"center"})');
+    if(await ev('matchMedia("(hover:hover) and (pointer:fine)").matches')){
+      const point=await ev('(()=>{const r=document.querySelector("#CardFixtures .catalog-card").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()');
+      await call('Input.dispatchMouseEvent',{type:'mouseMoved',...point});await sleep(260);
+      assert.ok(await ev('new DOMMatrixReadOnly(getComputedStyle(document.querySelector("#CardFixtures .catalog-card")).transform).m42<=-2'));
+    }
   });
  }finally{
   ws?.close();chrome?.kill();

@@ -712,5 +712,10 @@
     "no_image": "אין תמונה",
     "launcher_default": "הכנת רשימת קניות",
     "title_default": "עוזר הקניות של פאנקי"
+  },
+  "product_cards": {
+    "discount": "{{ percent }}% הנחה",
+    "new": "חדש",
+    "bestseller": "הכי נמכר"
   }
 }

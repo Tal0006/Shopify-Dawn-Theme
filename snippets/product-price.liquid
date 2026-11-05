@@ -4,7 +4,7 @@
   assign original_price = price_object.compare_at_price
 -%}
 <div class="catalog-price">
-  <span class="sr-only">{{ 'products.product.price.regular_price' | t }}</span>
+  <span class="sr-only">{% if original_price > current_price %}{{ 'products.product.price.sale_price' | t }}{% else %}{{ 'products.product.price.regular_price' | t }}{% endif %}</span>
   {% if variant == blank and card_product.price_varies %}
     {% assign formatted_price = current_price | money %}
     <bdi>{{ 'products.product.price.from_price_html' | t: price: formatted_price }}</bdi>

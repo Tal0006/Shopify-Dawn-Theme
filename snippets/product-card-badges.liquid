@@ -1,0 +1,37 @@
+{% doc %}
+  Honest promotion labels from uniform numeric prices and explicit merchant tags only.
+  @param {product} card_product
+  @example
+  {% render 'product-card-badges', card_product: product %}
+{% enddoc %}
+{% liquid
+  assign card_discount = 0
+  assign card_sale = false
+  if card_product.price_varies == false and card_product.compare_at_price_varies == false
+    if card_product.compare_at_price > card_product.price and card_product.compare_at_price > 0 and card_product.price >= 0
+      assign card_sale = true
+      assign card_discount = card_product.compare_at_price | minus: card_product.price | times: 100.0 | divided_by: card_product.compare_at_price | floor
+    endif
+  endif
+%}
+<div class="catalog-card__badges">
+  {% if card_product.available == false %}
+    <span class="catalog-card__badge catalog-card__badge--quiet">{{ 'products.product.sold_out' | t }}</span>
+  {% elsif card_sale %}
+    <span class="catalog-card__badge catalog-card__badge--sale">{% if card_discount > 0 %}{{ 'product_cards.discount' | t: percent: card_discount }}{% else %}{{ 'products.product.on_sale' | t }}{% endif %}</span>
+  {% elsif card_product.tags contains 'חדש' or card_product.tags contains 'new' %}
+    <span class="catalog-card__badge">{{ 'product_cards.new' | t }}</span>
+  {% elsif card_product.tags contains 'הכי נמכר' or card_product.tags contains 'bestseller' %}
+    <span class="catalog-card__badge">{{ 'product_cards.bestseller' | t }}</span>
+  {% endif %}
+</div>
+
+{% stylesheet %}
+.catalog-card__badges { position: absolute; inset-block-start: 8px; inset-inline: 8px; display: flex; flex-wrap: wrap; gap: 4px; min-height: 24px; pointer-events: none; }
+.catalog-card__badge { display: inline-flex; align-items: center; max-width: 100%; padding: 3px 7px; border-radius: 20px; background: #e7f5f6; color: #095564; font-size: 11px; line-height: 1.4; font-weight: 600; }
+.catalog-card__badge--sale { background: #a6314d; color: #fff; }
+.catalog-card__badge--quiet { background: #e9edf0; color: #49555d; }
+@media (max-width: 599px) {
+ .catalog-card__badge { font-size: 10px; padding-inline: 6px; }
+}
+{% endstylesheet %}

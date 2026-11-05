@@ -11,12 +11,12 @@
   {% assign card_quantity_min = card_variant.quantity_rule.min | default: 1 %}
   {% assign card_quantity_increment = card_variant.quantity_rule.increment | default: 1 %}
   {% assign card_image_alt = card_product.featured_image.alt | default: card_product.title %}
-  <article class="catalog-card">
+  <article class="catalog-card{% if card_product.available == false %} catalog-card--sold-out{% endif %}">
     <a href="{{ card_product.url }}" class="catalog-card__image" aria-label="{{ card_product.title | escape }}">
       {% if card_product.featured_image != blank %}
         {{ card_product.featured_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '200, 300, 450, 600', sizes: '(min-width: 1000px) 25vw, 50vw', alt: card_image_alt }}
       {% else %}<span class="catalog-no-image">{{ 'storefront.no_image' | t }}</span>{% endif %}
-      {% if card_variant.compare_at_price > card_variant.price %}<span class="catalog-badge">{{ 'products.product.on_sale' | t }}</span>{% endif %}
+      {% render 'product-card-badges', card_product: card_product %}
     </a>
     <div class="catalog-card__content">
       <{{ card_heading_tag }}><a href="{{ card_product.url }}">{{ card_product.title | escape }}</a></{{ card_heading_tag }}>

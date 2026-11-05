@@ -712,5 +712,10 @@
     "no_image": "No image",
     "launcher_default": "Prepare a shopping list",
     "title_default": "Fankee Shopping Assistant"
+  },
+  "product_cards": {
+    "discount": "{{ percent }}% off",
+    "new": "New",
+    "bestseller": "Best seller"
   }
 }
