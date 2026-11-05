@@ -717,5 +717,8 @@
     "discount": "{{ percent }}% הנחה",
     "new": "חדש",
     "bestseller": "הכי נמכר"
+  },
+  "trust_strip": {
+    "label": "היתרונות של פאנקי"
   }
 }

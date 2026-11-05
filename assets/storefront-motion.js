@@ -3,7 +3,7 @@
  const home = document.querySelector('[data-storefront-home]');
  if (!home || !('IntersectionObserver' in window)) return;
  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
- const targets = '.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn, .catalog-section-header, .catalog-category, .catalog-home .catalog-card';
+ const targets = '.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn, .trust-strip__list, .catalog-section-header, .catalog-category, .catalog-home .catalog-card';
  let observer;
  const showAll = () => {
   observer?.disconnect();

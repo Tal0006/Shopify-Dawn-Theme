@@ -5,7 +5,8 @@ const root=path.join(__dirname,'..'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 test('Shopping Assistant browser flows',{timeout:90000},async t=>{
  const source=fs.readFileSync(path.join(root,'snippets/shopping-assistant.liquid'),'utf8');
  const strings=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8')).shopping_assistant;
- const css=source.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
+ const trustCSS=fs.readFileSync(path.join(root,'sections/trust-benefits.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
+ const css=trustCSS+source.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
  const markup=source.replace(/{% doc %}[\s\S]*?{% enddoc %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'')
   .replace(/<script type="application\/json" data-strings>[\s\S]*?<\/script>/,'<script type="application/json" data-strings>'+JSON.stringify(strings)+'</script>')
   .replace(/<script src=[\s\S]*?<\/script>/,'')
@@ -159,6 +160,41 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
     }else assert.equal(metrics.position,'fixed');
    }
    await ev('headerFixture.remove();document.querySelector("main").removeAttribute("data-storefront-home");document.querySelector("main").innerHTML="Fixture";');
+  });
+  await t.test('Trust strip is compact, readable and clear of floating controls at all requested sizes',async()=>{
+   const trustSource=fs.readFileSync(path.join(root,'sections/trust-benefits.liquid'),'utf8');
+   const index=JSON.parse(fs.readFileSync(path.join(root,'templates/index.json'),'utf8'));
+   assert.equal(index.order[index.order.indexOf('hero')+1],'trust_benefits');
+   const config=index.sections.trust_benefits;
+   const itemTemplate=trustSource.match(/<li class="trust-strip__item"[\s\S]*?<\/li>/)[0];
+   const items=config.block_order.map(id=>{
+    const b=config.blocks[id].settings;
+    return itemTemplate.replace('{{ block.shopify_attributes }}','')
+     .replace(/{% case block.settings.icon %}[\s\S]*?{% endcase %}/,'<path d="M4 12h16M12 4v16"/>')
+     .replace('{{ block.settings.title | escape }}',b.title).replace('{{ block.settings.subtitle | escape }}',b.subtitle)
+     .replace(/{% if block.settings.subtitle != blank %}|{% endif %}/g,'');
+   }).join('');
+   await ev('app.dialog.close();window.scrollTo(0,0);document.querySelector("main").innerHTML='+JSON.stringify('<section class="trust-strip container" aria-label="יתרונות החנות"><ul class="trust-strip__list" role="list">'+items+'</ul></section>'));
+   for(const width of [320,360,375,390,768,1440,1600]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<992});await sleep(40);
+    const m=await ev(`(()=>{
+     const strip=document.querySelector('.trust-strip'),rect=strip.getBoundingClientRect();
+     const intersects=node=>{const r=node.getBoundingClientRect();return r.width&&r.height&&r.left<rect.right&&r.right>rect.left&&r.top<rect.bottom&&r.bottom>rect.top;};
+     return {overflow:document.documentElement.scrollWidth>innerWidth,height:rect.height,
+      columns:getComputedStyle(document.querySelector('.trust-strip__list')).gridTemplateColumns.split(' ').length,
+      clipped:[...strip.querySelectorAll('.trust-strip__title')].some(n=>n.scrollWidth>n.clientWidth||n.scrollHeight>n.clientHeight),
+      launcherOverlap:intersects(app.launcher),accessibilityOverlap:intersects(document.querySelector('.a11y-launcher')),
+      icons:[...strip.querySelectorAll('svg')].every(n=>n.getAttribute('aria-hidden')==='true')};
+    })()`);
+    assert.equal(m.overflow,false,'overflow at '+width);assert.equal(m.clipped,false,'clipped text at '+width);
+    assert.equal(m.columns,width<992?2:4);assert.equal(m.icons,true);
+    assert.equal(m.launcherOverlap,false);assert.equal(m.accessibilityOverlap,false);
+    if(width<600)assert.ok(m.height<=180,'mobile strip too tall: '+m.height);
+   }
+   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+   assert.equal(await ev('getComputedStyle(document.querySelector(".trust-strip__item")).transitionDuration'),'0s');
+   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+   await ev('document.querySelector("main").innerHTML="Fixture"');
   });
   await t.test('Checkout has separate confirmation, price changes require reconfirmation',async()=>{
    await submit('matched');const before=await ev('calls.length');

@@ -88,10 +88,57 @@
         "show_view_all": true,
         "collection": "חד-פעמי-1"
       }
+    },
+    "trust_benefits": {
+      "type": "trust-benefits",
+      "settings": {
+        "enabled": true
+      },
+      "blocks": {
+        "truck": {
+          "type": "benefit",
+          "settings": {
+            "icon": "truck",
+            "title": "משלוח חינם מעל ₪150",
+            "subtitle": "בקנייה מעל ₪150"
+          }
+        },
+        "location": {
+          "type": "benefit",
+          "settings": {
+            "icon": "location",
+            "title": "משלוחים באזור הדרום",
+            "subtitle": "משלוחים מהירים באזורי השירות"
+          }
+        },
+        "package": {
+          "type": "benefit",
+          "settings": {
+            "icon": "package",
+            "title": "איסוף עצמי",
+            "subtitle": "אפשרות לאיסוף ללא עלות"
+          }
+        },
+        "shield": {
+          "type": "benefit",
+          "settings": {
+            "icon": "shield",
+            "title": "תשלום מאובטח",
+            "subtitle": "קנייה מאובטחת באתר"
+          }
+        }
+      },
+      "block_order": [
+        "truck",
+        "location",
+        "package",
+        "shield"
+      ]
     }
   },
   "order": [
     "hero",
+    "trust_benefits",
     "categories",
     "laundry",
     "cleaning",

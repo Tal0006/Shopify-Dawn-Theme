@@ -3484,5 +3484,26 @@
     "launcher": "Launcher text",
     "title": "Assistant title",
     "url": "Backend API base URL"
+  },
+  "trust_strip_editor": {
+    "name": "Store benefits",
+    "enabled": "Show benefits",
+    "heading": "Heading (optional)",
+    "benefit": "Benefit",
+    "title": "Benefit title",
+    "subtitle": "Short subtitle (optional)",
+    "icon": "Icon",
+    "truck": "Delivery",
+    "location": "Service area",
+    "package": "Pickup",
+    "shield": "Secure payment",
+    "title_0": "Free shipping over ₪150",
+    "subtitle_0": "On orders over ₪150",
+    "title_1": "Delivery in southern Israel",
+    "subtitle_1": "Fast delivery in service areas",
+    "title_2": "Local pickup",
+    "subtitle_2": "Free pickup available",
+    "title_3": "Secure payment",
+    "subtitle_3": "Secure shopping online"
   }
 }

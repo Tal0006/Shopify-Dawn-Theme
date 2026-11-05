@@ -717,5 +717,8 @@
     "discount": "{{ percent }}% off",
     "new": "New",
     "bestseller": "Best seller"
+  },
+  "trust_strip": {
+    "label": "Why shop with Fankee"
   }
 }
