@@ -3477,7 +3477,10 @@
     "free_shipping_threshold_info": "In shop currency. 0 hides the message. Match your shipping rules; this setting does not change rates.",
     "product_usage": "Usage instructions",
     "product_additional": "Additional information",
-    "recently_viewed": "Recently viewed"
+    "recently_viewed": "Recently viewed",
+    "bundle": "Bought together",
+    "group_delivery": "Group delivery",
+    "group_delivery_url": "Group delivery service origin"
   },
   "shopping_assistant_editor": {
     "name": "Shopping Assistant",

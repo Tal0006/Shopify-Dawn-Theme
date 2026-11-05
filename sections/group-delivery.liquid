@@ -1,0 +1,84 @@
+{% comment %}
+  Phase-one group pledges. Public service URL only; all prices and persistence are server-owned.
+  Assign page.group-delivery to a Shopify Page and configure the service origin in Theme Editor.
+{% endcomment %}
+<fankee-group-delivery class="container group-delivery" data-service-url="{{ section.settings.service_url | escape }}" data-cart-url="{{ routes.cart_url }}.js"
+ data-error="{{ 'group_delivery.error' | t | escape }}" data-empty="{{ 'group_delivery.empty_cart' | t | escape }}" data-unavailable="{{ 'group_delivery.cart_unavailable' | t | escape }}"
+ data-geo-error="{{ 'group_delivery.geo_error' | t | escape }}" data-geo-ready="{{ 'group_delivery.geo_ready' | t | escape }}" data-joined="{{ 'group_delivery.joined' | t | escape }}"
+ data-found="{{ 'group_delivery.found' | t | escape }}" data-updated="{{ 'group_delivery.updated' | t | escape }}" data-area="{{ 'group_delivery.area' | t: area: '__AREA__' | escape }}"
+ data-count="{{ 'group_delivery.participants' | t: count: '__COUNT__' | escape }}" data-remaining="{{ 'group_delivery.remaining' | t: amount: '__AMOUNT__' | escape }}"
+ data-update-label="{{ 'group_delivery.update' | t | escape }}" data-join-label="{{ 'group_delivery.join' | t | escape }}" data-closed="{{ 'group_delivery.closed' | t | escape }}" data-setup="{{ 'group_delivery.setup' | t | escape }}"
+ data-duplicate="{{ 'group_delivery.duplicate' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}" data-locale="{{ request.locale.iso_code }}">
+ <header><p class="group-delivery__eyebrow">{{ 'group_delivery.heading' | t }}</p><h1>{{ 'group_delivery.intro' | t }}</h1><h2>{{ 'group_delivery.promise' | t }}</h2><p>{{ 'group_delivery.description' | t }}</p></header>
+ <p class="group-delivery__notice">{{ 'group_delivery.notice' | t }}</p>
+ <form data-find-group>
+  <label for="GroupArea-{{ section.id }}">{{ 'group_delivery.location' | t }}</label>
+  <input id="GroupArea-{{ section.id }}" name="area" required maxlength="60" minlength="2" autocomplete="address-level2" aria-describedby="GroupLocationHint-{{ section.id }}">
+  <p id="GroupLocationHint-{{ section.id }}" class="group-delivery__hint">{{ 'group_delivery.location_hint' | t }}</p>
+  <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-geolocate>{{ 'group_delivery.geolocate' | t }}</button><button class="theme-btn" type="submit">{{ 'group_delivery.find' | t }}</button></div>
+ </form>
+ <p>{{ 'group_delivery.current_cart' | t }} <bdi data-current-cart>—</bdi></p>
+ <p class="group-delivery__hint">{{ 'group_delivery.valuation' | t }}</p>
+ <section class="group-delivery__panel" data-group-panel hidden aria-labelledby="GroupTitle-{{ section.id }}">
+  <h2 id="GroupTitle-{{ section.id }}" data-group-title></h2>
+  <p class="group-delivery__status" data-group-state></p>
+  <div class="group-delivery__totals"><bdi data-pledged></bdi><span>{{ 'group_delivery.of' | t }}</span><bdi data-threshold></bdi></div>
+  <div class="group-delivery__progress" role="progressbar" aria-label="{{ 'group_delivery.progress' | t | escape }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-progress-fill></span></div>
+  <p><span data-percent></span> · <span data-remaining></span></p>
+  <p data-participants></p>
+  <p class="group-delivery__hint">{{ 'group_delivery.expires' | t }} <time data-expiry></time></p>
+  <p data-validated-pledge hidden>{{ 'group_delivery.your_pledge' | t }} <bdi></bdi></p>
+  <form data-join-group>
+   <fieldset data-contact-fields><legend>{{ 'group_delivery.contact' | t }}</legend>
+    <label for="GroupEmail-{{ section.id }}">{{ 'group_delivery.email' | t }}</label><input id="GroupEmail-{{ section.id }}" type="email" name="email" required maxlength="254" autocomplete="email">
+    <label for="GroupPhone-{{ section.id }}">{{ 'group_delivery.phone' | t }}</label><input id="GroupPhone-{{ section.id }}" type="tel" name="phone" required maxlength="24" autocomplete="tel" dir="ltr">
+   </fieldset>
+   <button class="theme-btn" type="submit" data-join-button disabled>{{ 'group_delivery.join' | t }}</button>
+  </form>
+  <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-refresh>{{ 'group_delivery.refresh' | t }}</button><button type="button" class="group-delivery__secondary" disabled>{{ 'group_delivery.share_soon' | t }}</button></div>
+ </section>
+ <p data-group-message role="status" aria-live="polite" aria-atomic="true"></p>
+ <noscript><p>{{ 'group_delivery.javascript' | t }}</p></noscript>
+ <script type="application/json" data-group-labels>{% assign group_states = 'OPEN,THRESHOLD_REACHED,APPROVED,PAYMENT_OPEN,CONFIRMED,SCHEDULED,COMPLETED,EXPIRED,CANCELLED' | split: ',' %}{ {% for state in group_states %}{% assign state_key = state | downcase | prepend: 'group_delivery.status.' %}{{ state | json }}:{{ state_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
+</fankee-group-delivery>
+<script src="{{ 'group-delivery.js' | asset_url }}" defer></script>
+{% stylesheet %}
+.group-delivery { display:block;max-width:780px;margin-block:32px;color:var(--storefront-ink); }
+.group-delivery [hidden] { display:none; }
+.group-delivery header h1 {font-size:clamp(25px,4vw,36px);line-height:1.3;margin:8px 0;}
+.group-delivery header h2 {font-size:22px;margin:8px 0;}
+.group-delivery header p {line-height:1.7;}
+.group-delivery__eyebrow {color:var(--storefront-accent);font-weight:600;}
+.group-delivery__notice,.group-delivery__panel,.group-delivery [data-find-group] {padding:20px;border:1px solid var(--storefront-border-soft,#cfe4e8);border-radius:16px;background:#ffffffef;box-shadow:var(--storefront-shadow);margin-block:16px;}
+.group-delivery__notice {background:#edf8fa;font-size:14px;}
+.group-delivery label {display:block;margin-block:10px 5px;font-weight:500;}
+.group-delivery input {width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #aacbd2;border-radius:10px;background:#fff;color:inherit;}
+.group-delivery :is(input,button):focus-visible {outline:2px solid var(--storefront-accent,#086b7b);outline-offset:3px;}
+.group-delivery fieldset {border:0;padding:0;margin:0 0 16px;min-width:0;}
+.group-delivery legend {font-size:16px;font-weight:600;}
+.group-delivery__actions {display:flex;flex-wrap:wrap;gap:10px;margin-block:14px;}
+.group-delivery button {min-height:44px;max-width:100%;white-space:normal;line-height:1.4;}
+.group-delivery__secondary {padding:9px 14px;border:1px solid #aacbd2;background:#f0f9fa;border-radius:10px;color:#095564;}
+.group-delivery button:disabled {opacity:.6;cursor:default;}
+.group-delivery__hint {font-size:13px;color:#536975;line-height:1.6;}
+.group-delivery__status {color:#095564;font-weight:600;}
+.group-delivery__totals {display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;font-size:20px;font-weight:600;}
+.group-delivery__progress {height:10px;border-radius:20px;overflow:hidden;background:#dceef1;margin-block:14px;}
+.group-delivery__progress span {display:block;width:100%;height:100%;background:var(--storefront-accent,#086b7b);transform:scaleX(0);transform-origin:right;transition:transform 220ms var(--storefront-ease,ease);}
+.group-delivery:dir(ltr) .group-delivery__progress span {transform-origin:left;}
+.group-delivery__panel h2 {font-size:23px;overflow-wrap:anywhere;}
+.group-delivery [data-join-button] {width:100%;}
+.group-delivery[aria-busy=true] form {opacity:.7;}
+body:has(.a11y-launcher:not([hidden])) .group-delivery {padding-inline-end:max(16px,calc(76px - max(0px,(100vw - 780px)/2)));}
+@media(min-width:992px) {body:has(fankee-shopping-assistant [data-launch]:not([hidden])) .group-delivery {padding-inline-end:max(16px,calc(216px - max(0px,(100vw - 780px)/2)));}}
+@media(max-width:599px) {
+ .group-delivery {margin-block:22px;}
+ .group-delivery__panel,.group-delivery [data-find-group],.group-delivery__notice {padding:14px;}
+ .group-delivery__actions>button {flex:1 1 140px;}
+ .group-delivery__panel h2 {font-size:20px;}
+}
+@media(prefers-reduced-motion:reduce) {.group-delivery__progress span {transition:none;}}
+{% endstylesheet %}
+{% schema %}
+{"name":"t:storefront_editor.group_delivery","settings":[{"type":"url","id":"service_url","label":"t:storefront_editor.group_delivery_url"}],"presets":[{"name":"t:storefront_editor.group_delivery"}]}
+{% endschema %}

@@ -1,0 +1,11 @@
+{
+  "sections": {
+    "main": {
+      "type": "group-delivery",
+      "settings": {}
+    }
+  },
+  "order": [
+    "main"
+  ]
+}

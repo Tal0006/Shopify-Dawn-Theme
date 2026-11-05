@@ -52,7 +52,10 @@
     "free_shipping_threshold_info": "במטבע החנות. 0 מסתיר את ההודעה. יש להתאים לכללי המשלוח; ההגדרה אינה משנה תעריפים.",
     "product_usage": "הוראות שימוש",
     "product_additional": "מידע נוסף",
-    "recently_viewed": "נצפו לאחרונה"
+    "recently_viewed": "נצפו לאחרונה",
+    "bundle": "קונים יחד",
+    "group_delivery": "משלוח קבוצתי",
+    "group_delivery_url": "כתובת שירות המשלוחים הקבוצתיים"
   },
   "sections": {
     "all": {

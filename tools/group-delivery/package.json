@@ -1,0 +1,27 @@
+{
+  "name": "fankee-group-delivery",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "dev": "tsx --env-file=.env src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "migrate": "tsx --env-file=.env src/migrate.ts",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.15.0",
+    "@electric-sql/pglite": "^0.3.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
