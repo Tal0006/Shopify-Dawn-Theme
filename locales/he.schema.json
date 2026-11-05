@@ -51,7 +51,8 @@
     "free_shipping_threshold": "סכום למשלוח חינם",
     "free_shipping_threshold_info": "במטבע החנות. 0 מסתיר את ההודעה. יש להתאים לכללי המשלוח; ההגדרה אינה משנה תעריפים.",
     "product_usage": "הוראות שימוש",
-    "product_additional": "מידע נוסף"
+    "product_additional": "מידע נוסף",
+    "recently_viewed": "נצפו לאחרונה"
   },
   "sections": {
     "all": {
@@ -3505,5 +3506,8 @@
     "subtitle_2": "אפשרות לאיסוף ללא עלות",
     "title_3": "תשלום מאובטח",
     "subtitle_3": "קנייה מאובטחת באתר"
+  },
+  "footer_design_editor": {
+    "description": "תיאור קצר של החנות (רשות)"
   }
 }

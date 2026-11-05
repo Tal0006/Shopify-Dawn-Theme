@@ -644,7 +644,8 @@
     "product_whatsapp_question": "שאלה על המוצר ב-WhatsApp",
     "product_whatsapp_message": "שלום, יש לי שאלה לגבי:\n{{ title }}",
     "product_recommendations": "אולי יעניין אותך גם",
-    "cart_toast_success": "המוצר נוסף לסל בהצלחה"
+    "cart_toast_success": "המוצר נוסף לסל בהצלחה",
+    "recently_viewed": "נצפו לאחרונה"
   },
   "date_formats": {
     "date": "%d/%m/%Y",
@@ -727,5 +728,16 @@
     "area": "משלוחים באזור הדרום",
     "pickup": "איסוף עצמי",
     "secure": "תשלום מאובטח"
+  },
+  "collection_page": {
+    "description": "פרטי הקטגוריה",
+    "no_matches": "לא מצאנו מוצרים שמתאימים לסינון שבחרת",
+    "clear": "נקה סינון",
+    "categories": "חזרה לקטגוריות",
+    "filter": "סינון",
+    "sort": "מיון"
+  },
+  "footer_design": {
+    "newsletter_support": "עדכונים מהחנות, ישירות למייל"
   }
 }

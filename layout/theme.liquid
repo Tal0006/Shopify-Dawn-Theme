@@ -35,7 +35,7 @@
 
     {{ 'storefront.css' | asset_url | stylesheet_tag }}
     {% render 'storefront-design' %}
-    {% if request.page_type == 'index' %}<script src="{{ 'storefront-motion.js' | asset_url }}" defer></script>{% endif %}
+    {% if request.page_type == 'index' or request.page_type == 'collection' or request.page_type == 'product' %}<script src="{{ 'storefront-motion.js' | asset_url }}" defer></script>{% endif %}
     {% if request.page_type == 'customers/account' or request.page_type == 'customers/login' or request.page_type contains 'customers/' %}{{ 'base.css' | asset_url | stylesheet_tag }}{% endif %}
     <script>window.themeStrings = {quantityIncrease: {{ 'products.product.quantity.increase' | t: product: product.title | json }}, quantityDecrease: {{ 'products.product.quantity.decrease' | t: product: product.title | json }}, required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}, previousSlide: {{ 'general.slider.previous_slide' | t | json }}, nextSlide: {{ 'general.slider.next_slide' | t | json }}};</script>
     {% render 'cart-submit-guard' %}

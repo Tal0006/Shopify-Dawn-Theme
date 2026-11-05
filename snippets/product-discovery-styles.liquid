@@ -1,0 +1,22 @@
+{% doc %}
+  Shared styles for native product discovery rows.
+  @example
+  {% render 'product-discovery-styles' %}
+{% enddoc %}
+{% stylesheet %}
+.product-discovery { margin-block: 28px; min-width: 0; }
+.product-discovery[hidden] { display: none; }
+.product-discovery__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.product-discovery__grid > * { min-width: 0; }
+.product-discovery__grid > [data-history-handle] { display: flex; }
+.product-discovery__grid > [data-history-handle] > .catalog-card { width: 100%; }
+.product-discovery__grid:focus-visible { outline: 2px solid var(--storefront-accent); outline-offset: 4px; border-radius: 12px; }
+@media (max-width: 991px) {
+ .product-discovery { margin-block: 22px; }
+ .product-discovery__grid { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 42%; overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: inline proximity; gap: 12px; padding: 4px 3px 16px; }
+ .product-discovery__grid > * { scroll-snap-align: start; }
+}
+@media (max-width: 599px) {
+ .product-discovery__grid { grid-auto-columns: 78%; }
+}
+{% endstylesheet %}

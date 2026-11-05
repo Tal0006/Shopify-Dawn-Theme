@@ -644,7 +644,8 @@
     "product_whatsapp_question": "Ask about this product on WhatsApp",
     "product_whatsapp_message": "Hello, I have a question about:\n{{ title }}",
     "product_recommendations": "You may also like",
-    "cart_toast_success": "Product added to cart successfully"
+    "cart_toast_success": "Product added to cart successfully",
+    "recently_viewed": "Recently viewed"
   },
   "date_formats": {
     "date": "%d/%m/%Y",
@@ -727,5 +728,16 @@
     "area": "Delivery in southern Israel",
     "pickup": "Local pickup",
     "secure": "Secure payment"
+  },
+  "collection_page": {
+    "description": "About this collection",
+    "no_matches": "No products match your selected filters",
+    "clear": "Clear filters",
+    "categories": "Back to categories",
+    "filter": "Filter",
+    "sort": "Sort"
+  },
+  "footer_design": {
+    "newsletter_support": "Store updates, straight to your inbox"
   }
 }

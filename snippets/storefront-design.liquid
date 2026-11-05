@@ -62,10 +62,10 @@ body { background: #f9fcfd; }
 :is(.theme-btn, .theme-btn-2, .theme-btn-4), fankee-shopping-assistant .shopping-assistant__primary { border-radius: 12px; transition: transform var(--storefront-transition-fast), box-shadow var(--storefront-transition-fast), background-color var(--storefront-transition-fast); }
 :is(.theme-btn, .theme-btn-2, .theme-btn-4):not(:disabled):active, fankee-shopping-assistant .shopping-assistant__primary:not(:disabled):active { transform: translateY(1px); box-shadow: none; }
 fankee-shopping-assistant .shopping-assistant__launcher { border-color: #b8dfe0; border-radius: 24px; background: linear-gradient(125deg, var(--storefront-green), #146478); box-shadow: 0 4px 18px #13554126, 0 0 0 3px #dff5f766; transition: box-shadow var(--storefront-transition-fast); }
-[data-storefront-home] [data-storefront-reveal] { transition: opacity var(--storefront-transition-normal), transform var(--storefront-transition-normal); }
-[data-storefront-home] [data-storefront-reveal=pending] { opacity: 0; transform: translateY(12px); }
-[data-storefront-home] [data-storefront-reveal=visible] { opacity: 1; transform: none; }
-[data-storefront-home] [data-storefront-reveal]:focus-within { opacity: 1; transform: none; }
+:is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal] { transition: opacity var(--storefront-transition-normal), transform var(--storefront-transition-normal); }
+:is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal=pending] { opacity: 0; transform: translateY(12px); }
+:is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal=visible] { opacity: 1; transform: none; }
+:is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal]:focus-within { opacity: 1; transform: none; }
 [data-storefront-home] :is(.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn) { animation: storefront-entrance 330ms var(--storefront-ease) both; }
 [data-storefront-home] .hero-btn { animation-delay: 60ms; }
 @keyframes storefront-entrance { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -92,7 +92,7 @@ fankee-shopping-assistant .shopping-assistant__launcher { border-color: #b8dfe0;
 @media (prefers-reduced-motion: reduce) {
  [data-storefront-home] :is(.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn) { animation: none; }
  [data-storefront-home] .hero-area::before { animation: none; }
- [data-storefront-home] [data-storefront-reveal], [data-storefront-home] [data-storefront-reveal=pending] { opacity: 1; transform: none; transition: none; }
+ :is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal], :is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal=pending] { opacity: 1; transform: none; transition: none; }
  .catalog-card, .catalog-card__image img, [data-storefront-home] .catalog-category,
  :is(.theme-btn, .theme-btn-2, .theme-btn-4), fankee-shopping-assistant .shopping-assistant__primary, fankee-shopping-assistant .shopping-assistant__launcher { transition: none; }
  .catalog-card:hover, .catalog-card:hover .catalog-card__image img, [data-storefront-home] .catalog-category:hover,

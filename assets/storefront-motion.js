@@ -1,9 +1,9 @@
 (() => {
  'use strict';
- const home = document.querySelector('[data-storefront-home]');
+ const home = document.querySelector('[data-storefront-home], [data-storefront-collection]') || (document.querySelector('[data-storefront-discovery]') && document);
  if (!home || !('IntersectionObserver' in window)) return;
  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
- const targets = '.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn, .trust-strip__list, .catalog-section-header, .catalog-category, .catalog-home .catalog-card';
+ const targets = '.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn, .trust-strip__list, .catalog-section-header, .catalog-category, .catalog-home .catalog-card, .collection-page .catalog-card';
  let observer;
  const showAll = () => {
   observer?.disconnect();
@@ -26,6 +26,7 @@
    observer.observe(node);
   });
  };
+ document.addEventListener('storefront:discovery:loaded', event => setup(event.detail.section));
  setup();
  reduced.addEventListener('change', () => { if (reduced.matches) showAll(); });
  const preferences = new MutationObserver(() => { if (document.documentElement.hasAttribute('data-a11y-paused')) showAll(); });

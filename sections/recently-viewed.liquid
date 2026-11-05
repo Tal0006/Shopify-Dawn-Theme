@@ -1,0 +1,31 @@
+{% comment %}
+  Product-page history, hydrated in one localized section request.
+  Search terms transport handles only; all_products supplies current Shopify data.
+{% endcomment %}
+{% render 'product-discovery-styles' %}
+{% assign history_handles = search.terms | split: '|' %}
+{% capture history_cards %}
+  {% if request.page_type == 'search' %}
+    {% assign unique_handles = history_handles | uniq %}
+    {% for history_handle in unique_handles limit: 10 %}
+      {% assign history_product = all_products[history_handle] %}
+      {% if history_product != blank %}
+        <div data-history-handle="{{ history_product.handle | escape }}">{% render 'product-card', card_product: history_product, refined_card: true %}</div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endcapture %}
+{% assign history_cards = history_cards | strip %}
+<section class="catalog-section catalog-home container product-discovery" data-storefront-discovery data-recently-viewed data-current-handle="{{ product.handle | escape }}" data-section-id="recently-viewed" data-search-url="{{ routes.search_url }}" {% if history_cards == blank %}hidden{% endif %}>
+  <header class="catalog-section-header"><h2>{% if section.settings.heading != blank %}{{ section.settings.heading | escape }}{% else %}{{ 'storefront.recently_viewed' | t }}{% endif %}</h2></header>
+  <div class="product-discovery__grid" role="region" tabindex="0" aria-label="{{ 'storefront.recently_viewed' | t | escape }}">{{ history_cards }}</div>
+</section>
+<script src="{{ 'recently-viewed.js' | asset_url }}" defer></script>
+{% schema %}
+{
+ "name": "t:storefront_editor.recently_viewed",
+ "enabled_on": {"templates": ["product"]},
+ "settings": [{"type": "text", "id": "heading", "label": "t:storefront_editor.heading"}],
+ "presets": [{"name": "t:storefront_editor.recently_viewed"}]
+}
+{% endschema %}

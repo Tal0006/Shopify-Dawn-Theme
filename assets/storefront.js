@@ -350,7 +350,7 @@
         if (!response.ok) return;
         const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
         const content = doc.querySelector('[data-product-recommendations]');
-        if (content && !content.hidden) { section.innerHTML = content.innerHTML; section.hidden = false; }
+        if (content && !content.hidden) { section.innerHTML = content.innerHTML; section.hidden = false; document.dispatchEvent(new CustomEvent('storefront:discovery:loaded', {detail: {section}})); }
       } catch { /* Hide the optional section when no recommendations are available. */ }
     });
   }

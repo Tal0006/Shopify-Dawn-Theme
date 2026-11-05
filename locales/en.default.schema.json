@@ -3476,7 +3476,8 @@
     "free_shipping_threshold": "Free shipping threshold",
     "free_shipping_threshold_info": "In shop currency. 0 hides the message. Match your shipping rules; this setting does not change rates.",
     "product_usage": "Usage instructions",
-    "product_additional": "Additional information"
+    "product_additional": "Additional information",
+    "recently_viewed": "Recently viewed"
   },
   "shopping_assistant_editor": {
     "name": "Shopping Assistant",
@@ -3505,5 +3506,8 @@
     "subtitle_2": "Free pickup available",
     "title_3": "Secure payment",
     "subtitle_3": "Secure shopping online"
+  },
+  "footer_design_editor": {
+    "description": "Short store description (optional)"
   }
 }

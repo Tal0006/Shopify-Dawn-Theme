@@ -14,11 +14,16 @@
       "settings": {
         "product_limit": 4
       }
+    },
+    "recently_viewed": {
+      "type": "recently-viewed",
+      "settings": {}
     }
   },
   "order": [
     "main",
     "single_product_V3xA3Q",
-    "recommendations"
+    "recommendations",
+    "recently_viewed"
   ]
 }
