@@ -42,11 +42,22 @@ export function whatsappWebhook(config:WhatsAppConfig,adapter:WhatsAppAdapter){
     typeof challenge!=='string'||!/^\d{1,100}$/.test(challenge))return res.status(403).json({error:'Verification failed'});
   return res.type('text/plain').send(challenge);
  });
- router.post('/',raw({type:'application/json',limit:'256kb',inflate:false}),(req,res)=>{
-  if(!Buffer.isBuffer(req.body)||!verifySignature(req.body,req.get('x-hub-signature-256'),config.appSecret))
+ router.post('/',(_req,res,next)=>{
+  console.info('WhatsApp webhook: POST received');
+  res.once('finish',()=>{
+   if(res.statusCode===200)console.info('WhatsApp webhook: acknowledged HTTP 200');
+  });
+  next();
+ },raw({type:'application/json',limit:'256kb',inflate:false}),(req,res)=>{
+  if(!Buffer.isBuffer(req.body)||!verifySignature(req.body,req.get('x-hub-signature-256'),config.appSecret)){
+   console.warn('WhatsApp webhook: signature verification failed');
    return res.status(401).json({error:'Invalid signature'});
+  }
   let payload:unknown;try{payload=JSON.parse(req.body.toString('utf8'));}catch{return res.status(400).json({error:'Invalid payload'});}
-  for(const message of incomingMessages(payload,config.phoneNumberId)){
+  console.info('WhatsApp webhook: payload parsed');
+  const messages=incomingMessages(payload,config.phoneNumberId);
+  console.info('WhatsApp webhook: accepted inbound messages extracted',messages.length);
+  for(const message of messages){
    if(!adapter.enqueue(message))return res.status(503).json({error:'Temporarily unavailable'});
   }
   return res.sendStatus(200);

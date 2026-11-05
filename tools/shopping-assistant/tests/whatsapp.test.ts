@@ -223,3 +223,34 @@ test('Webhook content is private and disabled channel does not require credentia
  assert.equal(verifySignature(Buffer.from(raw),sign(raw),'incorrect'),false);
  assert.equal(configFromEnv({SHOPIFY_STORE_DOMAIN:'example.myshopify.com'}).whatsapp,undefined);
 });
+
+test('Webhook lifecycle logs contain only fixed events and extracted counts, never sensitive request data',async()=>{
+ const logs:unknown[][]=[],info=console.info,warn=console.warn;
+ console.info=(...args)=>{logs.push(args);};console.warn=(...args)=>{logs.push(args);};
+ try{
+  await serve(async(base,shop)=>{
+   const received=['WhatsApp webhook: POST received'],parsed=['WhatsApp webhook: payload parsed'],
+    acknowledged=['WhatsApp webhook: acknowledged HTTP 200'];
+   const post=async(body:string,signature=sign(body))=>{
+    logs.length=0;
+    return fetch(base+'/webhooks/whatsapp',{method:'POST',headers:{
+     'Content-Type':'application/json','x-hub-signature-256':signature
+    },body});
+   };
+   const body=JSON.stringify(payload('שלום','private-message-id-sentinel'));
+   const good=await post(body);assert.equal(good.status,200);
+   assert.deepEqual(logs,[received,parsed,['WhatsApp webhook: accepted inbound messages extracted',1],acknowledged]);
+   const serialized=JSON.stringify(logs);
+   for(const privateValue of [body,user,wa.phoneNumberId,wa.accessToken,wa.verifyToken,wa.appSecret,sign(body),'שלום','private-message-id-sentinel'])
+    assert.ok(!serialized.includes(privateValue));
+   const ignored=await post(JSON.stringify({object:'whatsapp_business_account',entry:[]}));
+   assert.equal(ignored.status,200);
+   assert.deepEqual(logs,[received,parsed,['WhatsApp webhook: accepted inbound messages extracted',0],acknowledged]);
+   const invalid=await post(body,'sha256='+'0'.repeat(64));assert.equal(invalid.status,401);
+   assert.deepEqual(logs,[received,['WhatsApp webhook: signature verification failed']]);
+   const malformed=await post('{');assert.equal(malformed.status,400);
+   assert.deepEqual(logs,[received]);
+   assert.equal(shop.searchCalls,0);assert.equal(shop.cartCalls,0);
+  });
+ }finally{console.info=info;console.warn=warn;}
+});
