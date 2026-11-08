@@ -1,0 +1,19 @@
+{% doc %}
+  Shopify inventory/quantity limits for one variant; no finite stock for untracked or continue-selling variants.
+  @param {variant} inventory_variant - Variant being offered.
+  @example {% render 'inventory-limit', inventory_variant: card_variant %}
+{% enddoc %}
+{% liquid
+ assign inventory_finite = false
+ if inventory_variant.inventory_management != blank and inventory_variant.inventory_policy == 'deny'
+  assign inventory_finite = true
+ endif
+ assign inventory_cart_lines = cart.items | where: 'variant_id', inventory_variant.id
+ assign inventory_in_cart = inventory_cart_lines | map: 'quantity' | sum
+%}
+<span class="inventory-limit" data-inventory-variant="{{ inventory_variant.id }}" data-inventory-finite="{{ inventory_finite }}" data-inventory-stock="{{ inventory_variant.inventory_quantity }}" data-inventory-rule-max="{{ inventory_variant.quantity_rule.max }}" data-inventory-cart="{{ inventory_in_cart }}" data-inventory-one="{{ 'storefront.inventory_one' | t | escape }}" data-inventory-many="{{ 'storefront.inventory_many' | t: count: '__COUNT__' | escape }}" data-inventory-empty="{{ 'products.product.sold_out' | t | escape }}" data-inventory-full="{{ 'storefront.inventory_full' | t | escape }}" data-inventory-changed="{{ 'storefront.inventory_changed' | t | escape }}" role="status" aria-live="polite" aria-atomic="true"></span>
+{% stylesheet %}
+.inventory-limit {display:block;font-size:13px;line-height:1.5;color:var(--storefront-muted,#536975);margin-block:6px;overflow-wrap:anywhere;}
+.inventory-limit:empty {display:none;}
+[data-card-cart] button[name=add]:disabled {cursor:not-allowed;box-shadow:none;}
+{% endstylesheet %}

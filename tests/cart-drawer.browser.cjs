@@ -35,18 +35,18 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   window.form=document.querySelector('[data-card-cart]');window.add=form.querySelector('button');window.panel=document.querySelector('dialog');window.submit=()=>form.requestSubmit(add);
   `);
   await ev(fs.readFileSync(path.join(root,'assets/storefront.js'),'utf8'));
-  await t.test('Add stays on page, opens modal, announces and refreshes badge/lines',async()=>{
+  await t.test('Add stays on page without opening; explicit cart click opens the updated drawer',async()=>{
     await ev('add.focus();submit();submit()');await wait('!form.hasAttribute("aria-busy")');
     assert.equal(await ev('count'),1);assert.equal(await ev('calls.length'),1);
-    assert.equal(await ev('panel.open'),true);assert.equal(await ev('panel.matches(":modal")'),true);
+    assert.equal(await ev('panel.open'),false);assert.equal(await ev('document.activeElement===add'),true);await ev('document.querySelector(".cart-toggle-btn").click()');assert.equal(await ev('panel.matches(":modal")'),true);
     assert.equal(await ev('document.activeElement.className'),'mini-cart-close');
     assert.equal(await ev('document.querySelector(".cart-count").textContent'),'1');
-    assert.equal(await ev('panel.querySelector("[data-cart-status]").textContent'),'Added');
+    assert.equal(await ev('form.querySelector("[data-card-feedback]").textContent'),'Added');
     assert.equal(new URL(await ev('location.href')).pathname,'/');
   });
   await t.test('Native modal contains Tab focus; Escape restores the add button',async()=>{
     for(let i=0;i<12;i++){await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});assert.equal(await ev('panel.contains(document.activeElement)||document.activeElement===document.body'),true);}
-    await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await wait('!panel.open');await wait('document.activeElement===add');
+    await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});await wait('!panel.open');await wait('document.activeElement.matches(".cart-toggle-btn")');
   });
   await t.test('Quantity updates use line keys, block duplicates, refresh totals and restore control focus',async()=>{
     await ev('document.querySelector(".cart-toggle-btn").click();window.plus=panel.querySelectorAll("[data-cart-delta]")[1];plus.focus();plus.click();plus.click()');await wait('!panel.hasAttribute("aria-busy")');
@@ -75,6 +75,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   });
   await t.test('Mobile RTL drawer is right aligned without overflow; close and header reopen work',async()=>{
     await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+    await ev('document.querySelector(".cart-toggle-btn").click()');await wait('panel.open');
     await sleep(250);
     const rect=await ev('(()=>{const r=panel.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,overflow:panel.scrollWidth>panel.clientWidth};})()');
     assert.equal(rect.right,390);assert.ok(rect.width<=390);assert.equal(rect.overflow,false,JSON.stringify(await ev('({client:panel.clientWidth,scroll:panel.scrollWidth,items:[...panel.querySelectorAll("*")].filter(e=>e.scrollWidth>e.clientWidth).map(e=>({tag:e.tagName,cls:e.className,w:e.getBoundingClientRect().width,left:e.getBoundingClientRect().left}))})')));

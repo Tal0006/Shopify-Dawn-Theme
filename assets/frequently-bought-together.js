@@ -16,7 +16,7 @@
    const formatted = valid ? state.format.format(total / 100) : '—';
    const output = section.querySelector('[data-bundle-total]');
    if (output.textContent !== formatted) output.textContent = formatted;
-   state.button.disabled = !valid || state.variantValid === false || pageBusy || !choices.some(choice => choice.checked && !choice.disabled);
+   state.button.disabled = state.form.dataset.inventoryBlocked === 'true' || !valid || state.variantValid === false || pageBusy || !choices.some(choice => choice.checked && !choice.disabled);
   }
   // Inert preserves form serialization and prevents selection changes mid-request.
   section.querySelector('.bundle-section__items').inert = busy;
@@ -35,6 +35,9 @@
   if (!variant || !Number.isSafeInteger(variant.price) || variant.price < 0 || !choice) { state.variantValid = false; state.button.disabled = true; return; }
   state.variantValid = true;
   const selectable = variant.available && variant.safe;
+  const rowLimit=section.querySelector('[data-bundle-main] [data-inventory-variant]');
+  const pageLimit=purchase.querySelector('[data-inventory-variant]');
+  if(rowLimit&&pageLimit) Object.assign(rowLimit.dataset,pageLimit.dataset);
   choice.value = String(id); choice.dataset.price = variant.price;
   choice.disabled = !selectable;
   if (!selectable) choice.checked = false;
@@ -60,6 +63,7 @@
    update(section);
   });
  }
+ document.addEventListener('storefront:inventory:updated', () => { for(const [section] of states) update(section); });
  document.addEventListener('change', event => {
   const section = event.target.closest('[data-bundle]');
   if (section) update(section);

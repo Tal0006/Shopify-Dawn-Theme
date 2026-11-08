@@ -6,6 +6,89 @@
   const cardFeedbackTimers = new WeakMap();
   let cardCartQueue = Promise.resolve();
   const cartRoot = () => window.Shopify?.routes?.root || (document.querySelector('form[data-card-cart]')?.action.replace(/cart\/add.*$/, '') || '/');
+
+  // Shopify-rendered limits and Shopify cart lines are the only inventory inputs.
+  const inventoryCart = new Map();
+  const inventoryButtonState = new WeakMap();
+  const inventoryNodes = () => [...document.querySelectorAll('[data-inventory-variant]')];
+  function inventoryRemaining(node) {
+    const stock = node.dataset.inventoryFinite === 'true' ? Math.max(0, Number(node.dataset.inventoryStock)) : Infinity;
+    const rule = node.dataset.inventoryRuleMax ? Number(node.dataset.inventoryRuleMax) : Infinity;
+    return Math.max(0, Math.min(stock, rule) - (inventoryCart.get(node.dataset.inventoryVariant) || 0));
+  }
+  function inventoryMessage(node, remaining = inventoryRemaining(node)) {
+    if (!Number.isFinite(remaining)) return '';
+    return remaining === 0 ? ((inventoryCart.get(node.dataset.inventoryVariant)||0)>0 ? node.dataset.inventoryFull : node.dataset.inventoryEmpty || node.dataset.inventoryFull) : remaining === 1 ? node.dataset.inventoryOne : node.dataset.inventoryMany.replace('__COUNT__', String(remaining));
+  }
+  function syncInventory() {
+    for (const node of inventoryNodes()) {
+      if (!inventoryCart.has(node.dataset.inventoryVariant)) inventoryCart.set(node.dataset.inventoryVariant, Number(node.dataset.inventoryCart || 0));
+      node.textContent = inventoryMessage(node);
+    }
+    document.querySelectorAll('form[data-card-cart]').forEach(form => {
+      const button = form.querySelector('[name=add]');
+      if (!button) return;
+      const bundle = form.hasAttribute('data-bundle-cart');
+      const selected = bundle ? [...form.querySelectorAll('[name=bundle_variant]:checked')].map(choice => String(choice.value)) : [String(form.querySelector('[name=id]')?.value)];
+      const nodes = [...form.querySelectorAll('[data-inventory-variant]')].filter(node => selected.includes(node.dataset.inventoryVariant));
+      if (!nodes.length) return;
+      const input = !bundle && form.querySelector('[name=quantity]');
+      const min = Number(input?.min || 1), step = Number(input?.step || 1);
+      const remaining = nodes.length ? Math.min(...nodes.map(inventoryRemaining)) : Infinity;
+      const blocked = remaining < min;
+      form.dataset.inventoryBlocked = String(blocked);
+      if (input && nodes.length) {
+        if (Number.isFinite(remaining)) input.max = String(Math.max(0, min + Math.floor((remaining-min)/step)*step));
+        else if (input.dataset.inventoryOriginalMax) input.max = input.dataset.inventoryOriginalMax;
+        else input.removeAttribute('max');
+        const plus = form.querySelector('[data-quantity-change="1"]');
+        if (plus) plus.disabled = blocked || (input.max !== '' && Number(input.value) + step > Number(input.max));
+      }
+      if (!inventoryButtonState.has(button) && !bundle && !form.hasAttribute('aria-busy')) inventoryButtonState.set(button, button.disabled);
+      if (!form.hasAttribute('aria-busy')) {
+        if (!bundle) button.disabled = inventoryButtonState.get(button) || blocked;
+        else if (blocked) button.disabled = true;
+      }
+    });
+    document.dispatchEvent(new CustomEvent('storefront:inventory:updated'));
+  }
+  async function loadInventoryCart() {
+    if (!inventoryNodes().length) return;
+    const response = await fetch(cartRoot()+'cart.js', {headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'});
+    if (!response.ok) throw Error('Cart inventory unavailable');
+    const cart = await response.json();
+    if (!Array.isArray(cart.items)) throw Error('Invalid cart inventory');
+    inventoryCart.clear();
+    inventoryNodes().forEach(node => inventoryCart.set(node.dataset.inventoryVariant, 0));
+    for (const line of cart.items) {
+      const id = String(line.variant_id || line.id);
+      if (!Number.isSafeInteger(line.quantity) || line.quantity < 0) throw Error('Invalid cart quantity');
+      inventoryCart.set(id, (inventoryCart.get(id)||0)+line.quantity);
+    }
+    syncInventory();
+    document.dispatchEvent(new CustomEvent('storefront:cart:updated'));
+  }
+  async function refreshInventorySnapshot() {
+    try {
+      const response = await fetch(location.href, {headers:{Accept:'text/html'},credentials:'same-origin',cache:'no-store'});
+      if (response.ok) {
+        const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+        for (const node of inventoryNodes()) {
+          const fresh = [...doc.querySelectorAll('[data-inventory-variant]')].find(value => value.dataset.inventoryVariant === node.dataset.inventoryVariant);
+          if (fresh) { node.dataset.inventoryStock=fresh.dataset.inventoryStock; node.dataset.inventoryFinite=fresh.dataset.inventoryFinite; node.dataset.inventoryRuleMax=fresh.dataset.inventoryRuleMax||''; }
+        }
+      }
+      await loadInventoryCart();
+    } catch { /* Retain the last known Shopify limits; never invent a new stock value. */ }
+  }
+  document.addEventListener('input', event => { if (event.target.matches('form[data-card-cart] [name=quantity]')) syncInventory(); });
+  document.addEventListener('change', event => { if (event.target.closest('form[data-card-cart]')) syncInventory(); });
+  document.addEventListener('shopify:section:load', syncInventory);
+  document.addEventListener('storefront:discovery:loaded', syncInventory);
+  document.addEventListener('storefront:variant:updated', () => queueMicrotask(syncInventory));
+  window.addEventListener('focus', () => { if (!document.querySelector('form[data-card-cart][aria-busy]')) void loadInventoryCart().catch(() => {}); });
+  syncInventory();
+
   let cartReturnFocus = null;
   let drawerPending = false;
   const drawerReady = new WeakSet();
@@ -79,7 +162,7 @@
   }
   function addFeedback(form, message, error = false) {
     const toast = document.querySelector('[data-cart-toast]');
-    if (!cartMobile.matches || !toast) { cardFeedback(form, message, error); return; }
+    if (!toast) { cardFeedback(form, message, error); return; }
     const inline = form.querySelector('[data-card-feedback]');
     if (inline) inline.textContent = '';
     clearTimeout(toastTimer);
@@ -132,6 +215,7 @@
     return true;
   }
   async function refreshCardCart(sections, sectionId) {
+    await loadInventoryCart().catch(() => {});
     if (sectionId && renderCardCartSection(sections?.[sectionId])) return true;
     if (sectionId) {
       try {
@@ -167,14 +251,12 @@
     const button = form.querySelector('button[name=add]');
     if (!button || button.disabled) return;
     const formData = window.fankeeCartSubmit?.consume(form) || new FormData(form);
-    const shouldOpenDrawer = !!drawer() && !cartMobile.matches;
-    let drawerMessage = '';
-    let drawerError = false;
     cardCartPending.add(form);
+    const returnAddFocus = document.activeElement === button;
     const label = button.textContent;
     const feedback = form.querySelector('[data-card-feedback]');
     clearTimeout(cardFeedbackTimers.get(form));
-    feedback.textContent = '';
+    feedback.textContent = button.dataset.pendingLabel || '';
     button.disabled = true;
     button.setAttribute('aria-busy', 'true');
     form.setAttribute('aria-busy', 'true');
@@ -197,9 +279,26 @@
           if (!ids.length || ids.length > 4 || ids.some(value => !/^\d+$/.test(value))) throw Error('Invalid bundle selection');
           items = ids.map(value => ({id: value, quantity: 1}));
         }
+        const limited = items.some(item => [...form.querySelectorAll('[data-inventory-variant]')].some(node => node.dataset.inventoryVariant === item.id && (node.dataset.inventoryFinite === 'true' || node.dataset.inventoryRuleMax)));
+        if (limited) {
+          await loadInventoryCart();
+          for (const item of items) {
+            const node = [...form.querySelectorAll('[data-inventory-variant]')].find(node => node.dataset.inventoryVariant === item.id);
+            if (node && item.quantity > inventoryRemaining(node)) throw Object.assign(Error('Inventory limit'), {inventoryMessage:inventoryMessage(node)});
+          }
+        }
         const body = {items, ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})};
         const response = await fetch(cartRoot() + 'cart/add.js', {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, credentials: 'same-origin', body: JSON.stringify(body)});
-        if (!response.ok) { const error = Error('Cart add rejected'); error.status = response.status; throw error; }
+        if (!response.ok) {
+          const error = Error('Cart add rejected'); error.status = response.status;
+          let rejection;try { rejection=await response.json(); } catch {}
+          if (response.status===422 && /stock|inventory|sold out|can.t add more|cannot add more|only\s+\d+.*available|מלאי/i.test(String(rejection?.description||rejection?.message||''))) {
+            await refreshInventorySnapshot();
+            const node = [...form.querySelectorAll('[data-inventory-variant]')].find(node => items.some(item => item.id===node.dataset.inventoryVariant && item.quantity>inventoryRemaining(node)));
+            error.inventoryMessage = node ? inventoryMessage(node) : form.querySelector('[data-inventory-variant]')?.dataset.inventoryChanged;
+          }
+          throw error;
+        }
         added = !bundled;
         const result = await response.json();
         if (bundled && (!Array.isArray(result.items) || items.some(item => !result.items.some(line => String(line.variant_id || line.id) === item.id && Number(line.quantity) >= item.quantity)))) {
@@ -207,18 +306,16 @@
         }
         added = true;
         const refreshed = await refreshCardCart(result.sections, sectionId);
-        if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer().dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
-        else addFeedback(form, refreshed || !document.querySelector('.mini-cart-content') ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed && !!document.querySelector('.mini-cart-content'));
+        addFeedback(form, refreshed || !document.querySelector('.mini-cart-content') ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed && !!document.querySelector('.mini-cart-content'));
       } catch (error) {
         if (window.Shopify?.designMode) console.warn('[Cart] AJAX add failed', {message: error.message, status: error.status});
         if (added) {
           const refreshed = await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection);
-          if (shouldOpenDrawer) { drawerMessage = refreshed ? drawer()?.dataset.cartAdded : feedback.dataset.refreshError; drawerError = !refreshed; }
-          else addFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
+          addFeedback(form, refreshed ? feedback.dataset.success : feedback.dataset.refreshError, !refreshed);
         }
         else {
           if (form.hasAttribute('data-bundle-cart')) await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection);
-          addFeedback(form, feedback.dataset.error, true);
+          addFeedback(form, error.inventoryMessage || feedback.dataset.error, true);
         }
       } finally {
         button.disabled = false;
@@ -226,11 +323,10 @@
         form.removeAttribute('aria-busy');
         button.textContent = label;
         cardCartPending.delete(form);
-        if (drawerMessage) {
-          if (cartMobile.matches) addFeedback(form, drawerMessage, drawerError);
-          else if (openCart(button)) cartStatus(drawerMessage, drawerError);
-          else addFeedback(form, feedback.dataset.success);
-        }
+        syncInventory();
+        document.dispatchEvent(new CustomEvent('storefront:cart:updated'));
+        if(returnAddFocus && !button.disabled && document.activeElement===document.body) button.focus({preventScroll:true});
+
       }
     });
     cardCartQueue = operation.catch(() => {});

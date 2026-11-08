@@ -614,7 +614,7 @@
     },
     "one_time_purchase": "One-time purchase",
     "product_type": "Product type",
-    "cart_adding": "Adding…",
+    "cart_adding": "Adding to cart...",
     "cart_add_error": "We could not add this product. Please try again.",
     "cart_refresh_error": "The product was added. We could not refresh the cart display; open your cart to review it.",
     "cart_added": "Product added to cart",
@@ -647,8 +647,12 @@
     "product_whatsapp_question": "Ask about this product on WhatsApp",
     "product_whatsapp_message": "Hello, I have a question about:\n{{ title }}",
     "product_recommendations": "You may also like",
-    "cart_toast_success": "Product added to cart successfully",
-    "recently_viewed": "Recently viewed"
+    "cart_toast_success": "Added to cart ✓",
+    "recently_viewed": "Recently viewed",
+    "inventory_one": "Only one available",
+    "inventory_many": "Only {{ count }} available",
+    "inventory_full": "All available stock is already in your cart",
+    "inventory_changed": "Stock has changed and this quantity cannot be added. Try a smaller quantity."
   },
   "date_formats": {
     "date": "%d/%m/%Y",

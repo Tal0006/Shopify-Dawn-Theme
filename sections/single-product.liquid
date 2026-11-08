@@ -59,6 +59,7 @@
             {% if selected_variant.quantity_rule.min > 1 %}<small>{{ 'products.product.quantity.minimum_of' | t: quantity: selected_variant.quantity_rule.min }}</small>{% endif %}
             {% if selected_variant.quantity_rule.increment > 1 %}<small>{{ 'products.product.quantity.multiples_of' | t: quantity: selected_variant.quantity_rule.increment }}</small>{% endif %}
           </div>
+{% render 'inventory-limit', inventory_variant: selected_variant %}
           <button class="theme-btn product-page__add" type="submit" name="add" data-pending-label="{{ 'storefront.cart_adding' | t | escape }}" aria-describedby="{{ form_id }}-Feedback" {% unless selected_variant.available %}disabled{% endunless %}>{% if selected_variant.available %}{{ 'products.product.add_to_cart' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endif %}</button>
           <p id="{{ form_id }}-Feedback" class="catalog-card-feedback" role="status" aria-live="polite" aria-atomic="true" data-card-feedback data-success="{{ 'storefront.cart_added' | t | escape }}" data-error="{{ 'storefront.cart_add_error' | t | escape }}" data-refresh-error="{{ 'storefront.cart_refresh_error' | t | escape }}"></p>
           {% if form.errors %}<div role="alert" class="storefront-form-errors">{{ form.errors | default_errors }}</div>{% endif %}

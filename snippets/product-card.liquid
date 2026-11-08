@@ -30,6 +30,7 @@
         {% form 'product', card_product, id: card_form_id, class: 'catalog-card__form', data-card-cart: '' %}
           <input type="hidden" name="id" value="{{ card_variant.id }}">
           <input type="hidden" name="quantity" value="1">
+{% render 'inventory-limit', inventory_variant: card_variant %}
           <button type="submit" class="theme-btn" name="add" aria-describedby="{{ card_form_id }}-Feedback" data-pending-label="{{ 'storefront.cart_adding' | t | escape }}">{{ 'products.product.add_to_cart' | t }}</button>
           <p id="{{ card_form_id }}-Feedback" class="catalog-card-feedback" role="status" aria-live="polite" aria-atomic="true" data-card-feedback data-success="{{ 'storefront.cart_added' | t | escape }}" data-error="{{ 'storefront.cart_add_error' | t | escape }}" data-refresh-error="{{ 'storefront.cart_refresh_error' | t | escape }}"></p>
         {% endform %}

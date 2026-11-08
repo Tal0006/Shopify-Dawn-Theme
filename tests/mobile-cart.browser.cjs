@@ -81,7 +81,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
     for(const path of ['/','/collections/cleaning']){
       await ev('history.replaceState(null,"",'+JSON.stringify(path)+');window.before=count;add.click()');await wait('!form.hasAttribute("aria-busy")');
       assert.equal(await ev('count'),await ev('before+1'));assert.equal(new URL(await ev('location.href')).pathname,path);
-      assert.equal(await ev('panel.open'),true);await ev('panel.querySelector(".mini-cart-close").click()');
+      assert.equal(await ev('panel.open'),false);
     }
   });
   await t.test('Mobile network and 422 failures remain on page with persistent accessible errors',async()=>{

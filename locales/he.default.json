@@ -614,7 +614,7 @@
     },
     "one_time_purchase": "רכישה חד־פעמית",
     "product_type": "סוג מוצר",
-    "cart_adding": "מוסיף...",
+    "cart_adding": "מוסיף לסל...",
     "cart_add_error": "לא ניתן להוסיף את המוצר לסל כרגע",
     "cart_refresh_error": "המוצר נוסף לסל. לא הצלחנו לרענן את התצוגה; אפשר לפתוח את סל הקניות.",
     "cart_added": "המוצר נוסף לסל",
@@ -647,8 +647,12 @@
     "product_whatsapp_question": "שאלה על המוצר ב-WhatsApp",
     "product_whatsapp_message": "שלום, יש לי שאלה לגבי:\n{{ title }}",
     "product_recommendations": "אולי יעניין אותך גם",
-    "cart_toast_success": "המוצר נוסף לסל בהצלחה",
-    "recently_viewed": "נצפו לאחרונה"
+    "cart_toast_success": "נוסף לסל ✓",
+    "recently_viewed": "נצפו לאחרונה",
+    "inventory_one": "קיים רק אחד במלאי",
+    "inventory_many": "קיימים רק {{ count }} במלאי",
+    "inventory_full": "כל המלאי הזמין כבר נמצא בסל",
+    "inventory_changed": "המלאי השתנה ולא ניתן להוסיף את הכמות המבוקשת. נסו כמות קטנה יותר."
   },
   "date_formats": {
     "date": "%d/%m/%Y",

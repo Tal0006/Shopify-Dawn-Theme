@@ -76,13 +76,13 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
     assert.equal(await ev('page.querySelector("[name=id]").value'),'11');assert.equal(await ev('page.querySelector("[name=add]").disabled'),false);
     await ev('failure=true;choose("22");choose("11")');await wait('!page.hasAttribute("aria-busy")');assert.equal(await ev('page.querySelector("[name=add]").disabled'),false);await ev('failure=false;slow=false');
   });
-  await t.test('Quantity buttons honor limits; selected variant/quantity add opens existing cart drawer',async()=>{
+  await t.test('Quantity buttons honor limits; selected variant/quantity add stays on page',async()=>{
     await ev('choose("22")');await wait('!page.hasAttribute("aria-busy")');
     await ev('window.qty=page.querySelector("[name=quantity]");qty.value=2;qty.dispatchEvent(new Event("change",{bubbles:true}))');
     assert.equal(await ev('page.querySelector("[data-quantity-change]").disabled'),true);
     await ev('page.querySelectorAll("[data-quantity-change]")[1].click()');assert.equal(await ev('qty.value'),'4');
     await ev('window.add=page.querySelector("[name=add]");add.focus();add.click()');await wait('!page.querySelector("form").hasAttribute("aria-busy")');
-    assert.equal(await ev('document.querySelector("dialog").open'),true);assert.equal(await ev('count'),4);
+    assert.equal(await ev('document.querySelector("dialog").open'),false);assert.equal(await ev('count'),4);
     assert.equal(await ev('calls.at(-1).body.items[0].id'),'22');
     await ev('document.querySelector(".mini-cart-close").click()');
   });

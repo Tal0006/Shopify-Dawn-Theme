@@ -23,6 +23,7 @@
   <div class="bundle-item__content">
     <h3><a href="{{ bundle_product.url }}">{{ bundle_product.title | escape }}</a></h3>
     <div data-bundle-price>{% render 'product-price', card_product: bundle_product, variant: bundle_variant %}</div>
+{% render 'inventory-limit', inventory_variant: bundle_variant %}
     <p data-bundle-availability>{% unless choice_safe %}{{ 'bundle.options_required' | t }}{% elsif bundle_variant.available %}{{ 'products.product.inventory_in_stock' | t }}{% else %}{{ 'products.product.sold_out' | t }}{% endunless %}</p>
   </div>
 </article>
