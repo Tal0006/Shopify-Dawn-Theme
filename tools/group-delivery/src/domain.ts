@@ -4,9 +4,10 @@ import {createHash} from 'node:crypto';
 // maps each one in sections/group-delivery.liquid, and tests/contract.test.ts keeps both sides aligned.
 export const PUBLIC_ERROR_CODES=['INVALID_INPUT','INVALID_LOCATION','INVALID_CART','INVALID_CONTACT','INVALID_PRICE','INVALID_CART_TOTAL',
  'CART_UNAVAILABLE','SHOPIFY_UNAVAILABLE','GROUP_NOT_FOUND','GROUP_CLOSED','GROUP_FULL','GROUP_LIMIT','LOCATION_OUTSIDE_GROUP',
- 'ALREADY_JOINED','MEMBER_AUTH_REQUIRED','RATE_LIMITED','INVALID_HOST','INVALID_ORIGIN','NOT_FOUND','BODY_TOO_LARGE','SERVICE_UNAVAILABLE'] as const;
+ 'ALREADY_JOINED','MEMBER_AUTH_REQUIRED','RATE_LIMITED','INVALID_HOST','INVALID_ORIGIN','NOT_FOUND','BODY_TOO_LARGE','SERVICE_UNAVAILABLE',
+ 'INVALID_AREA','INVALID_COORDINATES'] as const;
 // Merchant-only /admin codes; never shown on the storefront.
-export const ADMIN_ERROR_CODES=['LOGIN_FAILED','ADMIN_AUTH_REQUIRED','CSRF_REQUIRED','INVALID_CONTENT_TYPE','APPROVAL_NOT_ALLOWED'] as const;
+export const ADMIN_ERROR_CODES=['LOGIN_FAILED','ADMIN_AUTH_REQUIRED','CSRF_REQUIRED','INVALID_CONTENT_TYPE','APPROVAL_NOT_ALLOWED','AREA_EXISTS','AREA_NOT_FOUND'] as const;
 export type ErrorCode=typeof PUBLIC_ERROR_CODES[number]|typeof ADMIN_ERROR_CODES[number];
 export class ApiError extends Error {constructor(public status:number,public code:ErrorCode, message='לא ניתן להשלים את הבקשה. יש לבדוק את הפרטים ולנסות שוב.'){super(message)}}
 export const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
@@ -20,12 +21,28 @@ export function agorot(value:unknown):bigint{
  const [whole,fraction='']=value.split('.');
  return BigInt(whole)*100n+BigInt(fraction.slice(0,2).padEnd(2,'0'));
 }
-export interface Location {areaName:string;key:string;lat:number|null;lng:number|null}
+// areaId set: a server-resolved delivery area (the grouping boundary). Unset: a legacy free-text/coordinate place.
+export interface Location {areaName:string;key:string;lat:number|null;lng:number|null;areaId?:string}
+// Shared normalization for locality keys, area slugs and aliases (migrations/002 seeds use the same form).
+export const localityKey=(name:string)=>name.normalize('NFKC').toLocaleLowerCase().replace(/[\s'״׳.()-]+/g,' ').trim();
+export function placeName(value:unknown):string{
+ const name=text(value,2,60);
+ if(!/^[\p{L}\p{M}\s'״׳.()-]+$/u.test(name)||!localityKey(name))return fail('INVALID_LOCATION');
+ return name;
+}
+const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+export function areaReference(value:unknown):string{
+ if(typeof value!=='string'||!UUID.test(value))throw new ApiError(400,'INVALID_AREA','האזור שנבחר אינו זמין. בחרו אזור מהרשימה.');
+ return value;
+}
+// Nearest-area lookups only: validated, never rounded into storage because they are never stored.
+export function coordinates(body:any){
+ const lat=body?.latitude,lng=body?.longitude;
+ if(typeof lat!=='number'||typeof lng!=='number'||!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)throw new ApiError(400,'INVALID_COORDINATES');
+ return {lat,lng};
+}
 export function location(value:any):Location{
- const areaName=text(value?.areaName,2,60);
- if(!/^[\p{L}\p{M}\s'״׳.()-]+$/u.test(areaName))return fail('INVALID_LOCATION');
- const key=areaName.normalize('NFKC').toLocaleLowerCase().replace(/[\s'״׳.()-]+/g,' ').trim();
- if(!key)return fail('INVALID_LOCATION');
+ const areaName=placeName(value?.areaName),key=localityKey(areaName);
  if(value?.lat==null&&value?.lng==null)return {areaName,key,lat:null,lng:null};
  const lat=value.lat,lng=value.lng;
  if(typeof lat!=='number'||typeof lng!=='number'||!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)return fail('INVALID_LOCATION');

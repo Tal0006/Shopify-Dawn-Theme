@@ -5,12 +5,13 @@ import {resolve} from 'node:path';
 import {config,type Config} from './config.js';
 import {database,migrate,type Database} from './db.js';
 import {Groups} from './groups.js';
+import {Areas} from './areas.js';
 import {Shopify,type CartValidator} from './shopify.js';
 import {Auth,same} from './auth.js';
 import {adminPage,loginPage,adminCSS} from './admin.js';
 import {ApiError,type ErrorCode} from './domain.js';
 export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg)){
- const app=express(),groups=new Groups(db,cfg,validator),auth=new Auth(db,cfg);
+ const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),auth=new Auth(db,cfg);
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
  app.use((_req,res,next)=>{
   res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
@@ -29,7 +30,9 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   if(origin){res.set('Access-Control-Allow-Origin',origin);res.vary('Origin');}
   if(req.method==='OPTIONS'){res.set({'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600'});res.status(204).end();return;}
   if(!['GET','HEAD'].includes(req.method)&&(!origin||!allowed.includes(origin)||!req.is('application/json')))throw new ApiError(403,'INVALID_ORIGIN');
-  await auth.limit(req,['GET','HEAD'].includes(req.method)?'public-read':'public-write',['GET','HEAD'].includes(req.method)?120:20,600);
+  // Nearest-area lookups get their own small bucket so location attempts cannot use up the join budget (or vice versa).
+  const read=['GET','HEAD'].includes(req.method),nearest=req.method==='POST'&&req.path==='/areas/nearest';
+  await auth.limit(req,nearest?'area-nearest':read?'public-read':'public-write',nearest?10:read?120:20,600);
   next();
  });
  app.use(express.json({limit:'24kb'}));
@@ -37,7 +40,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  const adminOrigin:express.RequestHandler=(req,_res,next)=>{if(req.get('Origin')!==cfg.origin)throw new ApiError(403,'INVALID_ORIGIN');next();};
  app.get('/',(_req,res)=>res.redirect(303,'/admin'));
  app.get('/admin/style.css',(_req,res)=>res.type('css').send(adminCSS));
- app.get('/admin',async(req,res)=>{const session=await auth.session(req);res.type('html').send(session?adminPage(await groups.list(),session.csrf):loginPage());});
+ app.get('/admin',async(req,res)=>{const session=await auth.session(req);res.type('html').send(session?adminPage(await groups.list(),await areas.adminList(),session.csrf):loginPage());});
  app.post('/admin/login',adminOrigin,async(req,res)=>{if(!req.is('application/x-www-form-urlencoded'))throw new ApiError(415,'INVALID_CONTENT_TYPE');await auth.login(req,res);});
  app.use('/admin',async(req,res,next)=>{
   const session=await auth.session(req);if(!session)throw new ApiError(401,'ADMIN_AUTH_REQUIRED','גישה אינה מורשית');
@@ -48,7 +51,16 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.post('/admin/groups/:publicId/approve',async(req,res)=>{await groups.approve(req.params.publicId);res.redirect(303,'/admin');});
  app.post('/admin/api/groups/:publicId/approve',async(req,res)=>res.json({group:await groups.approve(req.params.publicId)}));
  app.post('/admin/logout',async(req,res)=>auth.logout(req,res));
- // Search is read-only; groups are created only by the first join for an area (POST /groups/join).
+ // Delivery areas: same admin session, Origin and CSRF checks as group approval. HTML forms redirect; JSON API returns data.
+ app.get('/admin/api/areas',async(_req,res)=>res.json({areas:await areas.adminList()}));
+ app.post('/admin/api/areas',async(req,res)=>res.status(201).json({area:await areas.create(req.body)}));
+ app.post('/admin/api/areas/:publicId',async(req,res)=>res.json({area:await areas.update(req.params.publicId,req.body)}));
+ app.post('/admin/areas',async(req,res)=>{await areas.create(req.body,true);res.redirect(303,'/admin');});
+ app.post('/admin/areas/:publicId',async(req,res)=>{await areas.update(req.params.publicId,req.body,true);res.redirect(303,'/admin');});
+ // Public delivery areas (no coordinates) and the server-side nearest-area suggestion (coordinates never stored).
+ app.get('/api/v1/areas',async(_req,res)=>res.json({areas:await areas.list()}));
+ app.post('/api/v1/areas/nearest',async(req,res)=>res.json(await areas.nearest(req.body)));
+ // Search is read-only and area-based (areaPublicId); groups are created only by the first join (POST /groups/join).
  app.post('/api/v1/groups/find',async(req,res)=>res.json(await groups.find(req.body)));
  app.post('/api/v1/groups/join',async(req,res)=>res.status(201).json(await groups.joinArea(req.body)));
  // DEPRECATED: legacy route for the theme live before the staged rollout; still creates on a miss. Never point new

@@ -5,7 +5,7 @@
 {% assign group_delivery_service_url = section.settings.service_url | default: 'https://fankee-group-delivery.onrender.com' %}
 <fankee-group-delivery class="container group-delivery" data-service-url="{{ group_delivery_service_url | escape }}" data-cart-url="{{ routes.cart_url }}.js"
  data-waking="{{ 'group_delivery.waking' | t | escape }}" data-none-found="{{ 'group_delivery.none_found' | t | escape }}" data-pending-title="{{ 'group_delivery.pending_title' | t: area: '__AREA__' | escape }}" data-pending-state="{{ 'group_delivery.pending_state' | t | escape }}" data-start-label="{{ 'group_delivery.start' | t | escape }}" data-started="{{ 'group_delivery.started' | t | escape }}"
- data-geo-error="{{ 'group_delivery.geo_error' | t | escape }}" data-geo-ready="{{ 'group_delivery.geo_ready' | t | escape }}" data-joined="{{ 'group_delivery.joined' | t | escape }}"
+ data-geo-denied="{{ 'group_delivery.geo_denied' | t | escape }}" data-geo-unsupported="{{ 'group_delivery.geo_unsupported' | t | escape }}" data-geo-error="{{ 'group_delivery.geo_error' | t | escape }}" data-geo-selected="{{ 'group_delivery.geo_selected' | t: area: '__AREA__' | escape }}" data-geo-none="{{ 'group_delivery.geo_none' | t | escape }}" data-area-selected-label="{{ 'group_delivery.area_selected' | t: area: '__AREA__' | escape }}" data-area-empty="{{ 'group_delivery.area_empty' | t | escape }}" data-joined="{{ 'group_delivery.joined' | t | escape }}"
  data-found="{{ 'group_delivery.found' | t | escape }}" data-updated="{{ 'group_delivery.updated' | t | escape }}" data-area="{{ 'group_delivery.area' | t: area: '__AREA__' | escape }}"
  data-count="{{ 'group_delivery.participants' | t: count: '__COUNT__' | escape }}" data-remaining="{{ 'group_delivery.remaining' | t: amount: '__AMOUNT__' | escape }}"
  data-update-label="{{ 'group_delivery.update' | t | escape }}" data-join-label="{{ 'group_delivery.join' | t | escape }}" data-closed="{{ 'group_delivery.closed' | t | escape }}" data-setup="{{ 'group_delivery.setup' | t | escape }}"
@@ -13,8 +13,13 @@
  <header><p class="group-delivery__eyebrow">{{ 'group_delivery.heading' | t }}</p><h1>{{ 'group_delivery.intro' | t }}</h1><h2>{{ 'group_delivery.promise' | t }}</h2><p>{{ 'group_delivery.description' | t }}</p></header>
  <p class="group-delivery__notice">{{ 'group_delivery.notice' | t }}</p>
  <form data-find-group>
-  <label for="GroupArea-{{ section.id }}">{{ 'group_delivery.location' | t }}</label>
-  <input id="GroupArea-{{ section.id }}" name="area" required maxlength="60" minlength="2" autocomplete="address-level2" aria-describedby="GroupLocationHint-{{ section.id }}">
+  {% comment %}Server-owned delivery areas (GET /api/v1/areas) in an ARIA 1.2 combobox; options are filled by group-delivery.js.{% endcomment %}
+  <label id="GroupAreaLabel-{{ section.id }}" for="GroupArea-{{ section.id }}">{{ 'group_delivery.location' | t }}</label>
+  <div class="group-delivery__combobox" data-area-picker>
+   <input id="GroupArea-{{ section.id }}" name="area" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="GroupAreaList-{{ section.id }}" autocomplete="off" required maxlength="60" placeholder="{{ 'group_delivery.area_placeholder' | t | escape }}" aria-describedby="GroupLocationHint-{{ section.id }} GroupAreaSelected-{{ section.id }}" data-area-input>
+   <ul id="GroupAreaList-{{ section.id }}" class="group-delivery__options" role="listbox" aria-labelledby="GroupAreaLabel-{{ section.id }}" hidden data-area-list></ul>
+  </div>
+  <p id="GroupAreaSelected-{{ section.id }}" class="group-delivery__selected" data-area-selected hidden></p>
   <p id="GroupLocationHint-{{ section.id }}" class="group-delivery__hint">{{ 'group_delivery.location_hint' | t }}</p>
   <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-geolocate>{{ 'group_delivery.geolocate' | t }}</button><button class="theme-btn" type="submit">{{ 'group_delivery.find' | t }}</button></div>
  </form>
@@ -43,10 +48,10 @@
  <script type="application/json" data-group-labels>{% assign group_states = 'OPEN,THRESHOLD_REACHED,APPROVED,PAYMENT_OPEN,CONFIRMED,SCHEDULED,COMPLETED,EXPIRED,CANCELLED' | split: ',' %}{ {% for state in group_states %}{% assign state_key = state | downcase | prepend: 'group_delivery.status.' %}{{ state | json }}:{{ state_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
  {% comment %}
    Single error contract: CODE:group_delivery locale key. Server codes come from PUBLIC_ERROR_CODES in
-   tools/group-delivery/src/domain.ts; CART_EMPTY..INVALID_RESPONSE are browser-side. DEFAULT is the fallback.
+   tools/group-delivery/src/domain.ts; CART_EMPTY..INVALID_RESPONSE, AREA_REQUIRED and AREAS_EMPTY are browser-side. DEFAULT is the fallback.
    tools/group-delivery/tests/contract.test.ts fails when either side drifts.
  {% endcomment %}
- <script type="application/json" data-group-errors>{% assign group_errors = 'INVALID_INPUT:error,INVALID_LOCATION:error_location,INVALID_CART:invalid_cart,INVALID_CONTACT:error_contact,INVALID_PRICE:error,INVALID_CART_TOTAL:error_cart_total,CART_UNAVAILABLE:cart_unavailable,SHOPIFY_UNAVAILABLE:shopify_error,GROUP_NOT_FOUND:error_not_found,GROUP_CLOSED:closed,GROUP_FULL:error_full,GROUP_LIMIT:error_group_limit,LOCATION_OUTSIDE_GROUP:error_outside,ALREADY_JOINED:duplicate,MEMBER_AUTH_REQUIRED:error_receipt,RATE_LIMITED:error_rate_limited,INVALID_HOST:error_unavailable,INVALID_ORIGIN:error_unavailable,NOT_FOUND:error_unavailable,BODY_TOO_LARGE:error,SERVICE_UNAVAILABLE:error_unavailable,CART_EMPTY:empty_cart,CART_READ_FAILED:error_cart_read,CART_CURRENCY:error_currency,REQUEST_TIMEOUT:error_timeout,NETWORK_ERROR:error_network,INVALID_RESPONSE:error,DEFAULT:error' | split: ',' %}{ {% for group_error in group_errors %}{% assign group_error_pair = group_error | split: ':' %}{% assign group_error_key = group_error_pair.last | prepend: 'group_delivery.' %}{{ group_error_pair.first | json }}:{{ group_error_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
+ <script type="application/json" data-group-errors>{% assign group_errors = 'INVALID_INPUT:error,INVALID_LOCATION:error_location,INVALID_CART:invalid_cart,INVALID_CONTACT:error_contact,INVALID_PRICE:error,INVALID_CART_TOTAL:error_cart_total,CART_UNAVAILABLE:cart_unavailable,SHOPIFY_UNAVAILABLE:shopify_error,GROUP_NOT_FOUND:error_not_found,GROUP_CLOSED:closed,GROUP_FULL:error_full,GROUP_LIMIT:error_group_limit,LOCATION_OUTSIDE_GROUP:error_outside,ALREADY_JOINED:duplicate,MEMBER_AUTH_REQUIRED:error_receipt,RATE_LIMITED:error_rate_limited,INVALID_HOST:error_unavailable,INVALID_ORIGIN:error_unavailable,NOT_FOUND:error_unavailable,BODY_TOO_LARGE:error,SERVICE_UNAVAILABLE:error_unavailable,CART_EMPTY:empty_cart,CART_READ_FAILED:error_cart_read,CART_CURRENCY:error_currency,REQUEST_TIMEOUT:error_timeout,NETWORK_ERROR:error_network,INVALID_RESPONSE:error,INVALID_AREA:error_area,INVALID_COORDINATES:geo_error,AREA_REQUIRED:area_required,AREAS_EMPTY:areas_none,DEFAULT:error' | split: ',' %}{ {% for group_error in group_errors %}{% assign group_error_pair = group_error | split: ':' %}{% assign group_error_key = group_error_pair.last | prepend: 'group_delivery.' %}{{ group_error_pair.first | json }}:{{ group_error_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
 </fankee-group-delivery>
 <script src="{{ 'group-delivery.js' | asset_url }}" defer></script>
 {% stylesheet %}
@@ -112,6 +117,17 @@ body:has(.a11y-launcher:not([hidden])) .group-delivery {padding-inline-end:max(1
 .group-delivery__pledge bdi {font-size:22px;font-weight:600;}
 .group-delivery button[aria-busy=true] {cursor:wait;box-shadow:none;}
 .group-delivery button[aria-busy=true]::after {content:"";display:inline-block;width:14px;height:14px;margin-inline-start:8px;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;animation:group-delivery-spin 700ms linear infinite;vertical-align:middle;}
+/* Area combobox: options are rendered by group-delivery.js; long lists scroll inside the control. */
+.group-delivery__combobox {position:relative;min-width:0;}
+.group-delivery__options {position:absolute;z-index:5;inset-inline:0;inset-block-start:calc(100% + 4px);max-height:min(280px,50vh);overflow-y:auto;overscroll-behavior:contain;margin:0;padding:6px;list-style:none;border:1px solid #aacbd2;border-radius:12px;background:#fff;box-shadow:0 8px 24px #194e5b1f;}
+.group-delivery__options[hidden] {display:none;}
+.group-delivery__options [role=option] {display:flex;align-items:center;min-height:44px;padding:8px 12px;border-radius:8px;cursor:pointer;overflow-wrap:anywhere;}
+.group-delivery__options [role=option][aria-selected=true] {font-weight:600;color:var(--storefront-accent,#086b7b);}
+.group-delivery__options [role=option][data-active] {background:#e7f5f7;outline:2px solid var(--storefront-accent,#086b7b);outline-offset:-2px;}
+.group-delivery__options .group-delivery__no-option {padding:10px 12px;color:#536975;font-size:14px;}
+.group-delivery__selected {margin-block:8px 0;font-size:14px;font-weight:600;color:var(--storefront-accent,#086b7b);}
+.group-delivery__selected[hidden] {display:none;}
+@media(forced-colors:active) {.group-delivery__options [role=option][data-active] {outline-color:Highlight;}}
 /* No group yet for the searched area: only the explanation, verified cart and join form apply. */
 .group-delivery__panel[data-group-pending]>:is(.group-delivery__totals,.group-delivery__progress,.group-delivery__summary,.group-delivery__milestone,.group-delivery__stats,.group-delivery__actions) {display:none;}
 @keyframes group-delivery-spin {to {rotate:360deg;}}

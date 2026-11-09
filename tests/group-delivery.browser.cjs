@@ -49,7 +49,10 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   await ev(`
    sessionStorage.clear();localStorage.clear();window.requests=[];window.logged=[];window.existing=true;window.updateResponse=null;window.getResponse=null;
    for(const level of ['log','info','warn','error','debug']){const original=console[level].bind(console);console[level]=(...args)=>{logged.push(args.map(String).join(' '));original(...args);};}window.geoCalls=0;window.apiFailure=false;window.quantity=1;
-   Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition(success){geoCalls++;success({coords:{latitude:31.812345,longitude:34.654321}});}}});
+   window.geoMode='success';window.nearestArea=null;
+   window.geolocationMock={getCurrentPosition(success,fail){geoCalls++;if(geoMode==='denied')fail({code:1});else if(geoMode==='error')fail({code:2});else success({coords:{latitude:31.812345,longitude:34.654321}});}};
+   Object.defineProperty(navigator,'geolocation',{configurable:true,value:geolocationMock});
+   window.areaList=[{"publicId":"6f1a2c00-0001-4a00-8000-0000000000a1","name":"באר שבע"},{"publicId":"6f1a2c00-0002-4a00-8000-0000000000a2","name":"אשדוד"},{"publicId":"6f1a2c00-0003-4a00-8000-0000000000a3","name":"אשקלון"},{"publicId":"6f1a2c00-0004-4a00-8000-0000000000a4","name":"קריית גת"},{"publicId":"6f1a2c00-0005-4a00-8000-0000000000a5","name":"נתיבות"},{"publicId":"6f1a2c00-0006-4a00-8000-0000000000a6","name":"אופקים"},{"publicId":"6f1a2c00-0007-4a00-8000-0000000000a7","name":"שדרות"}];
    window.group={publicId:'11111111-1111-4111-8111-111111111111',areaName:'אשדוד',status:'OPEN',participantCount:5,currency:'ILS',thresholdAgorot:50000,pledgedTotalAgorot:36500,remainingAmountAgorot:13500,progressPercent:73,expiresAt:'2050-01-01T00:00:00.000Z'};
    window.fetch=async(input,options={})=>{
     const url=new URL(input,location.origin),body=options.body?JSON.parse(options.body):null;requests.push({url:url.href,method:options.method||'GET',body,headers:options.headers});
@@ -60,8 +63,8 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
     if(apiFailure)return new Response(JSON.stringify({code:'SERVICE_UNAVAILABLE',error:'upstream secret must not display'}),{status:503});
     if(url.pathname.endsWith('/update-pledge')&&window.updateResponse)return new Response(JSON.stringify(updateResponse.body),{status:updateResponse.status});
     if(!body&&url.pathname.includes('/groups/')&&window.getResponse)return new Response(JSON.stringify(getResponse.body),{status:getResponse.status});
-    if(url.pathname.endsWith('/groups/find')&&window.legacyService)return new Response(JSON.stringify({error:'x',code:'NOT_FOUND'}),{status:404});
-    if(url.pathname.endsWith('/groups/find-or-create'))return new Response(JSON.stringify({group,withinStandardRadius:false,validatedPledgeAgorot:1590*quantity}));
+    if(url.pathname.endsWith('/api/v1/areas'))return new Response(JSON.stringify({areas:areaList}));
+    if(url.pathname.endsWith('/api/v1/areas/nearest'))return new Response(JSON.stringify({area:nearestArea}));
     if(url.pathname.endsWith('/groups/find'))return new Response(JSON.stringify({group:existing?group:null,canCreateOnJoin:!existing,withinStandardRadius:false,validatedPledgeAgorot:1590*quantity}));
     if(url.pathname.endsWith('/groups/join')){const created=!existing;existing=true;group={...group,publicId:created?'22222222-2222-4222-8222-222222222222':group.publicId,participantCount:created?1:group.participantCount+1,pledgedTotalAgorot:1590*quantity,remainingAmountAgorot:50000-1590*quantity,progressPercent:3};return new Response(JSON.stringify({group,created,memberToken:'b'.repeat(64),validatedPledgeAgorot:1590*quantity}),{status:201});}
     if(url.pathname.endsWith('/join')){group={...group,participantCount:6,pledgedTotalAgorot:38090,remainingAmountAgorot:11910,progressPercent:76};return new Response(JSON.stringify({group,memberToken:'a'.repeat(64),validatedPledgeAgorot:1590*quantity}));}
@@ -72,18 +75,32 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   `);
   await ev(fs.readFileSync(path.join(root,'assets/group-delivery.js'),'utf8'));
   await wait('!widget.hasAttribute("aria-busy")');
-  await t.test('No automatic geolocation; explicit action stores only approximate coordinates',async()=>{
-   assert.equal(await ev('geoCalls'),0);assert.equal(await ev('requests.length'),1);
-   await ev('widget.querySelector("[name=area]").value="אשדוד";widget.querySelector("[data-geolocate]").click()');
+  const ASHDOD='6f1a2c00-0002-4a00-8000-0000000000a2',ASHKELON='6f1a2c00-0003-4a00-8000-0000000000a3',OFAKIM='6f1a2c00-0006-4a00-8000-0000000000a6';
+  const input='widget.querySelector("[data-area-input]")',list='widget.querySelector("[data-area-list]")';
+  const key=name=>ev(input+'.dispatchEvent(new KeyboardEvent("keydown",{key:'+JSON.stringify(name)+',bubbles:true,cancelable:true}))');
+  const type=value=>ev(input+'.value='+JSON.stringify(value)+';'+input+'.dispatchEvent(new Event("input",{bubbles:true}))');
+  const optionNames=()=>ev('[...'+list+'.querySelectorAll("[role=option]")].map(o=>o.textContent)');
+  await t.test('Areas load from the service; geolocation only on click, coarse coordinates sent once to suggest an area',async()=>{
+   assert.equal(await ev('geoCalls'),0);
+   assert.deepEqual(await ev('requests.map(r=>new URL(r.url).pathname).sort()'),['/api/v1/areas','/he/cart.js']);
+   assert.equal(await ev('widget.areas.length'),7);
+   await ev('window.nearestArea={publicId:'+JSON.stringify(ASHDOD)+',name:"אשדוד"};widget.querySelector("[data-geolocate]").click()');
+   await wait('widget.area?.publicId==='+JSON.stringify(ASHDOD));await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('geoCalls'),1);
-   assert.deepEqual(await ev('widget.coords'),{lat:31.81,lng:34.65});
+   const lookups=await ev('requests.filter(r=>r.url.endsWith("/areas/nearest"))');
+   assert.equal(lookups.length,1);assert.deepEqual(lookups[0].body,{latitude:31.81,longitude:34.65},'only ~1 km coordinates leave the browser');
+   assert.equal(await ev(input+'.value'),'אשדוד');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.geo_selected.replace('{{ area }}','אשדוד'));
+   assert.equal(await ev('widget.querySelector("[data-area-selected]").textContent'),tr.group_delivery.area_selected.replace('{{ area }}','אשדוד'));
+   assert.ok(!(await ev('JSON.stringify({...localStorage})+JSON.stringify({...sessionStorage})+document.documentElement.outerHTML')).includes('31.81'),'coordinates never stored or rendered');
   });
-  await t.test('Find renders aggregates and server-verified pledge with no customer identities',async()=>{
+  await t.test('Find sends only the server area reference and renders aggregates without customer identities',async()=>{
    await ev('widget.querySelector("[data-find-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('widget.querySelector("[data-group-panel]").hidden'),false);
    assert.equal(await ev('widget.querySelector("[role=progressbar]").getAttribute("aria-valuenow")'),'73');
    assert.ok(await ev('widget.querySelector("[data-validated-pledge]").textContent.includes("15.90")'));
-   assert.equal(await ev('requests.find(r=>r.url.endsWith("/groups/find")).body.location.lat'),31.81);
+   const search=await ev('requests.find(r=>r.url.endsWith("/groups/find")).body');
+   assert.deepEqual(Object.keys(search).sort(),['areaPublicId','lines']);assert.equal(search.areaPublicId,ASHDOD);
    assert.ok(await ev('widget.querySelector("[data-group-title]").textContent.includes("אשדוד")'));
   });
   await t.test('Changing location invalidates unjoined results before another join',async()=>{
@@ -175,11 +192,13 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    await wait('!widget.hasAttribute("aria-busy")');
   });
   await t.test('No group yet: searching creates nothing and the join starts the group',async()=>{
-   await ev('existing=false;quantity=1;widget.querySelector("[name=area]").value="בית שמש";widget.querySelector("[name=area]").dispatchEvent(new Event("input",{bubbles:true}));widget.querySelector("[data-find-group]").requestSubmit()');
+   await ev('existing=false;quantity=1');await type('אופ');await key('ArrowDown');await key('Enter');
+   assert.equal(await ev('widget.area.publicId'),OFAKIM);
+   await ev('widget.querySelector("[data-find-group]").requestSubmit()');
    await wait('!widget.hasAttribute("aria-busy")');
    const panel='widget.querySelector("[data-group-panel]")';
    assert.equal(await ev(panel+'.hidden'),false);assert.equal(await ev(panel+'.hasAttribute("data-group-pending")'),true);
-   assert.equal(await ev('widget.querySelector("[data-group-title]").textContent'),tr.group_delivery.pending_title.replace('{{ area }}','בית שמש'));
+   assert.equal(await ev('widget.querySelector("[data-group-title]").textContent'),tr.group_delivery.pending_title.replace('{{ area }}','אופקים'));
    assert.equal(await ev('widget.querySelector("[data-group-state]").textContent'),tr.group_delivery.pending_state);
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.none_found);
    assert.equal(await ev('widget.querySelector("[data-join-button]").textContent'),tr.group_delivery.start);
@@ -190,8 +209,8 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    await ev('widget.querySelector("[name=email]").value="starter@example.test";widget.querySelector("[name=phone]").value="0507654321";widget.querySelector("[data-join-group]").requestSubmit();widget.querySelector("[data-join-group]").requestSubmit()');
    await wait('!widget.hasAttribute("aria-busy")');
    const joins=await ev('requests.filter(r=>r.url.endsWith("/groups/join"))');
-   assert.equal(joins.length,1);assert.deepEqual(Object.keys(joins[0].body).sort(),['email','lines','location','phone']);
-   assert.equal(joins[0].body.location.areaName,'בית שמש');
+   assert.equal(joins.length,1);assert.deepEqual(Object.keys(joins[0].body).sort(),['areaPublicId','email','lines','phone']);
+   assert.equal(joins[0].body.areaPublicId,OFAKIM,'the join uses the searched area');
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.started);
    assert.equal(await ev(panel+'.hasAttribute("data-group-pending")'),false);
    assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true);
@@ -199,13 +218,83 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.notEqual(await ev('localStorage.getItem(widget.receiptPrefix+"11111111-1111-4111-8111-111111111111")'),null,'receipts are per group');
    assert.ok(!(await ev('localStorage.getItem(widget.receiptPrefix+"22222222-2222-4222-8222-222222222222")')).includes('starter@'));
   });
-  await t.test('Transition: a service without /groups/find falls back once to the retired route',async()=>{
-   await ev('window.legacyService=true;existing=true;window.mark=requests.length;widget.querySelector("[name=area]").value="אשדוד";widget.querySelector("[name=area]").dispatchEvent(new Event("input",{bubbles:true}));widget.querySelector("[data-find-group]").requestSubmit()');
-   await wait('!widget.hasAttribute("aria-busy")');
-   const paths=await ev('requests.slice(mark).map(r=>new URL(r.url).pathname).filter(p=>p.includes("/groups/"))');
-   assert.deepEqual(paths,['/api/v1/groups/find','/api/v1/groups/find-or-create']);
-   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.found);
-   await ev('window.legacyService=false');
+  await t.test('Area combobox: filtering, keyboard navigation, selection state and exact typed names',async()=>{
+   await ev('existing=true;group.status="OPEN";'+input+'.value="";widget.clearArea();widget.closeAreas()');
+   await ev(input+'.focus()');
+   assert.equal(await ev(input+'.getAttribute("aria-expanded")'),'true');
+   assert.equal((await optionNames()).length,7);
+   assert.equal(await ev(input+'.getAttribute("role")'),'combobox');assert.equal(await ev(list+'.getAttribute("role")'),'listbox');
+   await type('אש');
+   assert.deepEqual(await optionNames(),['אשדוד','אשקלון'],'typing filters');
+   await key('ArrowDown');
+   const first=await ev(list+'.querySelector("[role=option]").id');
+   assert.equal(await ev(input+'.getAttribute("aria-activedescendant")'),first);
+   assert.equal(await ev(list+'.querySelector("[data-active]").textContent'),'אשדוד');
+   await key('ArrowDown');assert.equal(await ev(list+'.querySelector("[data-active]").textContent'),'אשקלון');
+   await key('ArrowDown');assert.equal(await ev(list+'.querySelector("[data-active]").textContent'),'אשדוד','wraps to the first option');
+   await key('ArrowUp');assert.equal(await ev(list+'.querySelector("[data-active]").textContent'),'אשקלון','wraps to the last option');
+   await key('Enter');
+   assert.equal(await ev('widget.area.publicId'),ASHKELON);assert.equal(await ev(input+'.value'),'אשקלון');
+   assert.equal(await ev(list+'.hidden'),true);assert.equal(await ev(input+'.getAttribute("aria-expanded")'),'false');
+   assert.equal(await ev(input+'.hasAttribute("aria-activedescendant")'),false);
+   assert.equal(await ev('widget.querySelector("[data-area-selected]").textContent'),tr.group_delivery.area_selected.replace('{{ area }}','אשקלון'));
+   // Reopening shows every area with the current one marked selected.
+   await key('ArrowDown');
+   assert.equal((await optionNames()).length,7);
+   assert.equal(await ev(list+'.querySelector("[aria-selected=true]").textContent'),'אשקלון');
+   await key('Escape');assert.equal(await ev(list+'.hidden'),true);assert.equal(await ev('widget.area.publicId'),ASHKELON,'Escape closes without changing the selection');
+   await key('Escape');assert.equal(await ev(input+'.value'),'');assert.equal(await ev('widget.area'),null,'second Escape clears');
+   // Pointer selection.
+   await ev(input+'.focus();'+list+'.querySelectorAll("[role=option]")[3].dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,cancelable:true}))');
+   assert.equal(await ev('widget.area.name'),'קריית גת');
+   // No match: no listbox, a clear message, and search is refused without a request.
+   await type('zzz');
+   assert.equal(await ev(list+'.hidden'),true);assert.equal(await ev('widget.querySelector("[data-area-selected]").textContent'),tr.group_delivery.area_empty);
+   let before=await ev('requests.length');
+   await type('אש');await ev('widget.querySelector("[data-find-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.area_required);
+   assert.equal(await ev('requests.length'),before,'partial text never reaches the service');
+   // An exact name typed in full counts as that area.
+   await type(' אשקלון ');await ev('widget.querySelector("[data-find-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('requests.filter(r=>r.url.endsWith("/groups/find")).at(-1).body.areaPublicId'),ASHKELON);
+   assert.equal(await ev(list+'.hidden'),true);
+   assert.ok(await ev('requests.every(r=>!r.url.includes("find-or-create"))'),'the new client never uses the legacy route');
+  });
+  await t.test('Location denied, failing, unsupported or far away keeps manual selection fully usable',async()=>{
+   await ev('widget.clearArea();'+input+'.value=""');
+   const locate=async()=>{await ev('widget.querySelector("[data-geolocate]").click()');await sleep(30);await wait('!widget.hasAttribute("aria-busy")');};
+   let lookups=await ev('requests.filter(r=>r.url.endsWith("/areas/nearest")).length');
+   await ev('geoMode="denied"');await locate();
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.geo_denied);
+   await ev('geoMode="error"');await locate();
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.geo_error);
+   assert.equal(await ev('requests.filter(r=>r.url.endsWith("/areas/nearest")).length'),lookups,'no lookup without a position');
+   await ev('geoMode="success";nearestArea=null');await locate();
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.geo_none);assert.equal(await ev('widget.area'),null,'never forced into a wrong area');
+   await ev('nearestArea={publicId:"99999999-9999-4999-8999-999999999999",name:"לא ברשימה"}');await locate();
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.geo_none,'unknown areas are ignored');
+   await ev('window.apiResponse={status:400,body:{code:"INVALID_COORDINATES"}}');await locate();
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.geo_error);
+   await ev('window.apiResponse=null;Object.defineProperty(navigator,"geolocation",{configurable:true,value:undefined})');await locate();
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.geo_unsupported);
+   await ev('Object.defineProperty(navigator,"geolocation",{configurable:true,value:geolocationMock})');
+   // Manual selection still works after every failure.
+   await type('שד');
+   assert.deepEqual(await optionNames(),['שדרות','אשדוד'],'names starting with the query rank first');
+   await key('ArrowDown');await key('Enter');
+   assert.equal(await ev('widget.area.name'),'שדרות');assert.equal(await ev(input+'.disabled'),false);
+  });
+  await t.test('Combobox fits RTL mobile and desktop widths with touch-sized options',async()=>{
+   for(const width of [320,360,375,390,768,1280]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:800,deviceScaleFactor:1,mobile:width<992});
+    await ev(input+'.scrollIntoView({block:"start"});'+input+'.value="";widget.clearArea();'+input+'.focus();widget.openAreas()');
+    const m=await ev('(()=>{const i='+input+'.getBoundingClientRect(),l='+list+'.getBoundingClientRect(),options=[...'+list+'.querySelectorAll("[role=option]")];return {dir:getComputedStyle('+input+').direction,open:!'+list+'.hidden,overflow:document.documentElement.scrollWidth>innerWidth,inside:l.left>=i.left-1&&l.right<=i.right+1&&l.right<=innerWidth,touch:options.every(o=>o.getBoundingClientRect().height>=44),inputHeight:i.height}})()');
+    assert.equal(m.dir,'rtl');assert.equal(m.open,true,'open '+width);assert.equal(m.overflow,false,'overflow '+width);
+    assert.equal(m.inside,true,'listbox stays within the control '+width);assert.equal(m.touch,true,'44px options '+width);assert.ok(m.inputHeight>=44);
+    await key('Escape');
+   }
+   await call('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
+   await type('אשדוד');await key('Escape');
   });
   await t.test('Member tokens never appear in logs or rendered content',async()=>{
    const page=await ev('document.documentElement.outerHTML'),logs=await ev('logged.join("\\n")');
@@ -322,7 +411,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    await ev('widget.remove();widget.dataset.serviceUrl='+JSON.stringify(fallback)+';document.querySelector("main").append(widget)');
    await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('widget.origin.origin'),fallback);
-   await ev('group.status="OPEN";quantity=1;widget.querySelector("[name=area]").value="Fixture area";void widget.perform(()=>widget.find())');
+   await ev('group.status="OPEN";quantity=1;widget.querySelector("[name=area]").value="אשדוד";void widget.perform(()=>widget.find())');
    await wait('!widget.hasAttribute("aria-busy")');
    assert.ok(await ev('requests.some(r=>r.url==='+JSON.stringify(fallback+'/api/v1/groups/find')+')'));
    assert.equal(await ev('widget.querySelector("[data-group-panel]").hidden'),false);

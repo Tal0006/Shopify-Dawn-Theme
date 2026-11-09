@@ -8,6 +8,8 @@
  // SHOPIFY_UNAVAILABLE and GROUP_CLOSED (an approved group still needs its members) all keep it.
  const RECEIPT_INVALIDATING_CODES=new Set(['MEMBER_AUTH_REQUIRED','GROUP_NOT_FOUND']);
  const storage=name=>{try{return window[name]||null;}catch{return null;}};
+ // Filtering only; the server resolves areas by publicId and never trusts a typed name.
+ const areaKey=name=>String(name).normalize('NFKC').toLocaleLowerCase().replace(/[\s'"״׳.()-]+/g,' ').trim();
  class GroupDelivery extends HTMLElement {
   // Render cold starts can take close to a minute: announce the wait, then fail at a finite limit.
   static wakeDelay=12000;
@@ -15,7 +17,9 @@
   static cartTimeout=10000;
   connectedCallback(){
    if(this.lifecycle)return;
-   this.lifecycle=new AbortController();this.requests=new Set();this.coords=null;this.busy=false;this.pending=false;
+   this.lifecycle=new AbortController();this.requests=new Set();this.busy=false;this.pending=false;
+   this.areas=[];this.area=null;this.options=[];this.active=-1;
+   this.areaInput=this.querySelector('[data-area-input]');this.areaList=this.querySelector('[data-area-list]');this.areaStatus=this.querySelector('[data-area-selected]');
    this.message=this.querySelector('[data-group-message]');this.group=null;this.querySelector('[data-validated-pledge]').hidden=true;
    this.currency=new Intl.NumberFormat(this.dataset.locale||'he',{style:'currency',currency:'ILS'});
    this.labels=JSON.parse(this.querySelector('[data-group-labels]').textContent);
@@ -33,21 +37,113 @@
    this.querySelector('[data-join-group]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.join(),event.submitter);},options);
    this.querySelector('[data-share]').addEventListener('click',()=>this.share(),options);
    this.querySelector('[data-refresh]').addEventListener('click',event=>{void this.perform(()=>this.refresh(),event.currentTarget);},options);
-   this.querySelector('[name=area]').addEventListener('input',()=>{this.coords=null;this.invalidateSearch();},options);
-   this.querySelector('[data-geolocate]').addEventListener('click',()=>{
-    if(!navigator.geolocation){this.message.textContent=this.dataset.geoError;return;}
-    // This is the only geolocation invocation; explicit customer click is required.
-    navigator.geolocation.getCurrentPosition(position=>{
-     if(!this.isConnected)return;
-     this.coords={lat:Math.round(position.coords.latitude*100)/100,lng:Math.round(position.coords.longitude*100)/100};this.invalidateSearch();
-     this.message.textContent=this.dataset.geoReady;
-    },()=>{if(this.isConnected)this.message.textContent=this.dataset.geoError;},{enableHighAccuracy:false,timeout:10000,maximumAge:300000});
+   this.areaInput.addEventListener('input',()=>this.onAreaInput(),options);
+   this.areaInput.addEventListener('keydown',event=>this.onAreaKeydown(event),options);
+   this.areaInput.addEventListener('click',()=>this.openAreas(),options);
+   this.areaInput.addEventListener('focus',()=>this.openAreas(),options);
+   // pointerdown keeps focus in the input, so selection never loses the combobox context.
+   this.areaList.addEventListener('pointerdown',event=>{
+    const option=event.target.closest('[role=option]');if(!option)return;
+    event.preventDefault();const area=this.areas.find(item=>item.publicId===option.dataset.areaId);if(area)this.selectArea(area);
    },options);
+   this.querySelector('[data-area-picker]').addEventListener('focusout',event=>{if(!this.querySelector('[data-area-picker]').contains(event.relatedTarget))this.closeAreas();},options);
+   document.addEventListener('pointerdown',event=>{if(!this.querySelector('[data-area-picker]')?.contains(event.target))this.closeAreas();},options);
+   // The only geolocation request; it needs this explicit click.
+   this.querySelector('[data-geolocate]').addEventListener('click',()=>{void this.locate();},options);
    void this.perform(async()=>{
-    await this.cart();
+    const results=await Promise.allSettled([this.loadAreas(),this.cart()]);
     const receipt=this.latestReceipt();
     if(receipt)this.show((await this.withReceipt(receipt.publicId,()=>this.api('/groups/'+receipt.publicId))).group);
+    const failed=results.find(result=>result.status==='rejected');if(failed)throw failed.reason;
    });
+  }
+  // Server-owned list of active areas (publicId + name only).
+  async loadAreas(){
+   const data=await this.api('/areas');
+   if(!Array.isArray(data.areas))throw failure('INVALID_RESPONSE');
+   this.areas=data.areas.filter(area=>area&&typeof area.publicId==='string'&&UUID.test(area.publicId)&&typeof area.name==='string'&&area.name.trim()).map(area=>({publicId:area.publicId,name:area.name,key:areaKey(area.name)}));
+   if(this.area&&!this.areas.some(area=>area.publicId===this.area.publicId))this.clearArea();
+   if(!this.areas.length)throw failure('AREAS_EMPTY');
+  }
+  openAreas(){if(!this.areas.length||this.busy)return;this.renderAreas(this.area&&this.areaInput.value===this.area.name?'':this.areaInput.value);}
+  renderAreas(query){
+   const key=areaKey(query);
+   // Names (or words) that start with the query come first, then other substring matches, each in server order.
+   const starts=area=>area.key.startsWith(key)||area.key.includes(' '+key);
+   this.options=this.areas.filter(area=>!key||area.key.includes(key)).sort((a,b)=>key?Number(starts(b))-Number(starts(a)):0);
+   this.areaStatus.hidden=true;
+   if(!this.options.length){
+    this.closeAreas();
+    if(key){this.areaStatus.hidden=false;this.areaStatus.textContent=this.dataset.areaEmpty;}
+    return;
+   }
+   const listId=this.areaList.id;
+   this.areaList.replaceChildren(...this.options.map((area,index)=>{
+    const option=document.createElement('li');option.id=listId+'-'+index;option.setAttribute('role','option');option.dataset.areaId=area.publicId;
+    option.setAttribute('aria-selected',String(this.area?.publicId===area.publicId));option.textContent=area.name;return option;
+   }));
+   this.areaList.hidden=false;this.areaInput.setAttribute('aria-expanded','true');
+   this.setActive(this.options.findIndex(area=>area.publicId===this.area?.publicId));
+  }
+  closeAreas(){
+   if(!this.areaList)return;
+   this.areaList.hidden=true;this.areaInput.setAttribute('aria-expanded','false');this.areaInput.removeAttribute('aria-activedescendant');this.active=-1;
+   if(this.area)this.showSelectedArea();
+  }
+  setActive(index){
+   this.active=index;
+   [...this.areaList.children].forEach((option,i)=>option.toggleAttribute('data-active',i===index));
+   const option=this.areaList.children[index];
+   if(option){this.areaInput.setAttribute('aria-activedescendant',option.id);option.scrollIntoView({block:'nearest'});}
+   else this.areaInput.removeAttribute('aria-activedescendant');
+  }
+  onAreaKeydown(event){
+   if(event.isComposing)return;
+   const open=!this.areaList.hidden;
+   if(event.key==='ArrowDown'||event.key==='ArrowUp'){
+    event.preventDefault();
+    if(!open){this.openAreas();if(this.areaList.hidden)return;}
+    const last=this.options.length-1;
+    this.setActive(event.key==='ArrowDown'?(this.active<last?this.active+1:0):(this.active>0?this.active-1:last));
+   }else if(event.key==='Enter'&&open&&this.active>=0){event.preventDefault();this.selectArea(this.options[this.active]);}
+   else if(event.key==='Escape'){
+    if(open){event.preventDefault();event.stopPropagation();this.closeAreas();}
+    else if(this.areaInput.value){event.preventDefault();this.areaInput.value='';this.clearArea();this.invalidateSearch();}
+   }else if(event.key==='Tab')this.closeAreas();
+  }
+  onAreaInput(){
+   if(this.area&&this.areaInput.value!==this.area.name)this.clearArea();
+   this.invalidateSearch();this.renderAreas(this.areaInput.value);
+  }
+  selectArea(area){
+   const changed=this.area?.publicId!==area.publicId;
+   this.area=area;this.areaInput.value=area.name;this.closeAreas();this.showSelectedArea();
+   if(changed)this.invalidateSearch();
+  }
+  showSelectedArea(){this.areaStatus.hidden=false;this.areaStatus.textContent=this.dataset.areaSelectedLabel.replace('__AREA__',this.area.name);}
+  clearArea(){this.area=null;this.areaStatus.hidden=true;this.areaStatus.textContent='';}
+  // A typed name counts only when it exactly equals one listed area; otherwise the shopper must pick from the list.
+  chosenArea(){
+   if(this.area&&this.areaInput.value===this.area.name)return this.area;
+   const key=areaKey(this.areaInput.value),exact=key?this.areas.filter(area=>area.key===key):[];
+   if(exact.length===1){this.selectArea(exact[0]);return exact[0];}
+   return null;
+  }
+  // Explicit button only. Coarse (~1 km) coordinates are sent once to pick a town; nothing stores them.
+  async locate(){
+   if(this.busy||!this.origin)return;
+   if(!navigator.geolocation){this.message.textContent=this.dataset.geoUnsupported;return;}
+   let position;
+   try{position=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:false,timeout:10000,maximumAge:300000}));}
+   catch(error){if(this.isConnected)this.message.textContent=error?.code===1?this.dataset.geoDenied:this.dataset.geoError;return;}
+   if(!this.isConnected)return;
+   const latitude=Math.round(position.coords.latitude*100)/100,longitude=Math.round(position.coords.longitude*100)/100;
+   await this.perform(async()=>{
+    const result=await this.api('/areas/nearest',{latitude,longitude});
+    const area=typeof result.area?.publicId==='string'?this.areas.find(item=>item.publicId===result.area.publicId):undefined;
+    if(!area){this.message.textContent=this.dataset.geoNone;return;}
+    this.selectArea(area);this.message.textContent=this.dataset.geoSelected.replace('__AREA__',area.name);
+   },this.querySelector('[data-geolocate]'));
   }
   disconnectedCallback(){this.lifecycle?.abort();this.requests?.forEach(request=>request.abort());this.lifecycle=null;}
   // Receipts: {publicId, memberToken, savedAt}. No contact details, cart, coordinates or payment data are stored.
@@ -174,20 +270,15 @@
     return this.lines;
    }finally{clearTimeout(timer);this.requests.delete(controller);}
   }
-  place(){return {areaName:this.querySelector('[name=area]').value.trim(),...(this.coords||{})};}
-  // Read-only search. Temporary safety net for a service older than the staged rollout: it answers /groups/find with
-  // 404 NOT_FOUND, so fall back once to the deprecated /groups/find-or-create. Remove in the staged-deployment cleanup
-  // (tools/group-delivery/README.md), together with the legacy route.
-  async search(body){
-   try{return await this.api('/groups/find',body);}
-   catch(error){if(error?.code!=='NOT_FOUND')throw error;return this.api('/groups/find-or-create',body);}
-  }
+  // Read-only, area-based search. The service resolves areaPublicId; free text is never sent. This requires the
+  // area-aware service (deploy it before this theme), so there is no fallback to the legacy find-or-create route.
   async find(){
+   this.closeAreas();const area=this.chosenArea();if(!area)throw failure('AREA_REQUIRED');
    const lines=await this.cart();if(!lines.length)throw failure('CART_EMPTY');
-   this.foundPlace=this.place();
-   const result=await this.search({location:this.foundPlace,lines});
+   this.foundPlace=area;
+   const result=await this.api('/groups/find',{areaPublicId:area.publicId,lines});
    if(result.group){this.show(result.group);this.message.textContent=this.dataset.found;}
-   else{this.showPending(this.foundPlace.areaName);this.message.textContent=this.dataset.noneFound;}
+   else{this.showPending(area.name);this.message.textContent=this.dataset.noneFound;}
    if(result.withinStandardRadius===true)this.message.textContent=this.dataset.standard;
    this.pledge(result);
   }
@@ -209,8 +300,8 @@
    }
    if(!this.foundPlace||(!this.group&&!this.pending))throw failure('DEFAULT');
    const form=this.querySelector('[data-join-group]');
-   const body={location:this.foundPlace,lines,email:form.querySelector('[name=email]').value,phone:form.querySelector('[name=phone]').value};
-   // A shown group is joined directly; with no group yet, the service re-checks the area under its lock and
+   const body={areaPublicId:this.foundPlace.publicId,lines,email:form.querySelector('[name=email]').value,phone:form.querySelector('[name=phone]').value};
+   // A shown group is joined directly; with no group yet, the service re-checks the same area under its lock and
    // creates the group only now, with this shopper as its first member.
    const result=await this.api(this.group?'/groups/'+this.group.publicId+'/join':'/groups/join',body);
    if(!TOKEN.test(result.memberToken)||!UUID.test(result.group?.publicId))throw failure('INVALID_RESPONSE');
