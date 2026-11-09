@@ -220,7 +220,8 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   });
   await t.test('Area combobox: filtering, keyboard navigation, selection state and exact typed names',async()=>{
    await ev('existing=true;group.status="OPEN";'+input+'.value="";widget.clearArea();widget.closeAreas()');
-   await ev(input+'.focus()');
+   // focus() fires no event when the input already has focus (perform() may restore it), so blur first.
+   await wait('!widget.hasAttribute("aria-busy")');await ev(input+'.blur();'+input+'.focus()');
    assert.equal(await ev(input+'.getAttribute("aria-expanded")'),'true');
    assert.equal((await optionNames()).length,7);
    assert.equal(await ev(input+'.getAttribute("role")'),'combobox');assert.equal(await ev(list+'.getAttribute("role")'),'listbox');
@@ -283,6 +284,35 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.deepEqual(await optionNames(),['שדרות','אשדוד'],'names starting with the query rank first');
    await key('ArrowDown');await key('Enter');
    assert.equal(await ev('widget.area.name'),'שדרות');assert.equal(await ev(input+'.disabled'),false);
+  });
+  await t.test('Open listbox paints above the search button and other form controls; closed button stays clickable',async()=>{
+   const button='widget.querySelector("[data-find-group] button[type=submit]")';
+   // Diagnostics only: every ancestor/sibling that creates a stacking context, to explain a failure.
+   const contexts='(()=>{const out=[];const add=el=>{const s=getComputedStyle(el);if(s.position!=="static"&&s.zIndex!=="auto"||s.isolation==="isolate"||s.transform!=="none"||Number(s.opacity)<1||s.filter!=="none"||s.backdropFilter&&s.backdropFilter!=="none"||s.willChange!=="auto"||s.contain!=="none")out.push((el.className||el.tagName)+" z="+s.zIndex+" pos="+s.position+" iso="+s.isolation+" tf="+s.transform);};for(let el='+list+';el;el=el.parentElement)add(el);add('+button+');return out.join(" | ")})()';
+   for(const width of [320,390,768,1280]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:800,deviceScaleFactor:1,mobile:width<992});
+    await ev(input+'.value="";widget.clearArea();'+input+'.scrollIntoView({block:"start"});'+input+'.focus();widget.openAreas()');
+    const probe=await ev('(()=>{const b='+button+'.getBoundingClientRect(),l='+list+'.getBoundingClientRect();const x=Math.max(b.left,l.left)+Math.min(b.width,l.width)/2,y=Math.max(b.top,l.top)+Math.max(1,Math.min(b.bottom,l.bottom)-Math.max(b.top,l.top))/2;const hit=document.elementFromPoint(x,y);return {overlap:b.left<l.right&&b.right>l.left&&b.top<l.bottom&&b.bottom>l.top,inList:!!hit?.closest("[data-area-list]"),hit:hit?.tagName+"."+(hit?.className||""),overflow:document.documentElement.scrollWidth>innerWidth}})()');
+    assert.equal(probe.overlap,true,'fixture: the open list should cover the button at '+width+'px');
+    assert.equal(probe.inList,true,'button painted above the listbox at '+width+'px (hit '+probe.hit+'); stacking: '+await ev(contexts));
+    assert.equal(probe.overflow,false,'overflow '+width);
+    // Every other visible control the open list overlaps (geolocate, panel buttons, fields) is painted beneath it.
+    const covered=await ev('(()=>{const l='+list+'.getBoundingClientRect(),bad=[];for(const el of widget.querySelectorAll("button,input:not([data-area-input])")){const b=el.getBoundingClientRect();if(!b.width||!(b.left<l.right&&b.right>l.left&&b.top<l.bottom&&b.bottom>l.top))continue;const x=(Math.max(b.left,l.left)+Math.min(b.right,l.right))/2,y=(Math.max(b.top,l.top)+Math.min(b.bottom,l.bottom))/2;if(!document.elementFromPoint(x,y)?.closest("[data-area-list]"))bad.push(el.textContent.trim()||el.name);}return bad})()');
+    assert.deepEqual(covered,[],'controls above the open list at '+width+'px');
+    // Long lists scroll inside the listbox, and the last option is reachable by keyboard and pointer.
+    assert.ok(await ev(list+'.scrollHeight>='+list+'.clientHeight'));
+    await key('ArrowUp');
+    assert.equal(await ev(list+'.querySelector("[data-active]").textContent'),'שדרות');
+    const last=await ev('(()=>{const o='+list+'.querySelector("[data-active]").getBoundingClientRect(),l='+list+'.getBoundingClientRect();return o.top>=l.top-1&&o.bottom<=l.bottom+1})()');
+    assert.equal(last,true,'active option scrolled into view');
+    const clicked=await ev('(()=>{const o='+list+'.querySelector("[data-active]").getBoundingClientRect();const hit=document.elementFromPoint(o.left+o.width/2,o.top+o.height/2);hit.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,cancelable:true}));return widget.area?.name})()');
+    assert.equal(clicked,'שדרות','pointer on the visible option selects it');
+    assert.equal(await ev(list+'.hidden'),true);
+    // Closed: the button is the topmost element at its own center again.
+    const free=await ev('(()=>{const b='+button+'.getBoundingClientRect();return document.elementFromPoint(b.left+b.width/2,b.top+b.height/2)?.closest("button")==='+button+'})()');
+    assert.equal(free,true,'closed listbox must not block the button at '+width+'px');
+   }
+   await call('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
   });
   await t.test('Combobox fits RTL mobile and desktop widths with touch-sized options',async()=>{
    for(const width of [320,360,375,390,768,1280]){
