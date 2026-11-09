@@ -259,7 +259,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    await type(' אשקלון ');await ev('widget.querySelector("[data-find-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('requests.filter(r=>r.url.endsWith("/groups/find")).at(-1).body.areaPublicId'),ASHKELON);
    assert.equal(await ev(list+'.hidden'),true);
-   assert.ok(await ev('requests.every(r=>!r.url.includes("find-or-create"))'),'the new client never uses the legacy route');
+   assert.ok(await ev('requests.every(r=>!r.url.includes("find-or-create"))'),'search uses only /groups/find');
   });
   await t.test('Location denied, failing, unsupported or far away keeps manual selection fully usable',async()=>{
    await ev('widget.clearArea();'+input+'.value=""');

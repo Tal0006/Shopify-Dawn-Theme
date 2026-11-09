@@ -270,8 +270,8 @@
     return this.lines;
    }finally{clearTimeout(timer);this.requests.delete(controller);}
   }
-  // Read-only, area-based search. The service resolves areaPublicId; free text is never sent. This requires the
-  // area-aware service (deploy it before this theme), so there is no fallback to the legacy find-or-create route.
+  // The only search endpoint: read-only and area-based. The service resolves areaPublicId; free text is never sent.
+  // Search never creates a group: a miss shows the no-group state, and only Join (/groups/join) may create one.
   async find(){
    this.closeAreas();const area=this.chosenArea();if(!area)throw failure('AREA_REQUIRED');
    const lines=await this.cart();if(!lines.length)throw failure('CART_EMPTY');

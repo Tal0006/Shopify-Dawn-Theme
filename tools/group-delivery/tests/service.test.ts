@@ -10,7 +10,7 @@ import {Groups} from '../src/groups.js';
 import {Areas} from '../src/areas.js';
 import {Shopify} from '../src/shopify.js';
 import {config} from '../src/config.js';
-import {agorot,location,distance,lines,contact,localityKey,ApiError} from '../src/domain.js';
+import {agorot,placeName,distance,lines,contact,localityKey,hash,ApiError} from '../src/domain.js';
 import {migrate,type Database,type Connection} from '../src/db.js';
 // Seeded in migrations/002_delivery_areas.sql with fixed public IDs.
 const AREA={beerSheva:'6f1a2c00-0001-4a00-8000-0000000000a1',ashdod:'6f1a2c00-0002-4a00-8000-0000000000a2',ashkelon:'6f1a2c00-0003-4a00-8000-0000000000a3',kiryatGat:'6f1a2c00-0004-4a00-8000-0000000000a4',netivot:'6f1a2c00-0005-4a00-8000-0000000000a5',ofakim:'6f1a2c00-0006-4a00-8000-0000000000a6',sderot:'6f1a2c00-0007-4a00-8000-0000000000a7'};
@@ -53,13 +53,11 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
  cfg.origin='http://127.0.0.1:'+(server.address() as any).port;
  const line=(quantity=2)=>[{variantId:'1',quantity}];
- const place=(lat=31.8,lng=34.64)=>({areaName:'אשדוד',lat,lng});
  let personIndex=0;
  const person=()=>({email:'fixture'+(++personIndex)+'@example.test',phone:'+972501'+String(personIndex).padStart(6,'0')});
  const post=(path:string,body:any,extra:Record<string,string>={})=>fetch(cfg.origin+path,{method:'POST',headers:{Origin:cfg.origin,'Content-Type':'application/json',...extra},body:JSON.stringify(body),redirect:'manual'});
  const find=async(area=AREA.ashdod)=>service.find({areaPublicId:area});
  const start=(area=AREA.ashdod,quantity=2,who=person())=>service.joinArea({...who,areaPublicId:area,lines:line(quantity)});
- const legacy=(loc:any=place())=>service.legacyFindOrCreate({location:loc});
  const count=async(table:string)=>Number((await db.query('SELECT COUNT(*)::int AS n FROM '+table)).rows[0].n);
  const publicAreas=async()=>((await (await fetch(cfg.origin+'/api/v1/areas')).json()) as any).areas as {publicId:string;name:string}[];
  t.beforeEach(async()=>{mode='ok';state.log=null;state.failMemberInsert=false;barrier=null;await db.query('TRUNCATE group_members, delivery_groups, request_limits, admin_sessions CASCADE');});
@@ -215,51 +213,39 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    const other=await Promise.all([start(AREA.ofakim),start(AREA.ofakim)]);
    assert.equal(other[0].group.publicId,other[1].group.publicId);assert.equal(await count('delivery_groups'),2);
   });
-  await t.test('DEPRECATED find-or-create keeps the old client contract while /groups/find stays read-only',async()=>{
-   // New search on a miss: null, and no writes to group tables over HTTP.
+  await t.test('the retired create-on-search route is gone and free text never selects or creates a group',async()=>{
    state.log=[];
-   const miss=await (await post('/api/v1/groups/find',{areaPublicId:AREA.ashdod,lines:line()})).json() as any;
-   assert.equal(miss.group,null);assert.equal(miss.canCreateOnJoin,true);
-   assert.ok(!writes().some(sql=>/delivery_groups|group_members/.test(sql)),'find must not touch group tables');
-   state.log=null;assert.equal(await count('delivery_groups'),0);
-   // Legacy text naming an area keeps the old shape (non-null group, created on a miss) and lands in that area.
-   const response=await post('/api/v1/groups/find-or-create',{location:{areaName:'אשדוד'},lines:line()});
-   assert.equal(response.status,200);assert.equal(response.headers.get('deprecation'),'true');
-   const old=await response.json() as any;
-   assert.deepEqual(Object.keys(old).sort(),['group','validatedPledgeAgorot','withinStandardRadius']);
-   assert.match(old.group.publicId,/^[a-f0-9-]{36}$/);assert.equal(old.group.participantCount,0);assert.equal(old.validatedPledgeAgorot,25000);
-   assert.ok(!('canCreateOnJoin' in old),'legacy shape must not change');
-   assert.equal((await find()).group.publicId,old.group.publicId,'old and new clients converge on the area group');
-   // Exact alias spellings reach the same area group; unknown names stay separate legacy text groups.
-   assert.equal((await legacy({areaName:'Ashdod'})).group.publicId,old.group.publicId);
-   const unknown=await legacy({areaName:'תל אביב'});assert.notEqual(unknown.group.publicId,old.group.publicId);
-   // The old client then joins by publicId with free text exactly as before.
-   const joined=await post('/api/v1/groups/'+old.group.publicId+'/join',{...person(),location:{areaName:'אשדוד'},lines:line()});
-   assert.equal(joined.status,201);const member=await joined.json() as any;
-   assert.match(member.memberToken,/^[a-f0-9]{64}$/);assert.equal(member.group.participantCount,1);
-   // Legacy coordinate searches keep creating legacy coordinate groups that area searches never return.
-   const coordinate=await legacy(place());assert.notEqual(coordinate.group.publicId,old.group.publicId);
-   assert.equal((await find()).group.publicId,old.group.publicId);
-   // The new join flow is unchanged next to the legacy route.
-   const started=await post('/api/v1/groups/join',{...person(),areaPublicId:AREA.ashkelon,lines:line()});
-   assert.equal(started.status,201);const fresh=await started.json() as any;
-   assert.equal(fresh.created,true);assert.equal(fresh.group.participantCount,1);
-   assert.equal((await service.joinArea({...person(),areaPublicId:AREA.ashdod,lines:line()})).group.publicId,old.group.publicId);
+   const retired=await post('/api/v1/groups/find-or-create',{location:{areaName:'אשדוד'},lines:line()});
+   assert.equal(retired.status,404);assert.equal(((await retired.json()) as any).code,'NOT_FOUND');
+   assert.equal(retired.headers.get('deprecation'),null);
+   assert.ok(!writes().some(sql=>/delivery_groups|group_members/.test(sql)),'the retired route writes nothing');
+   state.log=null;
+   assert.equal((await post('/api/v1/groups/find',{location:{areaName:'אשדוד'}})).status,400);
+   const created=await start();
+   const freeText=await post('/api/v1/groups/'+created.group.publicId+'/join',{...person(),location:{areaName:'אשדוד'},lines:line()});
+   assert.equal(freeText.status,400);assert.equal(((await freeText.json()) as any).code,'INVALID_AREA');
+   assert.equal(await count('delivery_groups'),1);assert.equal((await service.get(created.group.publicId)).participantCount,1);
   });
-  await t.test('legacy coordinate groups keep fixed-anchor anti-chain matching and approximate coordinate privacy',async()=>{
-   const first=await legacy(place());
-   await service.join(first.group.publicId,{...person(),location:place(31.85,34.64),lines:line(1)});
-   const chained=await legacy(place(31.9,34.64));assert.notEqual(chained.group.publicId,first.group.publicId);
-   const row=(await db.query('SELECT anchor_lat,center_lat,area_id FROM delivery_groups WHERE public_id=$1',[first.group.publicId])).rows[0];
-   assert.equal(row.anchor_lat,31.8);assert.ok(row.center_lat>row.anchor_lat);assert.equal(row.area_id,null);
-   const geo=await legacy({areaName:'אשקלון',lat:31.612345,lng:34.554321});
-   const anchor=(await db.query('SELECT anchor_lat,anchor_lng FROM delivery_groups WHERE public_id=$1',[geo.group.publicId])).rows[0];
-   assert.equal(anchor.anchor_lat,31.61);assert.equal(anchor.anchor_lng,34.55);
-   assert.ok(!JSON.stringify(geo).includes('31.61'));
-   // Area places never join legacy coordinate groups, and legacy coordinates never join area groups.
-   await assert.rejects(()=>service.join(first.group.publicId,{...person(),areaPublicId:AREA.ashdod,lines:line()}),(e:any)=>e.code==='LOCATION_OUTSIDE_GROUP');
-   const area=await start();
-   await assert.rejects(()=>service.join(area.group.publicId,{...person(),location:place(),lines:line()}),(e:any)=>e.code==='LOCATION_OUTSIDE_GROUP');
+  await t.test('pre-areas groups stay readable; their members update and withdraw; new joins are refused',async()=>{
+   const legacyGroup=async(publicId:string,lat:number|null,lng:number|null)=>(await db.query("INSERT INTO delivery_groups(id,public_id,area_name,locality_key,anchor_lat,anchor_lng,center_lat,center_lng,threshold_agorot,pledged_total_agorot,expires_at) VALUES(gen_random_uuid(),$1,'אשדוד','אשדוד',$2,$3,$2,$3,50000,25000,NOW()+INTERVAL '3 days') RETURNING id",[publicId,lat,lng])).rows[0].id;
+   const legacyMember=async(groupId:string,token:string,lat:number|null,lng:number|null)=>db.query("INSERT INTO group_members(id,group_id,email,phone,locality_key,approx_lat,approx_lng,cart_snapshot,pledged_total_agorot,token_hash) VALUES(gen_random_uuid(),$1,$2,$3,'אשדוד',$4,$5,'[]'::jsonb,25000,$6)",[groupId,'old'+token.slice(0,4)+'@example.test','+97250'+token.slice(0,7).replace(/\D/g,'7').padEnd(7,'7'),lat,lng,hash(token)]);
+   const coordinate='22222222-0000-4000-8000-000000000001',text='22222222-0000-4000-8000-000000000002';
+   const coordinateToken='1'.repeat(64),textToken='2'.repeat(64);
+   await legacyMember(await legacyGroup(coordinate,31.8,34.64),coordinateToken,31.81,34.65);
+   await legacyMember(await legacyGroup(text,null,null),textToken,null,null);
+   for(const id of [coordinate,text])assert.equal((await service.get(id)).participantCount,1);
+   // Area searches never offer them; a new area group is created next to them on Join.
+   assert.equal((await find()).group,null);
+   await assert.rejects(()=>service.join(coordinate,{...person(),areaPublicId:AREA.ashdod,lines:line()}),(e:any)=>e.code==='LOCATION_OUTSIDE_GROUP');
+   await assert.rejects(()=>service.join(text,{...person(),areaPublicId:AREA.ashdod,lines:line()}),(e:any)=>e.code==='LOCATION_OUTSIDE_GROUP');
+   // Existing members keep their receipts: update, cross the threshold, withdraw.
+   const reached=await service.update(coordinate,coordinateToken,{lines:line(4)});
+   assert.equal(reached.group.status,'THRESHOLD_REACHED');assert.equal(reached.group.pledgedTotalAgorot,50000);
+   const anchor=(await db.query('SELECT anchor_lat,center_lat FROM delivery_groups WHERE public_id=$1',[coordinate])).rows[0];
+   assert.equal(anchor.anchor_lat,31.8,'fixed anchor kept');assert.equal(anchor.center_lat,31.81,'center from the existing member');
+   const withdrawn=await service.update(text,textToken,{lines:[]});
+   assert.equal(withdrawn.group.participantCount,0);assert.equal(withdrawn.group.pledgedTotalAgorot,0);
+   assert.equal(await count('delivery_groups'),2,'no group rows created or deleted');
   });
   await t.test('duplicate membership and concurrent joins preserve integer totals',async()=>{
    const group=(await start()).group,who=person();
@@ -286,9 +272,8 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    assert.equal((await find()).group,null,'expired groups are not offered');
   });
   await t.test('invalid locations, invalid/unavailable carts and exact money arithmetic',async()=>{
-   for(const input of [{areaName:'a'},{areaName:'email@example.test'},{areaName:'אשדוד',lat:91,lng:34},{areaName:'אשדוד',lat:30}]){
-    assert.throws(()=>location(input),ApiError);
-   }
+   for(const input of ['a','email@example.test','אשדוד 12','',42])assert.throws(()=>placeName(input),ApiError);
+   assert.equal(placeName(' קריית גת '),'קריית גת');
    for(const phone of ['0501234567','972501234567','00972501234567','+972501234567'])assert.equal(contact({email:'fixture@example.test',phone}).phone,'+972501234567');
    assert.equal(agorot('19.90')*3n,5970n);assert.equal(agorot('0.10')+agorot('0.20'),30n);assert.throws(()=>agorot('1.001'));
    assert.ok(distance({lat:31.8,lng:34.64},{lat:31.8,lng:34.64})<0.001);
@@ -322,7 +307,6 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    assert.equal((await post('/api/v1/groups/find',{areaPublicId:AREA.ashdod},{Origin:'https://evil.example'})).status,403);
    assert.equal((await post('/api/v1/groups/join',{...person(),areaPublicId:AREA.ashdod,lines:line()},{Origin:'https://evil.example'})).status,403);
    assert.equal((await post('/api/v1/areas/nearest',{latitude:31.8,longitude:34.64},{Origin:'https://evil.example'})).status,403);
-   assert.equal((await post('/api/v1/groups/find-or-create',{location:place()},{Origin:'https://evil.example'})).status,403,'legacy route keeps origin checks');
    assert.equal((await post('/api/v1/groups/find',{areaPublicId:AREA.ashdod,padding:'x'.repeat(30000)})).status,413);
    await db.query('TRUNCATE request_limits');
    for(let i=0;i<20;i++)assert.equal((await post('/api/v1/groups/find',{areaPublicId:AREA.ashdod})).status,200);
@@ -436,15 +420,17 @@ test('Delivery-areas migration maps only exact text-only legacy groups and rewri
   const after=(await db.query('SELECT public_id,area_name,locality_key,anchor_lat,status,pledged_total_agorot FROM delivery_groups ORDER BY public_id')).rows;
   assert.deepEqual(after,before,'names, keys, coordinates, status and totals unchanged');
   assert.equal(Number((await db.query('SELECT COUNT(*)::int AS n FROM group_members')).rows[0].n),1);
-  // Mapped groups join area matching; unmapped groups stay readable and joinable through legacy paths.
+  // Mapped groups join area matching; unmapped groups stay readable and their members keep updating via receipts.
   const cfg=config({PORT:'4330',DATABASE_URL:'postgresql://test',ADMIN_USERNAME:'merchant',ADMIN_PASSWORD:'testing-password-long-only',SESSION_SECRET:'testing-session-secret-not-real-00000000',SHOPIFY_STORE_DOMAIN:'example.myshopify.com',SHOPIFY_STOREFRONT_PRIVATE_TOKEN:'test-private-shopify-token',APP_ORIGIN:'http://127.0.0.1:4330'});
   const validator={validate:async()=>({total:12500n,snapshot:[{variantId:'gid://shopify/ProductVariant/1',quantity:1,unitAgorot:'12500'}]})};
   const service=new Groups(db,cfg,validator);
   assert.equal((await service.find({areaPublicId:AREA.kiryatGat})).group.publicId,ids.kiryat);
   assert.equal((await service.find({areaPublicId:AREA.ashdod})).group.publicId,ids.english,'coordinate legacy group is never offered to area search');
   for(const id of Object.values(ids))assert.equal((await service.get(id)).publicId,id);
-  const joined=await service.join(ids.unknown,{email:'later@example.test',phone:'+972502222222',location:{areaName:'תל אביב'},lines:[{variantId:'1',quantity:1}]});
-  assert.equal(joined.group.participantCount,1);
+  const unknownId=(await db.query('SELECT id FROM delivery_groups WHERE public_id=$1',[ids.unknown])).rows[0].id,token='3'.repeat(64);
+  await db.query("INSERT INTO group_members(id,group_id,email,phone,locality_key,cart_snapshot,pledged_total_agorot,token_hash) VALUES(gen_random_uuid(),$1,'tlv@example.test','+972503333333','תל אביב','[]'::jsonb,12500,$2)",[unknownId,hash(token)]);
+  assert.equal((await service.update(ids.unknown,token,{lines:[{variantId:'1',quantity:2}]})).validatedPledgeAgorot,12500);
+  await assert.rejects(()=>service.join(ids.unknown,{email:'later@example.test',phone:'+972502222222',areaPublicId:AREA.ashdod,lines:[{variantId:'1',quantity:1}]}),(e:any)=>e.code==='LOCATION_OUTSIDE_GROUP');
  }finally{
   await state.engine.close();
   if(resolve(dir).startsWith(join(resolve(tmpdir()),'fankee-group-db-')))await rm(dir,{recursive:true,force:true,maxRetries:3,retryDelay:100});

@@ -63,9 +63,6 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // Search is read-only and area-based (areaPublicId); groups are created only by the first join (POST /groups/join).
  app.post('/api/v1/groups/find',async(req,res)=>res.json(await groups.find(req.body)));
  app.post('/api/v1/groups/join',async(req,res)=>res.status(201).json(await groups.joinArea(req.body)));
- // DEPRECATED: legacy route for the theme live before the staged rollout; still creates on a miss. Never point new
- // clients here. Remove after production traffic uses /groups/find (see README, Staged deployment).
- app.post('/api/v1/groups/find-or-create',async(req,res)=>{res.set('Deprecation','true');res.json(await groups.legacyFindOrCreate(req.body));});
  app.get('/api/v1/groups/:publicId',async(req,res)=>res.json({group:await groups.get(req.params.publicId)}));
  app.post('/api/v1/groups/:publicId/join',async(req,res)=>res.status(201).json(await groups.join(req.params.publicId,req.body)));
  app.post('/api/v1/groups/:publicId/update-pledge',async(req,res)=>{

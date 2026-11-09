@@ -21,8 +21,8 @@ export function agorot(value:unknown):bigint{
  const [whole,fraction='']=value.split('.');
  return BigInt(whole)*100n+BigInt(fraction.slice(0,2).padEnd(2,'0'));
 }
-// areaId set: a server-resolved delivery area (the grouping boundary). Unset: a legacy free-text/coordinate place.
-export interface Location {areaName:string;key:string;lat:number|null;lng:number|null;areaId?:string}
+// A server-resolved delivery area: the only grouping boundary for searches and joins.
+export interface AreaPlace {areaName:string;key:string;areaId:string}
 // Shared normalization for locality keys, area slugs and aliases (migrations/002 seeds use the same form).
 export const localityKey=(name:string)=>name.normalize('NFKC').toLocaleLowerCase().replace(/[\s'״׳.()-]+/g,' ').trim();
 export function placeName(value:unknown):string{
@@ -40,13 +40,6 @@ export function coordinates(body:any){
  const lat=body?.latitude,lng=body?.longitude;
  if(typeof lat!=='number'||typeof lng!=='number'||!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)throw new ApiError(400,'INVALID_COORDINATES');
  return {lat,lng};
-}
-export function location(value:any):Location{
- const areaName=placeName(value?.areaName),key=localityKey(areaName);
- if(value?.lat==null&&value?.lng==null)return {areaName,key,lat:null,lng:null};
- const lat=value.lat,lng=value.lng;
- if(typeof lat!=='number'||typeof lng!=='number'||!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)return fail('INVALID_LOCATION');
- return {areaName,key,lat:Math.round(lat*100)/100,lng:Math.round(lng*100)/100};
 }
 export function distance(a:{lat:number;lng:number},b:{lat:number;lng:number}):number{
  const rad=(v:number)=>v*Math.PI/180;

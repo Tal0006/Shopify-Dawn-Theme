@@ -42,7 +42,6 @@ For Render:
 | SHOPIFY_STOREFRONT_API_VERSION | Default 2026-10; configure a supported Shopify stable version |
 | SHOPIFY_STOREFRONT_PRIVATE_TOKEN | Private Storefront token; server only |
 | STANDARD_DELIVERY_RADIUS_KM | Default 20 |
-| GROUP_CLUSTER_RADIUS_KM | Default 7 |
 | GROUP_THRESHOLD_ILS | Decimal ILS setting, default 500; parsed directly to integer agorot |
 | GROUP_EXPIRY_DAYS | Default 7 |
 | AREA_SUGGESTION_RADIUS_KM | Default 25 (1-100). Nearest-area suggestions beyond this distance return no area |
@@ -84,24 +83,17 @@ Every group mutation locks a shared coordination row inside a PostgreSQL transac
 
 ## Matching and lifecycle
 
-Legacy coordinate mode (unmapped legacy groups and the deprecated route only):
-- Search OPEN, unexpired groups in a latitude prefilter; at most 500 candidates.
-- Use Haversine distance to the immutable anchor and current center.
-- Calculate a spherical mean of active member locations.
-- Require all active members and the new location to remain within the cluster radius of the proposed center.
-- Never move the anchor: a chain of nearby customers cannot walk a group indefinitely outward.
-- Groups are created only by `POST /groups/join`, never by `/groups/find` (the deprecated legacy `find-or-create` route is the temporary exception for the previous theme). The match is repeated inside the lock, so two first joins for the same area produce one group with two members.
+The only flow is: choose an area → `POST /groups/find` (read-only; an existing group or the no-group state) → `POST /groups/join`, which creates the area's group only when none exists. Search never creates a group.
 
-Legacy text mode (unmapped legacy groups and the deprecated route only):
-- Without coordinates, match only the same NFKC-normalized locality text.
-- Text-only and coordinate groups do not silently merge. The 7 km guarantee applies only when coordinates exist.
-- Different spellings/languages are not guessed to be the same city.
+- A search or join for an area matches only that area's OPEN, unexpired group with fewer than 100 membership records; area A never matches area B.
+- Groups are created only by `POST /groups/join`. The match is repeated inside the coordination lock, so two first joins for the same area produce one group with two members.
+- Direct joins (`POST /groups/:publicId/join`) require the group's own area.
 
 Thresholds and expiry are captured when a group is created. Nonzero pledge updates can move OPEN <-> THRESHOLD_REACHED. A zero update withdraws a member and may reopen the group. A matching group has capacity for at most 100 membership records. Merchant approval requires the stored threshold and freezes further member updates. There is no threshold override endpoint.
 
 Expiry is evaluated from PostgreSQL NOW() during reads, matching, joining, updates, listing and approval; it does not depend on a browser timer. OPEN, THRESHOLD_REACHED and APPROVED groups expire. No background payment/shipping jobs run.
 
-STANDARD_DELIVERY_RADIUS_KM is advisory only when store and customer coordinates exist. Without a configured store origin or coordinates, the API returns null, never fabricated delivery eligibility. Existing Shopify shipping rules are not changed.
+STANDARD_DELIVERY_RADIUS_KM is advisory only: it compares the selected area's center with STORE_LATITUDE/STORE_LONGITUDE. Without a configured store origin, the API returns null, never fabricated delivery eligibility. Existing Shopify shipping rules are not changed.
 
 ## Delivery areas
 
@@ -112,13 +104,12 @@ STANDARD_DELIVERY_RADIUS_KM is advisory only when store and customer coordinates
 - **Inactive areas** disappear from `/areas` and nearest-area suggestions and reject new searches and joins (INVALID_AREA). Their existing groups stay readable, members can still update or withdraw, and admin approval still works.
 - **Renaming** an area changes its display name for new groups and the list; the slug and existing groups (and their stored `area_name`) are not rewritten.
 
-### Legacy groups
+### Pre-areas groups
 
-Groups created before areas (free text and/or coordinates) are never deleted or rewritten.
+Groups created before delivery areas (free text and/or coordinates) are historical data: they are never deleted or rewritten.
 
-- The migration links a legacy group to an area only when it is **text-only** (no coordinates) and its stored `locality_key` **exactly** equals an alias. No fuzzy, partial or distance-based matching. Linked groups then take part in area matching.
-- Everything else stays an **unmapped legacy group** (`area_id` NULL): coordinate groups, unknown spellings and other towns. They remain readable by public ID, members keep updating or withdrawing with their receipts, and the live legacy theme can still join them through `/groups/:publicId/join` with `location`. Area searches never return them, so they wind down when they expire (GROUP_EXPIRY_DAYS). The admin list labels them as legacy.
-- The deprecated `/groups/find-or-create` route treats free text that exactly names an active area (any alias) as that area, so old- and new-theme shoppers converge on the same area group. Other text and all coordinate searches keep the old legacy behavior until the route is removed.
+- The `002` migration linked such a group to an area only when it was **text-only** and its stored `locality_key` **exactly** equalled an alias (no fuzzy, partial or distance-based matching). Linked groups take part in area matching like any other area group.
+- Unlinked groups (`area_id` NULL: coordinate groups, unknown spellings, other towns) stay readable by public ID, existing members keep updating or withdrawing with their receipts (coordinate groups keep their fixed anchor/center bookkeeping), and admin approval still applies. Searches never return them and they accept no new members, so they wind down at expiry. The admin list labels them as legacy.
 
 ### Area admin
 
@@ -126,20 +117,9 @@ The existing `/admin` page (same session, Origin and CSRF protection) lists all 
 
 ## APIs
 
-### Staged deployment (read-only search rollout)
+Group creation happens only during Join. The previous create-on-search route (`POST /groups/find-or-create`) has been removed and now returns 404 NOT_FOUND like any unknown path; the storefront has no fallback to it.
 
-The service now ships both the new routes and a **deprecated** legacy route, so it is safe to deploy before the theme.
-
-1. **Deploy the backend first.** The currently live theme keeps working through `POST /groups/find-or-create`.
-2. **Verify `/groups/find` exists:** `POST https://<service>/api/v1/groups/find` with `Origin: <store origin>`, `Content-Type: application/json` and `{"location":{"areaName":"<town>"}}` must return 200 with a `group` field (often `null`) and `canCreateOnJoin`, not 404.
-3. **Test the new theme on a Development Theme.** It calls `/areas`, `/groups/find` and `/groups/join` with `areaPublicId`; searches there create nothing. The area-based theme has no fallback for an older service: it needs this backend.
-4. **Publish the new theme.**
-5. **Verify production traffic uses `/groups/find`.** Legacy responses carry a `Deprecation: true` header; confirm in the Render request logs (or browser DevTools on the live store) that storefront searches hit `/groups/find` and `find-or-create` traffic has stopped, allowing for cached old pages.
-6. **Later cleanup:** remove the legacy route (`legacyFindOrCreate` in `src/groups.ts` and its route in `src/server.ts`), its tests, and `Areas.legacyPlace` once no legacy free-text callers remain. (The area-based theme already has no fallback to it.)
-
-Until step 6, `find-or-create` deliberately keeps the old create-on-search behavior for the old theme only, so old-theme searches can still create empty groups. Groups created by searches (before this change, or through the legacy route) remain in the database as historical data; they are not migrated or deleted.
-
-All JSON bodies are limited to 24 KiB. State-changing public API requests require a configured Origin and application/json. Locality is `{areaName,lat?,lng?}`. Cart lines are `[{variantId:"123456789",quantity:2}]`; Shopify GIDs are also accepted.
+All JSON bodies are limited to 24 KiB. State-changing public API requests require a configured Origin and application/json. Areas are referenced only by `areaPublicId`; free-text locations are rejected. Cart lines are `[{variantId:"123456789",quantity:2}]`; Shopify GIDs are also accepted.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
@@ -147,8 +127,7 @@ All JSON bodies are limited to 24 KiB. State-changing public API requests requir
 | POST | /api/v1/areas/nearest | Body: `{latitude,longitude}` (finite JSON numbers in range, otherwise 400 INVALID_COORDINATES). Returns `{area:{publicId,name}}` for the closest active area within AREA_SUGGESTION_RADIUS_KM, else `{area:null}`. Coordinates are used only for the computation: never stored, logged or echoed. Separate limit: 10 / 10 minutes / IP. |
 | POST | /api/v1/groups/find | Body: `areaPublicId`, optional lines. Read-only: never creates a group or writes. The service resolves the active area; free-text names are not accepted (400 INVALID_AREA). Returns `group` (or `null` when the area has no open group), `canCreateOnJoin` (true when `group` is null), nullable withinStandardRadius (area center vs. store) and optional validatedPledgeAgorot. |
 | POST | /api/v1/groups/join | Body: `areaPublicId`, email, phone, lines. Joins the area: under the coordination lock it expires stale groups, re-resolves the area (it must still be active), re-matches, joins the area's open group or creates one with this shopper as its first member, all in one transaction. Returns 201 with group, `created`, private memberToken and validatedPledgeAgorot. |
-| POST | /api/v1/groups/find-or-create | **DEPRECATED, scheduled for removal** once the new theme is live (see Staged deployment). Legacy contract for the previous theme only: body as `/find`; always returns a non-null `group` (creating an empty group on a miss), withinStandardRadius and optional validatedPledgeAgorot; no `canCreateOnJoin`. Responds with `Deprecation: true`. |
-| POST | /api/v1/groups/:publicId/join | Body: `areaPublicId` (new theme) or legacy `location` (live theme), plus email, phone, lines. Joins a specific group the shopper was shown; area places fit only groups of the same area. Validates fresh Shopify data, then adds one membership; returns group, private memberToken and validatedPledgeAgorot. |
+| POST | /api/v1/groups/:publicId/join | Body: `areaPublicId`, email, phone, lines. Joins a specific group the shopper was shown; the group must belong to that active area (409 LOCATION_OUTSIDE_GROUP otherwise). Validates fresh Shopify data, then adds one membership; returns group, private memberToken and validatedPledgeAgorot. |
 | GET | /api/v1/groups/:publicId | Aggregate only, no member authorization required. |
 | POST | /api/v1/groups/:publicId/update-pledge | Body: lines, including [] for withdrawal. Requires Authorization: Bearer memberToken. Revalidates prices; returns group and own validatedPledgeAgorot. |
 | GET | /health | Public status only |

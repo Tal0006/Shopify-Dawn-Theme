@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import type {Queryable} from './db.js';
 import type {Config} from './config.js';
-import {ApiError,areaReference,coordinates,distance,localityKey,placeName,type Location} from './domain.js';
+import {ApiError,areaReference,coordinates,distance,localityKey,placeName,type AreaPlace} from './domain.js';
 export interface AreaRow {id:string;public_id:string;name:string;slug:string;latitude:number;longitude:number;active:boolean;sort_order:number;created_at:Date;updated_at:Date}
 // Public shape: no coordinates. Nearest-area matching happens on the server.
 const publicArea=(area:AreaRow)=>({publicId:area.public_id,name:area.name});
@@ -30,13 +30,7 @@ export class Areas{
   if(!area)throw new ApiError(400,'INVALID_AREA','האזור שנבחר אינו זמין. בחרו אזור מהרשימה.');
   return area;
  }
- place(area:AreaRow):Location{return {areaName:area.name,key:area.slug,lat:null,lng:null,areaId:area.id};}
- // Legacy free text: an exact alias of an active area becomes that area; coordinates and other spellings stay legacy.
- async legacyPlace(db:Queryable,place:Location):Promise<Location>{
-  if(place.lat!==null)return place;
-  const area=(await db.query('SELECT a.* FROM delivery_area_aliases x JOIN delivery_areas a ON a.id=x.area_id WHERE x.alias_key=$1 AND a.active',[place.key])).rows[0];
-  return area?this.place(area):place;
- }
+ place(area:AreaRow):AreaPlace{return {areaName:area.name,key:area.slug,areaId:area.id};}
  async adminList(){return (await this.db.query('SELECT * FROM delivery_areas ORDER BY sort_order,name')).rows.map(adminArea);}
  private async alias(key:string,areaId:string){await this.db.query('INSERT INTO delivery_area_aliases(alias_key,area_id) VALUES($1,$2) ON CONFLICT (alias_key) DO NOTHING',[key,areaId]);}
  private async nameTaken(key:string,exceptId?:string){
