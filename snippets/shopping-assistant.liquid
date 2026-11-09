@@ -37,7 +37,7 @@
 </fankee-shopping-assistant>
 <script src="{{ 'shopping-assistant.js' | asset_url }}" defer></script>
 {% stylesheet %}
-fankee-shopping-assistant { --sa-green: var(--storefront-green, #135541); --sa-border: var(--storefront-border, #dce4df); color: var(--storefront-ink, #182b25); }
+fankee-shopping-assistant { --sa-green: var(--storefront-green, #0b6571); --sa-border: var(--storefront-border, #dce4df); color: var(--storefront-ink, #182b25); }
 fankee-shopping-assistant [hidden] { display: none !important; }
 .shopping-assistant__launcher { position: fixed; z-index: 1000001; inset-inline-end: 16px; inset-block-end: var(--sa-launch-bottom, calc(84px + env(safe-area-inset-bottom))); display: flex; align-items: center; gap: 8px; min-height: 44px; max-width: calc(100vw - 32px); padding: 10px 16px; border: 1px solid #fff; border-radius: 24px; background: var(--sa-green); color: #fff; box-shadow: 0 3px 16px #182b2526; font-size: 14px; cursor: pointer; }
 .shopping-assistant__dialog { position: fixed; inset: auto; inset-inline-end: 20px; inset-block-end: 20px; width: min(480px, calc(100vw - 40px)); max-width: none; height: min(760px, calc(100dvh - 40px)); max-height: calc(100dvh - 40px); margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--sa-border); border-radius: 16px; background: #fffefa; color: inherit; text-align: start; box-shadow: 0 12px 60px #182b2530; }
@@ -71,4 +71,40 @@ fankee-shopping-assistant :focus-visible { outline: 3px solid var(--sa-green); o
  .shopping-assistant__header h2 { font-size: 20px; }
  .shopping-assistant__launcher { font-size: 13px; padding: 8px 12px; }
 }
+/* Intelligent-feature polish (presentation only): teal header band, live orb, dot-grid workspace, staggered results. */
+.shopping-assistant__dialog { border-color: var(--fk-border); border-radius: var(--fk-radius-xl); background: #fff; box-shadow: var(--fk-shadow-lg), 0 0 0 1px rgb(18 167 187 / 8%); }
+.shopping-assistant__dialog[open] { animation: shopping-assistant-in var(--fk-dur) var(--fk-ease-out); }
+.shopping-assistant__dialog::backdrop { background: rgb(7 46 53 / 42%); }
+@keyframes shopping-assistant-in { from { opacity: 0; translate: 0 16px; scale: .98; } }
+.shopping-assistant__header { position: relative; border-block-end: 0; background: radial-gradient(ellipse at 90% -20%, rgb(18 167 187 / 45%), transparent 60%), linear-gradient(135deg, var(--fk-teal-950), var(--fk-teal-700)); color: #fff; }
+.shopping-assistant__header h2 { display: flex; align-items: center; gap: 10px; color: #fff; }
+.shopping-assistant__header h2::before { content: ''; flex: 0 0 10px; inline-size: 10px; block-size: 10px; border-radius: 50%; background: #7ff0ff; box-shadow: 0 0 0 4px rgb(127 240 255 / 22%), 0 0 14px rgb(127 240 255 / 80%); animation: shopping-assistant-orb calc(2400ms * var(--fk-motion-scale)) ease-in-out infinite; }
+@keyframes shopping-assistant-orb { 50% { box-shadow: 0 0 0 7px rgb(127 240 255 / 8%), 0 0 18px rgb(127 240 255 / 95%); } }
+.shopping-assistant__header p { color: #cdeaee; }
+fankee-shopping-assistant .shopping-assistant__header [data-close] { border-color: rgb(191 233 238 / 40%); background: rgb(255 255 255 / 10%); color: #fff; transition: background-color var(--fk-dur-fast) ease; }
+fankee-shopping-assistant .shopping-assistant__header [data-close]:hover { background: rgb(255 255 255 / 20%); }
+fankee-shopping-assistant .shopping-assistant__header :focus-visible { outline-color: #bff4fb; }
+.shopping-assistant__body { background-color: #fbfeff; background-image: radial-gradient(rgb(11 79 88 / 7%) 1px, transparent 1px); background-size: 18px 18px; }
+.shopping-assistant__body textarea { border-color: var(--fk-border-strong); border-radius: var(--fk-radius-md); box-shadow: var(--fk-shadow-sm); }
+.shopping-assistant__body [data-status]:not(:empty) { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--fk-border); border-radius: var(--fk-radius-md); background: #fff; box-shadow: var(--fk-shadow-sm); animation: fk-fade var(--fk-dur) var(--fk-ease-out); }
+.shopping-assistant__body [data-status]:not(:empty)::before { content: ''; flex: 0 0 8px; inline-size: 8px; block-size: 8px; border-radius: 50%; background: var(--fk-highlight); }
+.shopping-assistant__shell[aria-busy=true] [data-status]:not(:empty)::before { animation: shopping-assistant-pulse calc(1100ms * var(--fk-motion-scale)) ease-in-out infinite; }
+@keyframes shopping-assistant-pulse { 50% { transform: scale(1.6); opacity: .45; } }
+.shopping-assistant__item { border-color: var(--fk-border); animation: fk-rise var(--fk-dur) var(--fk-ease-out) both; }
+.shopping-assistant__item:nth-child(2) { animation-delay: calc(40ms * var(--fk-motion-scale)); }
+.shopping-assistant__item:nth-child(3) { animation-delay: calc(80ms * var(--fk-motion-scale)); }
+.shopping-assistant__item:nth-child(4) { animation-delay: calc(120ms * var(--fk-motion-scale)); }
+.shopping-assistant__item:nth-child(n+5) { animation-delay: calc(160ms * var(--fk-motion-scale)); }
+.shopping-assistant__item h3 { color: var(--fk-text); }
+.shopping-assistant__card { border-color: var(--fk-border); border-radius: var(--fk-radius-lg); box-shadow: var(--fk-shadow-sm); transition: border-color var(--fk-dur-fast) ease, box-shadow var(--fk-dur-fast) ease, transform var(--fk-dur-fast) ease; }
+.shopping-assistant__card img { border-radius: var(--fk-radius-sm); background: var(--fk-cyan-50); }
+.shopping-assistant__summary { border-color: var(--fk-border); background: rgb(255 255 255 / 96%); box-shadow: 0 -10px 26px rgb(11 79 88 / 8%); }
+.shopping-assistant__summary [data-total] { color: var(--fk-teal-900); font-size: 18px; }
+fankee-shopping-assistant .shopping-assistant__primary { background: var(--fk-gradient-primary); border-color: var(--fk-primary); box-shadow: var(--fk-shadow-cta); font-weight: 700; }
+fankee-shopping-assistant button:not(.shopping-assistant__primary):not(.shopping-assistant__launcher):not([data-close]) { border-color: var(--fk-border-strong); border-radius: var(--fk-radius-md); transition: background-color var(--fk-dur-fast) ease, border-color var(--fk-dur-fast) ease; }
+@media (hover: hover) and (pointer: fine) {
+ .shopping-assistant__card:hover { border-color: var(--fk-border-strong); box-shadow: var(--fk-shadow-md); transform: translateY(-1px); }
+ fankee-shopping-assistant button:not(.shopping-assistant__primary):not(.shopping-assistant__launcher):not([data-close]):not(:disabled):hover { background: var(--fk-cyan-50); border-color: var(--fk-accent); }
+}
+@media (prefers-reduced-motion: reduce) { .shopping-assistant__header h2::before { animation: none; } }
 {% endstylesheet %}

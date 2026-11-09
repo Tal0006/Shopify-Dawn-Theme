@@ -30,19 +30,24 @@
     const ruleLeft = Math.max(0, max - (inventoryCart.get(node.dataset.inventoryVariant) || 0));
     return ruleLeft < inventoryStockLeft(node) ? node.dataset.inventoryRule.replace('__COUNT__', String(max)) : '';
   }
-  function inventoryMessage(node, remaining = inventoryRemaining(node)) {
-    if (!Number.isFinite(remaining)) return '';
+  // One decision for both the text and its presentation tone ('limit' | 'out' | 'low' | '').
+  function inventoryState(node, remaining = inventoryRemaining(node)) {
+    if (!Number.isFinite(remaining)) return {text: '', tone: ''};
     const purchaseLimit = inventoryPurchaseLimit(node);
-    if (purchaseLimit) return purchaseLimit;
-    if (remaining === 0) return (inventoryCart.get(node.dataset.inventoryVariant)||0)>0 ? node.dataset.inventoryFull : node.dataset.inventoryEmpty || node.dataset.inventoryFull;
+    if (purchaseLimit) return {text: purchaseLimit, tone: 'limit'};
+    if (remaining === 0) return {text: (inventoryCart.get(node.dataset.inventoryVariant)||0)>0 ? node.dataset.inventoryFull : node.dataset.inventoryEmpty || node.dataset.inventoryFull, tone: 'out'};
     const stockLeft = inventoryStockLeft(node);
-    if (stockLeft > LOW_STOCK_THRESHOLD) return '';
-    return stockLeft === 1 ? node.dataset.inventoryOne : node.dataset.inventoryMany.replace('__COUNT__', String(stockLeft));
+    if (stockLeft > LOW_STOCK_THRESHOLD) return {text: '', tone: ''};
+    return {text: stockLeft === 1 ? node.dataset.inventoryOne : node.dataset.inventoryMany.replace('__COUNT__', String(stockLeft)), tone: 'low'};
   }
+  const inventoryMessage = (node, remaining) => inventoryState(node, remaining).text;
   function syncInventory() {
     for (const node of inventoryNodes()) {
       if (!inventoryCart.has(node.dataset.inventoryVariant)) inventoryCart.set(node.dataset.inventoryVariant, Number(node.dataset.inventoryCart || 0));
-      node.textContent = inventoryMessage(node);
+      // Write only real changes so these live regions do not re-announce identical text on every sync.
+      const state = inventoryState(node);
+      if (node.textContent !== state.text) node.textContent = state.text;
+      if ((node.dataset.tone || '') !== state.tone) { if (state.tone) node.dataset.tone = state.tone; else delete node.dataset.tone; }
     }
     document.querySelectorAll('form[data-card-cart]').forEach(form => {
       const button = form.querySelector('[name=add]');
@@ -224,7 +229,11 @@
     const items = current?.querySelector('.mini-cart-items');
     if (!freshButton || !freshItems || !button || !items) return false;
     // Keep existing controls/drawer nodes and their focus observers; replace only server-rendered cart content.
+    const previousCount = button.querySelector('.cart-count')?.textContent;
     button.replaceChildren(...freshButton.childNodes);
+    // Presentation only: a fresh badge animates once when the server-rendered count changed.
+    const badge = button.querySelector('.cart-count');
+    if (badge && previousCount !== undefined && badge.textContent !== previousCount) badge.setAttribute('data-bump', '');
     button.setAttribute('aria-label', freshButton.getAttribute('aria-label'));
     const focused = items.contains(document.activeElement) ? document.activeElement : null;
     const lineKey = focused?.closest('[data-cart-line]')?.dataset.cartLine;
@@ -257,6 +266,7 @@
         const button = document.querySelector('.storefront-header .cart-toggle-btn');
         const badge = button?.querySelector('.cart-count');
         if (badge && Number.isInteger(cart.item_count)) {
+          if (badge.textContent !== String(cart.item_count)) { badge.removeAttribute('data-bump'); void badge.offsetWidth; badge.setAttribute('data-bump', ''); }
           badge.textContent = String(cart.item_count);
           button.setAttribute('aria-label', button.dataset.countLabel.replace('__COUNT__', String(cart.item_count)));
         }

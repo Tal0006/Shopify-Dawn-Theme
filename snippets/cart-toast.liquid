@@ -14,6 +14,14 @@
 .cart-toast p { margin: 0; font-size: 14px; line-height: 1.5; }
 .cart-toast a { display: inline-flex; align-items: center; min-height: 44px; color: var(--storefront-green); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .cart-toast[data-error] { border-inline-start-color: #9b2525; }
-@keyframes cart-toast-enter { from { opacity: 0; transform: translateY(6px); } }
+@keyframes cart-toast-enter { from { opacity: 0; transform: translateY(10px) scale(.97); } }
+/* Glass surface with a decorative status mark on the container (outside the live region). */
+.cart-toast { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: center; border-color: var(--fk-border); border-inline-start: 1px solid var(--fk-border); border-radius: var(--fk-radius-lg); background: rgb(255 255 255 / 94%); box-shadow: var(--fk-shadow-lg); animation-duration: calc(220ms * var(--fk-motion-scale)); animation-timing-function: var(--fk-ease-out); }
+@supports (backdrop-filter: blur(1px)) { .cart-toast { background: rgb(255 255 255 / 86%); backdrop-filter: blur(12px) saturate(1.2); } }
+.cart-toast::before { content: ''; grid-row: 1 / span 2; inline-size: 26px; block-size: 26px; border-radius: 50%; background: var(--fk-success) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 4 4 10-10'/%3E%3C/svg%3E") center / 14px no-repeat; box-shadow: 0 0 0 4px var(--fk-success-bg); }
+.cart-toast[data-error] { border-inline-start-color: var(--fk-border); }
+.cart-toast[data-error]::before { background: var(--fk-danger) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M12 7v6M12 17h.01'/%3E%3C/svg%3E") center / 14px no-repeat; box-shadow: 0 0 0 4px var(--fk-danger-bg); }
+.cart-toast p { font-weight: 600; color: var(--fk-text); }
+.cart-toast a { color: var(--fk-accent); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .cart-toast { animation: none; transition: none; } }
 {% endstylesheet %}

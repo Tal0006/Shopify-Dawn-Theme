@@ -44,6 +44,12 @@ body:has(.a11y-launcher:not([hidden])) .group-delivery-promo {padding-inline-end
  .group-delivery-promo .group-delivery-promo__cta:is(:hover,:active) {transform:none;}
 }
 html[data-a11y-paused] .group-delivery-promo__cta::before {display:none;}
+/* Feature card: ambient glow, decorative ring and an eyebrow chip in the Group Delivery language. */
+.group-delivery-promo__surface {position:relative;overflow:hidden;isolation:isolate;border-color:var(--fk-border);border-radius:var(--fk-radius-xl);background:radial-gradient(ellipse at 0% 0%,rgb(18 167 187 / 18%),transparent 52%),linear-gradient(115deg,#fff,var(--fk-cyan-50));box-shadow:var(--fk-shadow-md),inset 0 1px 0 #fff;}
+.group-delivery-promo__surface::after {content:'';position:absolute;z-index:-1;inset-inline-start:-70px;inset-block-end:-90px;inline-size:240px;block-size:240px;border:1px solid rgb(18 167 187 / 20%);border-radius:50%;box-shadow:0 0 0 28px rgb(18 167 187 / 5%),0 0 0 56px rgb(18 167 187 / 3%);pointer-events:none;}
+.group-delivery-promo__eyebrow {display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:var(--fk-radius-pill);background:var(--fk-cyan-100);font-weight:600;}
+.group-delivery-promo__eyebrow::before {content:'';inline-size:7px;block-size:7px;border-radius:50%;background:var(--fk-highlight);box-shadow:0 0 0 3px rgb(18 167 187 / 20%);}
+.group-delivery-promo .group-delivery-promo__cta {background:var(--fk-gradient-primary);box-shadow:var(--fk-shadow-cta);}
 {% endstylesheet %}
 {% schema %}
 {

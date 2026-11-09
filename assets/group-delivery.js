@@ -74,7 +74,7 @@
    this.areaStatus.hidden=true;
    if(!this.options.length){
     this.closeAreas();
-    if(key){this.areaStatus.hidden=false;this.areaStatus.textContent=this.dataset.areaEmpty;}
+    if(key){this.areaStatus.hidden=false;this.areaStatus.dataset.state='empty';this.areaStatus.textContent=this.dataset.areaEmpty;}
     return;
    }
    const listId=this.areaList.id;
@@ -120,7 +120,7 @@
    this.area=area;this.areaInput.value=area.name;this.closeAreas();this.showSelectedArea();
    if(changed)this.invalidateSearch();
   }
-  showSelectedArea(){this.areaStatus.hidden=false;this.areaStatus.textContent=this.dataset.areaSelectedLabel.replace('__AREA__',this.area.name);}
+  showSelectedArea(){this.areaStatus.hidden=false;this.areaStatus.dataset.state='selected';this.areaStatus.textContent=this.dataset.areaSelectedLabel.replace('__AREA__',this.area.name);}
   clearArea(){this.area=null;this.areaStatus.hidden=true;this.areaStatus.textContent='';}
   // A typed name counts only when it exactly equals one listed area; otherwise the shopper must pick from the list.
   chosenArea(){

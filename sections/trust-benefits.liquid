@@ -51,6 +51,11 @@
  .trust-strip__item:hover { transform: none; }
 }
 html[data-a11y-paused] .trust-strip__item:hover { transform: none; }
+/* Glass strip with tinted icon tiles. */
+.trust-strip__list { border-color: var(--fk-border); border-radius: var(--fk-radius-xl); background: var(--fk-surface-elevated); box-shadow: var(--fk-shadow-md), inset 0 1px 0 #fff; }
+.trust-strip__item { border-color: var(--fk-border); }
+.trust-strip__icon { box-sizing: border-box; flex: 0 0 44px; inline-size: 44px; block-size: 44px; padding: 9px; border-radius: var(--fk-radius-md); background: linear-gradient(160deg, var(--fk-cyan-100), #fff); box-shadow: inset 0 0 0 1px #bfe3e8; color: var(--fk-accent); }
+@media (max-width: 599px) { .trust-strip__icon { flex-basis: 36px; inline-size: 36px; block-size: 36px; padding: 7px; } }
 {% endstylesheet %}
 {% schema %}
 {

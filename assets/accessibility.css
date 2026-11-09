@@ -1,12 +1,12 @@
 /* Accessibility layer: no layout changes until a preference is selected. */
-.a11y-skip-link { position: fixed; inset-block-start: 12px; inset-inline-start: 12px; z-index: 1000003; transform: translateY(-160%); padding: 12px 20px; border-radius: 8px; background: #fff; color: #135541; font-weight: 700; }
+.a11y-skip-link { position: fixed; inset-block-start: 12px; inset-inline-start: 12px; z-index: 1000003; transform: translateY(-160%); padding: 12px 20px; border-radius: 8px; background: #fff; color: var(--fk-teal-800, #0b4f58); font-weight: 700; }
 .a11y-skip-link:focus { transform: none; }
-:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid #135541 !important; outline-offset: 4px !important; box-shadow: 0 0 0 6px #fff; }
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--fk-teal-800, #0b4f58) !important; outline-offset: 4px !important; box-shadow: 0 0 0 6px #fff; }
 .hero-area :focus-visible { outline-color: #fff !important; box-shadow: 0 0 0 6px #000; }
 .a11y-widget { position: relative; z-index: 1000001; font-family: Arial, sans-serif; color: #182b25; font-size: 16px; }
-.a11y-launcher { position: fixed; inset-block-end: max(16px, env(safe-area-inset-bottom)); inset-inline-end: 16px; display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; padding: 10px; border: 2px solid #fff; border-radius: 50%; background: #135541; color: #fff; box-shadow: 0 2px 8px #0003; cursor: pointer; }
+.a11y-launcher { position: fixed; inset-block-end: max(16px, env(safe-area-inset-bottom)); inset-inline-end: 16px; display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; padding: 10px; border: 2px solid #fff; border-radius: 50%; background: var(--fk-teal-800, #0b4f58); color: #fff; box-shadow: 0 2px 8px #0003; cursor: pointer; }
 .a11y-launcher[hidden] { display: none; }
-.a11y-launcher:hover { background: #093c2d; }
+.a11y-launcher:hover { background: var(--fk-teal-900, #0a3f47); }
 .a11y-panel { position: fixed; inset: auto; inset-block-end: max(80px, calc(env(safe-area-inset-bottom) + 80px)); inset-inline-end: 16px; z-index: 1000002; width: min(340px, calc(100vw - 32px)); max-height: calc(100dvh - 112px); overflow-y: auto; margin: 0; padding: 16px; border: 1px solid #dce4df; border-radius: 12px; background: #fff; color: #182b25; box-shadow: 0 4px 24px #0003; text-align: start; }
 .a11y-panel:not([open]) { display: none; }
 .a11y-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 12px; }
@@ -14,7 +14,7 @@
 .a11y-panel button { min-height: 44px; border: 1px solid #b9c6be; border-radius: 6px; padding: 10px 12px; background: #fff; color: #182b25; font: 400 16px/1.4 Arial, sans-serif; cursor: pointer; }
 .a11y-panel > button { display: block; width: 100%; margin-block: 8px; text-align: start; }
 .a11y-panel button:hover { background: #eef4ef; }
-.a11y-panel button[aria-pressed=true] { background: #135541; border-color: #135541; color: #fff; }
+.a11y-panel button[aria-pressed=true] { background: var(--fk-teal-800, #0b4f58); border-color: var(--fk-teal-800, #0b4f58); color: #fff; }
 .a11y-panel button[aria-pressed=true]::after { content: ' ✓'; }
 .a11y-panel button:disabled { cursor: default; color: #657068; background: #f3f5f3; }
 .a11y-panel-heading button { min-width: 44px; font-size: 24px; padding: 4px; }
@@ -58,7 +58,7 @@ html[data-a11y-paused] .owl-carousel .animated { animation: none !important; }
 .storefront-footer-statement { font-size: 13px; text-decoration: underline !important; text-underline-offset: 3px; }
 .about-area .about-wrap :is(h1,h2) { font-family: inherit; color: inherit; text-align: start; }
 
-.catalog-card:focus-within { outline: 3px solid #135541; outline-offset: 3px; }
+.catalog-card:focus-within { outline: 3px solid var(--fk-teal-800, #0b4f58); outline-offset: 3px; }
 .product-thumbnil-active button:focus-visible { outline-offset: -4px !important; box-shadow: none; }
 
 .storefront-footer .newslatter-area h2 { font-size: 16px; margin-block: 0 12px; }

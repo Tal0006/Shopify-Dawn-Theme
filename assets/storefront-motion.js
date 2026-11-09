@@ -12,7 +12,16 @@
  const setup = (scope = home) => {
   if (reduced.matches || document.documentElement.hasAttribute('data-a11y-paused') || window.Shopify?.designMode) { showAll(); return; }
   observer ||= new IntersectionObserver(entries => {
+   // Items of one grid that arrive together reveal in a short stagger (max 200ms); the delay is then
+   // cleared so it never slows hover transitions.
+   const batch = new Map();
    for (const entry of entries) if (entry.isIntersecting) {
+    const index = batch.get(entry.target.parentElement) || 0;
+    batch.set(entry.target.parentElement, index + 1);
+    if (index) {
+     entry.target.style.setProperty('--fk-reveal-delay', Math.min(index, 4) * 50 + 'ms');
+     setTimeout(() => entry.target.style.removeProperty('--fk-reveal-delay'), 700);
+    }
     entry.target.dataset.storefrontReveal = 'visible';
     observer.unobserve(entry.target);
    }
