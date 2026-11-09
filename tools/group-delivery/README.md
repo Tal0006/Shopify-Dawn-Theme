@@ -67,7 +67,7 @@ The browser reads the current Shopify Ajax cart without changing it. Non-ILS car
 
 The visible cart total comes from Shopify Ajax. The **verified pledge** uses current Storefront IL/ILS variant prices times quantities, before shipping and cart-dependent discounts. The UI explicitly distinguishes these values and shows the verified amount. No formatted-price parsing or client-provided total is trusted. Intent snapshots are not inventory reservations; prices and stock can change.
 
-Only an opaque member receipt (group public ID + random bearer token) is stored in sessionStorage, scoped to the service origin. No contacts, coordinates or cart snapshots are stored there. Receipt loss has no unauthenticated recovery in Phase 1: the UI does not allow taking over membership using a known email address. Keep the original tab to update a pledge.
+Only opaque member receipts (group public ID + random bearer token + save time) are stored, one localStorage key per group under `fankee-group-delivery:<service origin>:receipt:<publicId>`, so closing the tab keeps membership and different groups never overwrite each other. A receipt from the earlier single sessionStorage key is migrated automatically, and the old copy is removed once the localStorage copy is confirmed. If localStorage is unavailable, sessionStorage is used for the tab. No contacts, coordinates, cart snapshots or payment data are stored. A receipt is deleted only when the service definitively rejects it (MEMBER_AUTH_REQUIRED or GROUP_NOT_FOUND); network/timeout/5xx, RATE_LIMITED, SHOPIFY_UNAVAILABLE and GROUP_CLOSED keep it. Receipt loss (for example, cleared site data) still has no unauthenticated recovery in Phase 1: the UI does not allow taking over membership using a known email address.
 
 ## PostgreSQL data model
 
@@ -79,7 +79,7 @@ Only an opaque member receipt (group public ID + random bearer token) is stored 
 
 All money arithmetic is bigint/integer agorot. Public monetary fields are integer agorot and are capped below JavaScript's safe-integer limit. Paid totals are constrained to zero in Phase 1. Zero-pledge withdrawn members do not count as participants.
 
-Every group mutation locks a shared coordination row inside a PostgreSQL transaction. This intentionally serializes the modest MVP write workload, including overlapping find/create, joins, updates and approval, across service instances. Group state is never kept in an application Map or process-local cache.
+Every group mutation locks a shared coordination row inside a PostgreSQL transaction. This intentionally serializes the modest MVP write workload, including joins that create a group, joins, updates and approval, across service instances. Search is read-only and takes no lock. Group state is never kept in an application Map or process-local cache.
 
 ## Matching and lifecycle
 
@@ -89,6 +89,7 @@ Coordinate mode:
 - Calculate a spherical mean of active member locations.
 - Require all active members and the new location to remain within the cluster radius of the proposed center.
 - Never move the anchor: a chain of nearby customers cannot walk a group indefinitely outward.
+- Groups are created only by `POST /groups/join`, never by `/groups/find` (the deprecated legacy `find-or-create` route is the temporary exception for the previous theme). The match is repeated inside the lock, so two first joins for the same area produce one group with two members.
 
 Text mode:
 - Without coordinates, match only the same NFKC-normalized locality text.
@@ -103,12 +104,27 @@ STANDARD_DELIVERY_RADIUS_KM is advisory only when store and customer coordinates
 
 ## APIs
 
+### Staged deployment (read-only search rollout)
+
+The service now ships both the new routes and a **deprecated** legacy route, so it is safe to deploy before the theme.
+
+1. **Deploy the backend first.** The currently live theme keeps working through `POST /groups/find-or-create`.
+2. **Verify `/groups/find` exists:** `POST https://<service>/api/v1/groups/find` with `Origin: <store origin>`, `Content-Type: application/json` and `{"location":{"areaName":"<town>"}}` must return 200 with a `group` field (often `null`) and `canCreateOnJoin`, not 404.
+3. **Test the new theme on a Development Theme.** It calls `/groups/find` and `/groups/join`; searches there create nothing.
+4. **Publish the new theme.**
+5. **Verify production traffic uses `/groups/find`.** Legacy responses carry a `Deprecation: true` header; confirm in the Render request logs (or browser DevTools on the live store) that storefront searches hit `/groups/find` and `find-or-create` traffic has stopped, allowing for cached old pages.
+6. **Later cleanup:** remove the legacy route (`legacyFindOrCreate` in `src/groups.ts` and its route in `src/server.ts`), its test, and the theme's `search()` fallback in `assets/group-delivery.js`.
+
+Until step 6, `find-or-create` deliberately keeps the old create-on-search behavior for the old theme only, so old-theme searches can still create empty groups. Groups created by searches (before this change, or through the legacy route) remain in the database as historical data; they are not migrated or deleted.
+
 All JSON bodies are limited to 24 KiB. State-changing public API requests require a configured Origin and application/json. Locality is `{areaName,lat?,lng?}`. Cart lines are `[{variantId:"123456789",quantity:2}]`; Shopify GIDs are also accepted.
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| POST | /api/v1/groups/find-or-create | Body: location, optional lines. Returns group, nullable withinStandardRadius and optional validatedPledgeAgorot. Does not join a member. |
-| POST | /api/v1/groups/:publicId/join | Body: location, email, phone, lines. Validates fresh Shopify data, then adds one membership; returns group, private memberToken and validatedPledgeAgorot. |
+| POST | /api/v1/groups/find | Body: location, optional lines. Read-only: never creates a group or writes. Returns `group` (or `null` when no compatible group exists), `canCreateOnJoin` (true when `group` is null), nullable withinStandardRadius and optional validatedPledgeAgorot. |
+| POST | /api/v1/groups/join | Body: location, email, phone, lines. Joins the area: under the coordination lock it expires stale groups, re-matches, joins a compatible group or creates one with this shopper as its first member, all in one transaction. Returns 201 with group, `created`, private memberToken and validatedPledgeAgorot. |
+| POST | /api/v1/groups/find-or-create | **DEPRECATED, scheduled for removal** once the new theme is live (see Staged deployment). Legacy contract for the previous theme only: body as `/find`; always returns a non-null `group` (creating an empty group on a miss), withinStandardRadius and optional validatedPledgeAgorot; no `canCreateOnJoin`. Responds with `Deprecation: true`. |
+| POST | /api/v1/groups/:publicId/join | Body: location, email, phone, lines. Joins a specific group the shopper was shown. Validates fresh Shopify data, then adds one membership; returns group, private memberToken and validatedPledgeAgorot. |
 | GET | /api/v1/groups/:publicId | Aggregate only, no member authorization required. |
 | POST | /api/v1/groups/:publicId/update-pledge | Body: lines, including [] for withdrawal. Requires Authorization: Bearer memberToken. Revalidates prices; returns group and own validatedPledgeAgorot. |
 | GET | /health | Public status only |
@@ -135,7 +151,7 @@ Open /admin. Login uses ADMIN_USERNAME/ADMIN_PASSWORD checked on the server, fol
 
 `npm test` uses an on-disk PGlite PostgreSQL engine with the real migrations and SQL, plus mocked Shopify responses. It tests DB restart persistence, duplicate/concurrent joins, anti-chain matching, money, empty-cart withdrawal, threshold changes, expiry, privacy, invalid carts, rate/body/origin limits, admin login, CSRF, approval, freeze and secure cookies.
 
-Root `tests/group-delivery.browser.cjs` exercises the actual client script and section styling with mocked cart/service responses, explicit geolocation consent, private session receipts, updates, failures, RTL, reduced motion and narrow widths.
+Root `tests/group-delivery.browser.cjs` exercises the actual client script and section styling with mocked cart/service responses, explicit geolocation consent, durable per-group receipts and their migration and stale-receipt rules, the no-group-yet join flow, updates, failures, RTL, reduced motion and narrow widths.
 
 No real Shopify API is consumed by automated tests. A live Render PostgreSQL instance, multi-process network concurrency, deployment credentials and real store variants are not part of the local fixtures. Run a staging smoke test against the deployed PostgreSQL/Shopify configuration before customer launch.
 

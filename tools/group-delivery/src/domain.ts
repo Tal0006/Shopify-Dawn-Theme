@@ -1,8 +1,16 @@
 
 import {createHash} from 'node:crypto';
-export class ApiError extends Error {constructor(public status:number,public code:string, message='לא ניתן להשלים את הבקשה. יש לבדוק את הפרטים ולנסות שוב.'){super(message)}}
+// Error-code contract. Every code the public /api/v1 routes can return is listed here; the storefront
+// maps each one in sections/group-delivery.liquid, and tests/contract.test.ts keeps both sides aligned.
+export const PUBLIC_ERROR_CODES=['INVALID_INPUT','INVALID_LOCATION','INVALID_CART','INVALID_CONTACT','INVALID_PRICE','INVALID_CART_TOTAL',
+ 'CART_UNAVAILABLE','SHOPIFY_UNAVAILABLE','GROUP_NOT_FOUND','GROUP_CLOSED','GROUP_FULL','GROUP_LIMIT','LOCATION_OUTSIDE_GROUP',
+ 'ALREADY_JOINED','MEMBER_AUTH_REQUIRED','RATE_LIMITED','INVALID_HOST','INVALID_ORIGIN','NOT_FOUND','BODY_TOO_LARGE','SERVICE_UNAVAILABLE'] as const;
+// Merchant-only /admin codes; never shown on the storefront.
+export const ADMIN_ERROR_CODES=['LOGIN_FAILED','ADMIN_AUTH_REQUIRED','CSRF_REQUIRED','INVALID_CONTENT_TYPE','APPROVAL_NOT_ALLOWED'] as const;
+export type ErrorCode=typeof PUBLIC_ERROR_CODES[number]|typeof ADMIN_ERROR_CODES[number];
+export class ApiError extends Error {constructor(public status:number,public code:ErrorCode, message='לא ניתן להשלים את הבקשה. יש לבדוק את הפרטים ולנסות שוב.'){super(message)}}
 export const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
-export const fail=(code='INVALID_INPUT'):never=>{throw new ApiError(400,code)};
+export const fail=(code:ErrorCode='INVALID_INPUT'):never=>{throw new ApiError(400,code)};
 export function text(value:unknown,min:number,max:number):string{
  if(typeof value!=='string'||value.trim().length<min||value.trim().length>max) return fail();
  return value.trim();

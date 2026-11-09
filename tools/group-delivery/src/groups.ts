@@ -4,7 +4,7 @@ import type {Config} from './config.js';
 import type {Database,Queryable} from './db.js';
 import {transaction} from './db.js';
 import {ApiError,hash,location,contact,lines,publicId,distance,center,type Location} from './domain.js';
-import type {CartValidator} from './shopify.js';
+import type {CartValidator,ValidatedCart} from './shopify.js';
 export class Groups {
  constructor(private db:Database,private config:Pick<Config,'clusterRadius'|'threshold'|'expiryDays'|'standardRadius'|'storeLocation'>,private shopify:CartValidator){}
  private async locked<T>(fn:(db:Queryable)=>Promise<T>):Promise<T>{
@@ -40,19 +40,35 @@ export class Groups {
    [randomUUID(),randomUUID(),place.areaName,place.key,place.lat,place.lng,this.config.threshold.toString(),this.config.expiryDays])).rows[0];
   return group;
  }
+ // Compatible OPEN, unexpired group with capacity, nearest center first. Read-only. Fixed anchors stop a moving center
+ // from chaining outward. Callers that create on a miss must run this inside locked() so the check and the insert
+ // are one serialized step.
+ private async match(db:Queryable,place:Location):Promise<any|undefined>{
+  const candidates=(await db.query("SELECT g.* FROM delivery_groups g WHERE status='OPEN' AND expires_at>NOW() AND (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id)<100 AND (($1::double precision IS NULL AND anchor_lat IS NULL AND locality_key=$2) OR ($1::double precision IS NOT NULL AND anchor_lat IS NOT NULL AND ABS(anchor_lat-$1)<=$3)) ORDER BY created_at LIMIT 500",[place.lat,place.key,this.config.clusterRadius/110])).rows;
+  const nearby=candidates.filter(group=>place.lat===null?group.anchor_lat===null&&group.locality_key===place.key:group.anchor_lat!==null&&distance({lat:place.lat,lng:place.lng!},{lat:group.anchor_lat,lng:group.anchor_lng})<=this.config.clusterRadius);
+  nearby.sort((a,b)=>place.lat===null?0:distance({lat:place.lat,lng:place.lng!},{lat:a.center_lat,lng:a.center_lng})-distance({lat:place.lat,lng:place.lng!},{lat:b.center_lat,lng:b.center_lng}));
+  for(const group of nearby)if(await this.fits(db,group,place))return group;
+  return undefined;
+ }
+ private standard(place:Location){return this.config.storeLocation&&place.lat!==null?distance({lat:place.lat,lng:place.lng!},this.config.storeLocation)<=this.config.standardRadius:null;}
+ // Search never writes: no group creation, no expiry update, no lock. A miss is reported as group:null and the
+ // first join for the area creates the group (see joinArea).
  async find(body:any){
   const place=location(body?.location);
   const cart=body?.lines===undefined?undefined:await this.shopify.validate(lines(body.lines));
+  const group=await this.match(this.db,place);
+  return {group:group?await this.aggregate(this.db,group):null,canCreateOnJoin:!group,withinStandardRadius:this.standard(place),...(cart?{validatedPledgeAgorot:Number(cart.total)}:{})};
+ }
+ // DEPRECATED legacy compatibility for POST /groups/find-or-create, used only by the theme that is live before the
+ // staged rollout. Keeps the old contract exactly: always returns a non-null group, creating an empty one on a miss
+ // (under the lock), and has no canCreateOnJoin. Deliberately separate from find(), which must stay read-only.
+ // Remove together with the route once production traffic uses /groups/find.
+ async legacyFindOrCreate(body:any){
+  const place=location(body?.location);
+  const cart=body?.lines===undefined?undefined:await this.shopify.validate(lines(body.lines));
   return this.locked(async db=>{
-   // Bounded candidate scan; fixed anchors stop a moving center from chaining outward.
-   const candidates=(await db.query("SELECT g.* FROM delivery_groups g WHERE status='OPEN' AND expires_at>NOW() AND (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id)<100 AND (($1::double precision IS NULL AND anchor_lat IS NULL AND locality_key=$2) OR ($1::double precision IS NOT NULL AND anchor_lat IS NOT NULL AND ABS(anchor_lat-$1)<=$3)) ORDER BY created_at LIMIT 500",[place.lat,place.key,this.config.clusterRadius/110])).rows;
-   let chosen;
-   const nearby=candidates.filter(group=>place.lat===null?group.anchor_lat===null&&group.locality_key===place.key:group.anchor_lat!==null&&distance({lat:place.lat,lng:place.lng!},{lat:group.anchor_lat,lng:group.anchor_lng})<=this.config.clusterRadius);
-   nearby.sort((a,b)=>place.lat===null?0:distance({lat:place.lat,lng:place.lng!},{lat:a.center_lat,lng:a.center_lng})-distance({lat:place.lat,lng:place.lng!},{lat:b.center_lat,lng:b.center_lng}));
-   for(const group of nearby)if(await this.fits(db,group,place)){chosen=group;break;}
-   chosen ||= await this.create(db,place);
-   const standard=this.config.storeLocation&&place.lat!==null?distance({lat:place.lat,lng:place.lng!},this.config.storeLocation)<=this.config.standardRadius:null;
-   return {group:await this.aggregate(db,chosen),withinStandardRadius:standard,...(cart?{validatedPledgeAgorot:Number(cart.total)}:{})};
+   const group=await this.match(db,place)||await this.create(db,place);
+   return {group:await this.aggregate(db,group),withinStandardRadius:this.standard(place),...(cart?{validatedPledgeAgorot:Number(cart.total)}:{})};
   });
  }
  async get(id:string){return this.locked(async db=>this.aggregate(db,await this.group(db,id)));}
@@ -66,20 +82,33 @@ export class Groups {
    [total.toString(),next.lat,next.lng,total>=BigInt(group.threshold_agorot)?'THRESHOLD_REACHED':'OPEN',group.id])).rows[0];
   return this.aggregate(db,updated);
  }
+ // Shared membership insert; must run inside locked(). Every rule applies to new and existing groups alike.
+ private async enroll(db:Queryable,group:any,place:Location,person:{email:string;phone:string},cart:ValidatedCart){
+  if(!['OPEN','THRESHOLD_REACHED'].includes(group.status))throw new ApiError(409,'GROUP_CLOSED');
+  if(!await this.fits(db,group,place))throw new ApiError(409,'LOCATION_OUTSIDE_GROUP','המיקום אינו מתאים לקבוצה הזאת. חפשו קבוצה באזור שלכם.');
+  const members=(await db.query('SELECT email,phone FROM group_members WHERE group_id=$1',[group.id])).rows;
+  if(members.length>=100)throw new ApiError(409,'GROUP_FULL');
+  if(members.some(member=>member.email===person.email||member.phone===person.phone))throw new ApiError(409,'ALREADY_JOINED','לא ניתן להצטרף שוב עם אותם פרטים. לעדכון הסל השתמשו באישור ההצטרפות הקיים.');
+  const token=randomBytes(32).toString('hex');
+  await db.query(`INSERT INTO group_members(id,group_id,email,phone,locality_key,approx_lat,approx_lng,cart_snapshot,pledged_total_agorot,token_hash)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)`,
+   [randomUUID(),group.id,person.email,person.phone,place.key,place.lat,place.lng,JSON.stringify(cart.snapshot),cart.total.toString(),hash(token)]);
+  return {group:await this.recalculate(db,group),memberToken:token,validatedPledgeAgorot:Number(cart.total)};
+ }
+ // Join a specific group the shopper was shown.
  async join(id:string,body:any){
   publicId(id);const place=location(body?.location),person=contact(body),cart=await this.shopify.validate(lines(body?.lines));
+  return this.locked(async db=>this.enroll(db,await this.group(db,id),place,person,cart));
+ }
+ // Join the area's group, creating it only now. Under the coordination lock: expire, re-match (another shopper may
+ // have created a compatible group since the search), create on a miss, insert the first member. A failure at any
+ // step rolls back the transaction, so a group never exists without its first member.
+ async joinArea(body:any){
+  const place=location(body?.location),person=contact(body),cart=await this.shopify.validate(lines(body?.lines));
   return this.locked(async db=>{
-   const group=await this.group(db,id);
-   if(!['OPEN','THRESHOLD_REACHED'].includes(group.status))throw new ApiError(409,'GROUP_CLOSED');
-   if(!await this.fits(db,group,place))throw new ApiError(409,'LOCATION_OUTSIDE_GROUP','המיקום אינו מתאים לקבוצה הזאת. חפשו קבוצה באזור שלכם.');
-   const members=(await db.query('SELECT email,phone FROM group_members WHERE group_id=$1',[group.id])).rows;
-   if(members.length>=100)throw new ApiError(409,'GROUP_FULL');
-   if(members.some(member=>member.email===person.email||member.phone===person.phone))throw new ApiError(409,'ALREADY_JOINED','לא ניתן להצטרף שוב עם אותם פרטים. לעדכון הסל השתמשו באישור ההצטרפות הקיים.');
-   const token=randomBytes(32).toString('hex');
-   await db.query(`INSERT INTO group_members(id,group_id,email,phone,locality_key,approx_lat,approx_lng,cart_snapshot,pledged_total_agorot,token_hash)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)`,
-    [randomUUID(),group.id,person.email,person.phone,place.key,place.lat,place.lng,JSON.stringify(cart.snapshot),cart.total.toString(),hash(token)]);
-   return {group:await this.recalculate(db,group),memberToken:token,validatedPledgeAgorot:Number(cart.total)};
+   const existing=await this.match(db,place);
+   const group=existing||await this.create(db,place);
+   return {...await this.enroll(db,group,place,person,cart),created:!existing};
   });
  }
  async update(id:string,token:string,body:any){

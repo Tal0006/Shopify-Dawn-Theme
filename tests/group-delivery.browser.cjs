@@ -36,21 +36,34 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   const escape=value=>String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const raw=fs.readFileSync(path.join(root,'sections/group-delivery.liquid'),'utf8');
   const labels=Object.fromEntries(Object.entries(tr.group_delivery.status).map(([key,value])=>[key.toUpperCase(),value]));
+  // Mirrors the Liquid data-group-errors table: CODE -> group_delivery locale key.
+  const errorKeys=Object.fromEntries(raw.match(/assign group_errors = '([^']+)'/)[1].split(',').map(entry=>entry.split(':')));
+  const errors=Object.fromEntries(Object.entries(errorKeys).map(([code,key])=>[code,tr.group_delivery[key]]));
   const markup=raw.slice(raw.indexOf('<fankee-group-delivery'),raw.indexOf('</fankee-group-delivery>')+25)
    .replace(/<script type="application\/json" data-group-labels>[\s\S]*?<\/script>/,'<script type="application/json" data-group-labels>'+JSON.stringify(labels)+'</script>')
+   .replace(/<script type="application\/json" data-group-errors>[\s\S]*?<\/script>/,'<script type="application/json" data-group-errors>'+JSON.stringify(errors)+'</script>')
    .replace(/{{ group_delivery_service_url \| escape }}/g,'https://groups.example.test')
    .replace(/{{ routes.cart_url }}/g,'/he/cart').replace(/{{ section.id }}/g,'fixture').replace(/{{ request.locale.iso_code }}/g,'he')
    .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escape(key.split('.').reduce((a,k)=>a[k],tr).replace('{{ area }}','__AREA__').replace('{{ count }}','__COUNT__').replace('{{ amount }}','__AMOUNT__').replace('{{ target }}','__TARGET__')));
   await ev('document.querySelector("main").innerHTML='+JSON.stringify(markup));
   await ev(`
-   sessionStorage.clear();window.requests=[];window.geoCalls=0;window.apiFailure=false;window.quantity=1;
+   sessionStorage.clear();localStorage.clear();window.requests=[];window.logged=[];window.existing=true;window.updateResponse=null;window.getResponse=null;
+   for(const level of ['log','info','warn','error','debug']){const original=console[level].bind(console);console[level]=(...args)=>{logged.push(args.map(String).join(' '));original(...args);};}window.geoCalls=0;window.apiFailure=false;window.quantity=1;
    Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition(success){geoCalls++;success({coords:{latitude:31.812345,longitude:34.654321}});}}});
    window.group={publicId:'11111111-1111-4111-8111-111111111111',areaName:'אשדוד',status:'OPEN',participantCount:5,currency:'ILS',thresholdAgorot:50000,pledgedTotalAgorot:36500,remainingAmountAgorot:13500,progressPercent:73,expiresAt:'2050-01-01T00:00:00.000Z'};
    window.fetch=async(input,options={})=>{
     const url=new URL(input,location.origin),body=options.body?JSON.parse(options.body):null;requests.push({url:url.href,method:options.method||'GET',body,headers:options.headers});
     if(url.pathname==='/he/cart.js')return new Response(JSON.stringify({currency:'ILS',total_price:1590*quantity,items:quantity?[{variant_id:101,quantity,properties:{}}]:[]}));
+    if(window.apiDelay){const delay=apiDelay;await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,delay);options.signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Aborted','AbortError'));},{once:true});});}
+    if(window.apiNetworkError)throw new TypeError('Failed to fetch');
+    if(window.apiResponse)return new Response(apiResponse.raw??JSON.stringify(apiResponse.body),{status:apiResponse.status});
     if(apiFailure)return new Response(JSON.stringify({code:'SERVICE_UNAVAILABLE',error:'upstream secret must not display'}),{status:503});
-    if(url.pathname.endsWith('/find-or-create'))return new Response(JSON.stringify({group,withinStandardRadius:false,validatedPledgeAgorot:1590*quantity}));
+    if(url.pathname.endsWith('/update-pledge')&&window.updateResponse)return new Response(JSON.stringify(updateResponse.body),{status:updateResponse.status});
+    if(!body&&url.pathname.includes('/groups/')&&window.getResponse)return new Response(JSON.stringify(getResponse.body),{status:getResponse.status});
+    if(url.pathname.endsWith('/groups/find')&&window.legacyService)return new Response(JSON.stringify({error:'x',code:'NOT_FOUND'}),{status:404});
+    if(url.pathname.endsWith('/groups/find-or-create'))return new Response(JSON.stringify({group,withinStandardRadius:false,validatedPledgeAgorot:1590*quantity}));
+    if(url.pathname.endsWith('/groups/find'))return new Response(JSON.stringify({group:existing?group:null,canCreateOnJoin:!existing,withinStandardRadius:false,validatedPledgeAgorot:1590*quantity}));
+    if(url.pathname.endsWith('/groups/join')){const created=!existing;existing=true;group={...group,publicId:created?'22222222-2222-4222-8222-222222222222':group.publicId,participantCount:created?1:group.participantCount+1,pledgedTotalAgorot:1590*quantity,remainingAmountAgorot:50000-1590*quantity,progressPercent:3};return new Response(JSON.stringify({group,created,memberToken:'b'.repeat(64),validatedPledgeAgorot:1590*quantity}),{status:201});}
     if(url.pathname.endsWith('/join')){group={...group,participantCount:6,pledgedTotalAgorot:38090,remainingAmountAgorot:11910,progressPercent:76};return new Response(JSON.stringify({group,memberToken:'a'.repeat(64),validatedPledgeAgorot:1590*quantity}));}
     if(url.pathname.endsWith('/update-pledge')){group={...group,pledgedTotalAgorot:39680,remainingAmountAgorot:10320,progressPercent:79};return new Response(JSON.stringify({group,validatedPledgeAgorot:1590*quantity}));}
     return new Response(JSON.stringify({group}));
@@ -70,7 +83,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.equal(await ev('widget.querySelector("[data-group-panel]").hidden'),false);
    assert.equal(await ev('widget.querySelector("[role=progressbar]").getAttribute("aria-valuenow")'),'73');
    assert.ok(await ev('widget.querySelector("[data-validated-pledge]").textContent.includes("15.90")'));
-   assert.equal(await ev('requests.find(r=>r.url.endsWith("/find-or-create")).body.location.lat'),31.81);
+   assert.equal(await ev('requests.find(r=>r.url.endsWith("/groups/find")).body.location.lat'),31.81);
    assert.ok(await ev('widget.querySelector("[data-group-title]").textContent.includes("אשדוד")'));
   });
   await t.test('Changing location invalidates unjoined results before another join',async()=>{
@@ -80,13 +93,14 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    await ev('widget.querySelector("[data-find-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('widget.querySelector("[data-group-panel]").hidden'),false);
   });
-  await t.test('Join is guarded, stores only an opaque session receipt and updates without payment',async()=>{
+  await t.test('Join is guarded, stores only an opaque durable receipt and updates without payment',async()=>{
    await ev('widget.querySelector("[name=email]").value="fixture@example.test";widget.querySelector("[name=phone]").value="0501234567";widget.querySelector("[data-join-group]").requestSubmit();widget.querySelector("[data-join-group]").requestSubmit()');
    await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('requests.filter(r=>r.url.endsWith("/join")).length'),1);
    assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true);
-   const receipt=await ev('JSON.parse(sessionStorage.getItem(widget.storageKey))');
-   assert.deepEqual(Object.keys(receipt).sort(),['memberToken','publicId']);
+   const receipt=await ev('JSON.parse(localStorage.getItem(widget.receiptPrefix+group.publicId))');
+   assert.deepEqual(Object.keys(receipt).sort(),['memberToken','publicId','savedAt']);
+   assert.equal(await ev('sessionStorage.length'),0,'no session-only copy');
    assert.ok(!JSON.stringify(receipt).includes('fixture@example'));
    await ev('quantity=2;widget.querySelector("[data-join-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
    const update=await ev('requests.find(r=>r.url.endsWith("/update-pledge"))');
@@ -99,7 +113,8 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.updated);
    assert.deepEqual(await ev('requests.filter(r=>r.url.endsWith("/update-pledge")).at(-1).body.lines'),[]);
    await ev('quantity=1;apiFailure=true;widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');
-   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error);
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_unavailable);
+   assert.ok(!(await ev('widget.message.textContent')).includes('secret'));
    await ev('apiFailure=false;group.status="APPROVED";widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),true);
    assert.ok(await ev('widget.querySelector("[data-group-state]").textContent.includes("התשלום עדיין")'));
@@ -111,6 +126,90 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    const before=await ev('requests.length');
    await ev('widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('requests.length'),before+1);
+  });
+  const reconnect='{const parent=widget.parentNode;widget.remove();parent.append(widget);}';
+  const receiptKey='widget.receiptPrefix+group.publicId';
+  await t.test('Durable receipts survive a new session and legacy sessionStorage receipts migrate',async()=>{
+   await ev('group.status="OPEN";sessionStorage.clear();'+reconnect);await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true,'new session keeps membership');
+   assert.equal(await ev('widget.group.publicId'),await ev('group.publicId'));
+   // Legacy single receipt in sessionStorage moves to its own localStorage key, then the old copy is removed.
+   await ev('localStorage.clear();sessionStorage.setItem(widget.storageKey,JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64)}));'+reconnect);
+   await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('JSON.parse(localStorage.getItem('+receiptKey+')).memberToken'),'a'.repeat(64));
+   assert.equal(await ev('sessionStorage.getItem(widget.storageKey)'),null);
+   assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true);
+   // If localStorage refuses the write, the legacy copy stays and the receipt still works in this tab.
+   await ev('localStorage.clear();sessionStorage.setItem(widget.storageKey,JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64)}));window.originalSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(...args){if(this===localStorage)throw new DOMException("full","QuotaExceededError");return originalSetItem.apply(this,args);};'+reconnect);
+   await wait('!widget.hasAttribute("aria-busy")');
+   assert.notEqual(await ev('sessionStorage.getItem(widget.storageKey)'),null);
+   assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true);
+   await ev('Storage.prototype.setItem=originalSetItem;'+reconnect);await wait('!widget.hasAttribute("aria-busy")');
+   assert.notEqual(await ev('localStorage.getItem('+receiptKey+')'),null);assert.equal(await ev('sessionStorage.getItem(widget.storageKey)'),null);
+  });
+  await t.test('Temporary failures keep receipts; only definitive rejections remove the affected receipt',async()=>{
+   await ev('group.status="OPEN";quantity=1;localStorage.setItem(widget.receiptPrefix+"33333333-3333-4333-8333-333333333333",JSON.stringify({publicId:"33333333-3333-4333-8333-333333333333",memberToken:"c".repeat(64),savedAt:1}));widget.loadReceipts()');
+   const kept=[[{status:503,body:{code:'SERVICE_UNAVAILABLE'}},'error_unavailable'],[{status:429,body:{code:'RATE_LIMITED'}},'error_rate_limited'],[{status:503,body:{code:'SHOPIFY_UNAVAILABLE'}},'shopify_error'],[{status:409,body:{code:'GROUP_CLOSED'}},'closed']];
+   for(const [response,key] of kept){
+    await ev('window.updateResponse='+JSON.stringify(response)+';widget.querySelector("[data-join-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
+    assert.equal(await ev('widget.message.textContent'),tr.group_delivery[key]);
+    assert.notEqual(await ev('localStorage.getItem('+receiptKey+')'),null,response.body.code+' must keep the receipt');
+    assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true);
+   }
+   await ev('window.updateResponse=null;window.apiNetworkError=true;widget.querySelector("[data-join-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_network);
+   assert.notEqual(await ev('localStorage.getItem('+receiptKey+')'),null,'network errors keep the receipt');
+   // A rejected token removes only that group's receipt and returns the shopper to the contact form.
+   await ev('window.apiNetworkError=false;window.updateResponse={status:401,body:{code:"MEMBER_AUTH_REQUIRED"}};widget.querySelector("[data-join-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('localStorage.getItem('+receiptKey+')'),null);
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_receipt);
+   assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),false);
+   assert.notEqual(await ev('localStorage.getItem(widget.receiptPrefix+"33333333-3333-4333-8333-333333333333")'),null,'other groups untouched');
+   // A deleted group removes its receipt on restore.
+   await ev('window.updateResponse=null;localStorage.removeItem(widget.receiptPrefix+"33333333-3333-4333-8333-333333333333");localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));window.getResponse={status:404,body:{code:"GROUP_NOT_FOUND"}};'+reconnect);
+   await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('localStorage.getItem('+receiptKey+')'),null);
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_not_found);
+   // Restore the membership for the following tests.
+   await ev('window.getResponse=null;localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));'+reconnect);
+   await wait('!widget.hasAttribute("aria-busy")');
+  });
+  await t.test('No group yet: searching creates nothing and the join starts the group',async()=>{
+   await ev('existing=false;quantity=1;widget.querySelector("[name=area]").value="בית שמש";widget.querySelector("[name=area]").dispatchEvent(new Event("input",{bubbles:true}));widget.querySelector("[data-find-group]").requestSubmit()');
+   await wait('!widget.hasAttribute("aria-busy")');
+   const panel='widget.querySelector("[data-group-panel]")';
+   assert.equal(await ev(panel+'.hidden'),false);assert.equal(await ev(panel+'.hasAttribute("data-group-pending")'),true);
+   assert.equal(await ev('widget.querySelector("[data-group-title]").textContent'),tr.group_delivery.pending_title.replace('{{ area }}','בית שמש'));
+   assert.equal(await ev('widget.querySelector("[data-group-state]").textContent'),tr.group_delivery.pending_state);
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.none_found);
+   assert.equal(await ev('widget.querySelector("[data-join-button]").textContent'),tr.group_delivery.start);
+   assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),false);
+   assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),false);
+   for(const part of ['.group-delivery__totals','.group-delivery__progress','.group-delivery__stats','[data-refresh]'])assert.equal(await ev('getComputedStyle(widget.querySelector('+JSON.stringify(part)+')).display==="none"||!widget.querySelector('+JSON.stringify(part)+').getClientRects().length'),true,part);
+   assert.equal(await ev('requests.filter(r=>r.url.endsWith("/groups/join")).length'),0,'nothing is created before Join');
+   await ev('widget.querySelector("[name=email]").value="starter@example.test";widget.querySelector("[name=phone]").value="0507654321";widget.querySelector("[data-join-group]").requestSubmit();widget.querySelector("[data-join-group]").requestSubmit()');
+   await wait('!widget.hasAttribute("aria-busy")');
+   const joins=await ev('requests.filter(r=>r.url.endsWith("/groups/join"))');
+   assert.equal(joins.length,1);assert.deepEqual(Object.keys(joins[0].body).sort(),['email','lines','location','phone']);
+   assert.equal(joins[0].body.location.areaName,'בית שמש');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.started);
+   assert.equal(await ev(panel+'.hasAttribute("data-group-pending")'),false);
+   assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true);
+   assert.equal(await ev('JSON.parse(localStorage.getItem(widget.receiptPrefix+"22222222-2222-4222-8222-222222222222")).memberToken'),'b'.repeat(64));
+   assert.notEqual(await ev('localStorage.getItem(widget.receiptPrefix+"11111111-1111-4111-8111-111111111111")'),null,'receipts are per group');
+   assert.ok(!(await ev('localStorage.getItem(widget.receiptPrefix+"22222222-2222-4222-8222-222222222222")')).includes('starter@'));
+  });
+  await t.test('Transition: a service without /groups/find falls back once to the retired route',async()=>{
+   await ev('window.legacyService=true;existing=true;window.mark=requests.length;widget.querySelector("[name=area]").value="אשדוד";widget.querySelector("[name=area]").dispatchEvent(new Event("input",{bubbles:true}));widget.querySelector("[data-find-group]").requestSubmit()');
+   await wait('!widget.hasAttribute("aria-busy")');
+   const paths=await ev('requests.slice(mark).map(r=>new URL(r.url).pathname).filter(p=>p.includes("/groups/"))');
+   assert.deepEqual(paths,['/api/v1/groups/find','/api/v1/groups/find-or-create']);
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.found);
+   await ev('window.legacyService=false');
+  });
+  await t.test('Member tokens never appear in logs or rendered content',async()=>{
+   const page=await ev('document.documentElement.outerHTML'),logs=await ev('logged.join("\\n")');
+   for(const token of ['a'.repeat(64),'b'.repeat(64),'c'.repeat(64)]){assert.ok(!page.includes(token),'rendered token');assert.ok(!logs.includes(token),'logged token');}
   });
 
   await t.test('Milestones, clamping, safe share and known errors',async()=>{
@@ -134,13 +233,59 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    const shared=await ev('shared');const text=new URL(shared[0]).searchParams.get('text');
    assert.ok(text.includes('500'));assert.ok(!/memberToken|private|secret|fixture@example|__TARGET__/.test(text));
    assert.equal(shared[2],'noopener,noreferrer');
-   for(const [code,key] of [['INVALID_CART','invalid_cart'],['SHOPIFY_UNAVAILABLE','shopify_error'],['GROUP_NOT_OPEN','closed'],['INVALID_ORIGIN','error']]){
+   for(const [code,key] of [['INVALID_CART','invalid_cart'],['SHOPIFY_UNAVAILABLE','shopify_error'],['CART_UNAVAILABLE','cart_unavailable'],['GROUP_CLOSED','closed'],['GROUP_NOT_OPEN','error'],['INVALID_ORIGIN','error_unavailable'],['UNKNOWN_FUTURE_CODE','error']]){
     await ev('widget.perform(async()=>{throw Object.assign(Error(),{code:'+JSON.stringify(code)+'})})');
     assert.equal(await ev('widget.message.textContent'),tr.group_delivery[key]);
    }
    await ev('(async()=>{widget.show({...group,status:"EXPIRED"});quantity=0;await widget.perform(()=>widget.cart())})()');
    assert.equal(await ev('widget.querySelector("[data-empty-cart]").hidden'),false);
    assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),true);
+  });
+  await t.test('Actual server codes and proxy failures show Hebrew messages without server text',async()=>{
+   await ev('widget.show({...group,status:"OPEN"})');
+   const cases=[
+    [{status:409,body:{code:'LOCATION_OUTSIDE_GROUP',error:'internal secret detail'}},'error_outside'],
+    [{status:409,body:{code:'GROUP_FULL',error:'internal secret detail'}},'error_full'],
+    [{status:409,body:{code:'GROUP_CLOSED',error:'internal secret detail'}},'closed'],
+    [{status:409,body:{code:'ALREADY_JOINED'}},'duplicate'],
+    [{status:401,body:{code:'MEMBER_AUTH_REQUIRED'}},'error_receipt'],
+    [{status:404,body:{code:'GROUP_NOT_FOUND'}},'error_not_found'],
+    [{status:429,body:{code:'RATE_LIMITED'}},'error_rate_limited'],
+    [{status:429,raw:'Too Many Requests'},'error_rate_limited'],
+    [{status:502,raw:'<html>Bad gateway internal secret</html>'},'error_unavailable'],
+    [{status:200,raw:'not json'},'error']
+   ];
+   for(const [response,key] of cases){
+    await ev('window.apiResponse='+JSON.stringify(response)+';widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');
+    assert.equal(await ev('widget.message.textContent'),tr.group_delivery[key],JSON.stringify(response));
+    assert.ok(!(await ev('widget.message.textContent')).includes('secret'));
+   }
+   await ev('window.apiResponse=null;window.apiNetworkError=true;widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_network);
+   await ev('window.apiNetworkError=false');
+  });
+  await t.test('Cold start announces waking, stays single-flight, times out finitely and aborts silently',async()=>{
+   await ev('{const C=customElements.get("fankee-group-delivery");C.wakeDelay=60;C.requestTimeout=600;window.apiDelay=250;group.status="OPEN"}');
+   let before=await ev('requests.length');
+   await ev('widget.querySelector("[data-refresh]").click();widget.querySelector("[data-refresh]").click()');
+   await wait('widget.message.textContent==='+JSON.stringify(tr.group_delivery.waking));
+   assert.equal(await ev('widget.querySelector("[data-refresh]").getAttribute("aria-busy")'),'true');
+   assert.equal(await ev('widget.querySelector("[data-join-group]").inert'),true);
+   await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('requests.length'),before+1,'duplicate request while busy');
+   assert.equal(await ev('widget.message.textContent'),'','waking state must clear after success');
+   await ev('window.apiDelay=5000;widget.querySelector("[data-refresh]").click()');
+   await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_timeout);
+   assert.equal(await ev('widget.querySelector("[data-refresh]").hasAttribute("aria-busy")'),false);
+   assert.equal(await ev('widget.querySelector("[data-join-group]").inert'),false);
+   // Removing the widget mid-request aborts it without surfacing an error.
+   await ev('widget.querySelector("[data-refresh]").click()');await wait('widget.requests.size===1');
+   await ev('window.parked=widget.parentNode;widget.remove()');
+   await sleep(50);assert.equal(await ev('widget.requests.size'),0);
+   await sleep(80);assert.notEqual(await ev('widget.message.textContent'),tr.group_delivery.error_timeout);
+   await ev('{window.apiDelay=0;const C=customElements.get("fankee-group-delivery");C.wakeDelay=12000;C.requestTimeout=90000;parked.append(widget)}');
+   await wait('!widget.hasAttribute("aria-busy")');
   });
   await t.test('Mobile and desktop RTL fit, keyboard targets are usable, progress respects reduced motion',async()=>{
    for(const width of [320,360,375,390,768,1440,1600]){
@@ -179,7 +324,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.equal(await ev('widget.origin.origin'),fallback);
    await ev('group.status="OPEN";quantity=1;widget.querySelector("[name=area]").value="Fixture area";void widget.perform(()=>widget.find())');
    await wait('!widget.hasAttribute("aria-busy")');
-   assert.ok(await ev('requests.some(r=>r.url==='+JSON.stringify(fallback+'/api/v1/groups/find-or-create')+')'));
+   assert.ok(await ev('requests.some(r=>r.url==='+JSON.stringify(fallback+'/api/v1/groups/find')+')'));
    assert.equal(await ev('widget.querySelector("[data-group-panel]").hidden'),false);
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.found);
    await ev('widget.remove();widget.dataset.serviceUrl="https://groups.example.test";document.querySelector("main").append(widget)');

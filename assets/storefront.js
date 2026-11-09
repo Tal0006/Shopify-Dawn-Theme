@@ -16,9 +16,28 @@
     const rule = node.dataset.inventoryRuleMax ? Number(node.dataset.inventoryRuleMax) : Infinity;
     return Math.max(0, Math.min(stock, rule) - (inventoryCart.get(node.dataset.inventoryVariant) || 0));
   }
+  // Exact counts are shown only when tracked stock is low; enforcement always uses inventoryRemaining().
+  const LOW_STOCK_THRESHOLD = 4;
+  function inventoryStockLeft(node) {
+    if (node.dataset.inventoryFinite !== 'true') return Infinity;
+    return Math.max(0, Math.max(0, Number(node.dataset.inventoryStock)) - (inventoryCart.get(node.dataset.inventoryVariant) || 0));
+  }
+  // A per-order quantity_rule.max is a purchase limit, never stock. It is described as such only when it is
+  // the binding limit (lower than tracked stock left, or stock is untracked); the stock count stays hidden.
+  function inventoryPurchaseLimit(node) {
+    const max = node.dataset.inventoryRuleMax ? Number(node.dataset.inventoryRuleMax) : Infinity;
+    if (!Number.isFinite(max) || !node.dataset.inventoryRule) return '';
+    const ruleLeft = Math.max(0, max - (inventoryCart.get(node.dataset.inventoryVariant) || 0));
+    return ruleLeft < inventoryStockLeft(node) ? node.dataset.inventoryRule.replace('__COUNT__', String(max)) : '';
+  }
   function inventoryMessage(node, remaining = inventoryRemaining(node)) {
     if (!Number.isFinite(remaining)) return '';
-    return remaining === 0 ? ((inventoryCart.get(node.dataset.inventoryVariant)||0)>0 ? node.dataset.inventoryFull : node.dataset.inventoryEmpty || node.dataset.inventoryFull) : remaining === 1 ? node.dataset.inventoryOne : node.dataset.inventoryMany.replace('__COUNT__', String(remaining));
+    const purchaseLimit = inventoryPurchaseLimit(node);
+    if (purchaseLimit) return purchaseLimit;
+    if (remaining === 0) return (inventoryCart.get(node.dataset.inventoryVariant)||0)>0 ? node.dataset.inventoryFull : node.dataset.inventoryEmpty || node.dataset.inventoryFull;
+    const stockLeft = inventoryStockLeft(node);
+    if (stockLeft > LOW_STOCK_THRESHOLD) return '';
+    return stockLeft === 1 ? node.dataset.inventoryOne : node.dataset.inventoryMany.replace('__COUNT__', String(stockLeft));
   }
   function syncInventory() {
     for (const node of inventoryNodes()) {
@@ -68,11 +87,14 @@
     syncInventory();
     document.dispatchEvent(new CustomEvent('storefront:cart:updated'));
   }
+  // Returns the freshly rendered page so callers can reuse it (for example, for the header cart) without another request.
   async function refreshInventorySnapshot() {
+    if (!inventoryNodes().length) return null;
+    let doc = null;
     try {
       const response = await fetch(location.href, {headers:{Accept:'text/html'},credentials:'same-origin',cache:'no-store'});
       if (response.ok) {
-        const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+        doc = new DOMParser().parseFromString(await response.text(), 'text/html');
         for (const node of inventoryNodes()) {
           const fresh = [...doc.querySelectorAll('[data-inventory-variant]')].find(value => value.dataset.inventoryVariant === node.dataset.inventoryVariant);
           if (fresh) { node.dataset.inventoryStock=fresh.dataset.inventoryStock; node.dataset.inventoryFinite=fresh.dataset.inventoryFinite; node.dataset.inventoryRuleMax=fresh.dataset.inventoryRuleMax||''; }
@@ -80,6 +102,7 @@
       }
       await loadInventoryCart();
     } catch { /* Retain the last known Shopify limits; never invent a new stock value. */ }
+    return doc;
   }
   document.addEventListener('input', event => { if (event.target.matches('form[data-card-cart] [name=quantity]')) syncInventory(); });
   document.addEventListener('change', event => { if (event.target.closest('form[data-card-cart]')) syncInventory(); });
@@ -191,8 +214,8 @@
   }
   cartMobile.addEventListener('change', () => { const toast = document.querySelector('[data-cart-toast]'); if (toast) hideCartToast(toast); });
   function renderCardCartSection(html) {
-    if (typeof html !== 'string') return false;
-    const doc = new DOMParser().parseFromString(html, 'text/html');
+    if (typeof html !== 'string' && !(html instanceof Document)) return false;
+    const doc = html instanceof Document ? html : new DOMParser().parseFromString(html, 'text/html');
     const fresh = doc.querySelector('.storefront-header .mini-cart');
     const current = document.querySelector('.storefront-header .mini-cart');
     const freshButton = fresh?.querySelector('.cart-toggle-btn');
@@ -284,7 +307,7 @@
           await loadInventoryCart();
           for (const item of items) {
             const node = [...form.querySelectorAll('[data-inventory-variant]')].find(node => node.dataset.inventoryVariant === item.id);
-            if (node && item.quantity > inventoryRemaining(node)) throw Object.assign(Error('Inventory limit'), {inventoryMessage:inventoryMessage(node)});
+            if (node && item.quantity > inventoryRemaining(node)) throw Object.assign(Error('Inventory limit'), {inventoryMessage:inventoryMessage(node) || node.dataset.inventoryChanged});
           }
         }
         const body = {items, ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})};
@@ -292,10 +315,14 @@
         if (!response.ok) {
           const error = Error('Cart add rejected'); error.status = response.status;
           let rejection;try { rejection=await response.json(); } catch {}
-          if (response.status===422 && /stock|inventory|sold out|can.t add more|cannot add more|only\s+\d+.*available|מלאי/i.test(String(rejection?.description||rejection?.message||''))) {
+          if (response.status===422) {
+            // Shopify localizes 422 text, so any rejection re-syncs stock and cart lines from Shopify.
+            // Only the refreshed limits (or recognizably stock-related text) select an inventory message.
             await refreshInventorySnapshot();
             const node = [...form.querySelectorAll('[data-inventory-variant]')].find(node => items.some(item => item.id===node.dataset.inventoryVariant && item.quantity>inventoryRemaining(node)));
-            error.inventoryMessage = node ? inventoryMessage(node) : form.querySelector('[data-inventory-variant]')?.dataset.inventoryChanged;
+            const stockText = /stock|inventory|sold out|can.t add more|cannot add more|only\s+\d+.*available|מלאי|אזל/i.test(String(rejection?.description||rejection?.message||''));
+            if (node) error.inventoryMessage = inventoryMessage(node) || node.dataset.inventoryChanged;
+            else if (stockText) error.inventoryMessage = form.querySelector('[data-inventory-variant]')?.dataset.inventoryChanged;
           }
           throw error;
         }
@@ -331,6 +358,19 @@
     });
     cardCartQueue = operation.catch(() => {});
   }, true);
+  // Back/forward cache restores a frozen DOM, so its badge and limits may predate cart changes made elsewhere.
+  // Normal loads are already server-rendered from the current cart and are skipped.
+  window.addEventListener('pageshow', event => {
+    if (!event.persisted) return;
+    const operation = cardCartQueue.then(async () => {
+      // One page render refreshes stock and the header cart together; without limits on the page only the header is fetched.
+      const doc = await refreshInventorySnapshot();
+      if (doc && renderCardCartSection(doc)) { document.dispatchEvent(new CustomEvent('storefront:cart:updated')); return; }
+      await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection);
+      document.dispatchEvent(new CustomEvent('storefront:cart:updated'));
+    });
+    cardCartQueue = operation.catch(() => {});
+  });
   window.fankeeCartSubmit?.ready();
 
   // Delegation keeps header controls working after Theme Editor section reloads.

@@ -4,12 +4,12 @@
 {% endcomment %}
 {% assign group_delivery_service_url = section.settings.service_url | default: 'https://fankee-group-delivery.onrender.com' %}
 <fankee-group-delivery class="container group-delivery" data-service-url="{{ group_delivery_service_url | escape }}" data-cart-url="{{ routes.cart_url }}.js"
- data-error="{{ 'group_delivery.error' | t | escape }}" data-empty="{{ 'group_delivery.empty_cart' | t | escape }}" data-unavailable="{{ 'group_delivery.cart_unavailable' | t | escape }}"
+ data-waking="{{ 'group_delivery.waking' | t | escape }}" data-none-found="{{ 'group_delivery.none_found' | t | escape }}" data-pending-title="{{ 'group_delivery.pending_title' | t: area: '__AREA__' | escape }}" data-pending-state="{{ 'group_delivery.pending_state' | t | escape }}" data-start-label="{{ 'group_delivery.start' | t | escape }}" data-started="{{ 'group_delivery.started' | t | escape }}"
  data-geo-error="{{ 'group_delivery.geo_error' | t | escape }}" data-geo-ready="{{ 'group_delivery.geo_ready' | t | escape }}" data-joined="{{ 'group_delivery.joined' | t | escape }}"
  data-found="{{ 'group_delivery.found' | t | escape }}" data-updated="{{ 'group_delivery.updated' | t | escape }}" data-area="{{ 'group_delivery.area' | t: area: '__AREA__' | escape }}"
  data-count="{{ 'group_delivery.participants' | t: count: '__COUNT__' | escape }}" data-remaining="{{ 'group_delivery.remaining' | t: amount: '__AMOUNT__' | escape }}"
  data-update-label="{{ 'group_delivery.update' | t | escape }}" data-join-label="{{ 'group_delivery.join' | t | escape }}" data-closed="{{ 'group_delivery.closed' | t | escape }}" data-setup="{{ 'group_delivery.setup' | t | escape }}"
- data-duplicate="{{ 'group_delivery.duplicate' | t | escape }}" data-almost="{{ 'group_delivery.almost' | t | escape }}" data-reached="{{ 'group_delivery.reached' | t | escape }}" data-waiting="{{ 'group_delivery.waiting' | t | escape }}" data-share-text="{{ 'group_delivery.share_text' | t: area: '__AREA__', amount: '__AMOUNT__', target: '__TARGET__' | escape }}" data-shopify-error="{{ 'group_delivery.shopify_error' | t | escape }}" data-invalid-cart="{{ 'group_delivery.invalid_cart' | t | escape }}" data-count-one="{{ 'group_delivery.participant_one' | t | escape }}" data-estimate="{{ 'group_delivery.verified_cart' | t | escape }}" data-pledge-label="{{ 'group_delivery.your_pledge' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}" data-locale="{{ request.locale.iso_code }}">
+ data-almost="{{ 'group_delivery.almost' | t | escape }}" data-reached="{{ 'group_delivery.reached' | t | escape }}" data-waiting="{{ 'group_delivery.waiting' | t | escape }}" data-share-text="{{ 'group_delivery.share_text' | t: area: '__AREA__', amount: '__AMOUNT__', target: '__TARGET__' | escape }}" data-count-one="{{ 'group_delivery.participant_one' | t | escape }}" data-estimate="{{ 'group_delivery.verified_cart' | t | escape }}" data-pledge-label="{{ 'group_delivery.your_pledge' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}" data-locale="{{ request.locale.iso_code }}">
  <header><p class="group-delivery__eyebrow">{{ 'group_delivery.heading' | t }}</p><h1>{{ 'group_delivery.intro' | t }}</h1><h2>{{ 'group_delivery.promise' | t }}</h2><p>{{ 'group_delivery.description' | t }}</p></header>
  <p class="group-delivery__notice">{{ 'group_delivery.notice' | t }}</p>
  <form data-find-group>
@@ -41,6 +41,12 @@
  <p data-group-message role="status" aria-live="polite" aria-atomic="true"></p>
  <noscript><p>{{ 'group_delivery.javascript' | t }}</p></noscript>
  <script type="application/json" data-group-labels>{% assign group_states = 'OPEN,THRESHOLD_REACHED,APPROVED,PAYMENT_OPEN,CONFIRMED,SCHEDULED,COMPLETED,EXPIRED,CANCELLED' | split: ',' %}{ {% for state in group_states %}{% assign state_key = state | downcase | prepend: 'group_delivery.status.' %}{{ state | json }}:{{ state_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
+ {% comment %}
+   Single error contract: CODE:group_delivery locale key. Server codes come from PUBLIC_ERROR_CODES in
+   tools/group-delivery/src/domain.ts; CART_EMPTY..INVALID_RESPONSE are browser-side. DEFAULT is the fallback.
+   tools/group-delivery/tests/contract.test.ts fails when either side drifts.
+ {% endcomment %}
+ <script type="application/json" data-group-errors>{% assign group_errors = 'INVALID_INPUT:error,INVALID_LOCATION:error_location,INVALID_CART:invalid_cart,INVALID_CONTACT:error_contact,INVALID_PRICE:error,INVALID_CART_TOTAL:error_cart_total,CART_UNAVAILABLE:cart_unavailable,SHOPIFY_UNAVAILABLE:shopify_error,GROUP_NOT_FOUND:error_not_found,GROUP_CLOSED:closed,GROUP_FULL:error_full,GROUP_LIMIT:error_group_limit,LOCATION_OUTSIDE_GROUP:error_outside,ALREADY_JOINED:duplicate,MEMBER_AUTH_REQUIRED:error_receipt,RATE_LIMITED:error_rate_limited,INVALID_HOST:error_unavailable,INVALID_ORIGIN:error_unavailable,NOT_FOUND:error_unavailable,BODY_TOO_LARGE:error,SERVICE_UNAVAILABLE:error_unavailable,CART_EMPTY:empty_cart,CART_READ_FAILED:error_cart_read,CART_CURRENCY:error_currency,REQUEST_TIMEOUT:error_timeout,NETWORK_ERROR:error_network,INVALID_RESPONSE:error,DEFAULT:error' | split: ',' %}{ {% for group_error in group_errors %}{% assign group_error_pair = group_error | split: ':' %}{% assign group_error_key = group_error_pair.last | prepend: 'group_delivery.' %}{{ group_error_pair.first | json }}:{{ group_error_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
 </fankee-group-delivery>
 <script src="{{ 'group-delivery.js' | asset_url }}" defer></script>
 {% stylesheet %}
@@ -106,6 +112,8 @@ body:has(.a11y-launcher:not([hidden])) .group-delivery {padding-inline-end:max(1
 .group-delivery__pledge bdi {font-size:22px;font-weight:600;}
 .group-delivery button[aria-busy=true] {cursor:wait;box-shadow:none;}
 .group-delivery button[aria-busy=true]::after {content:"";display:inline-block;width:14px;height:14px;margin-inline-start:8px;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;animation:group-delivery-spin 700ms linear infinite;vertical-align:middle;}
+/* No group yet for the searched area: only the explanation, verified cart and join form apply. */
+.group-delivery__panel[data-group-pending]>:is(.group-delivery__totals,.group-delivery__progress,.group-delivery__summary,.group-delivery__milestone,.group-delivery__stats,.group-delivery__actions) {display:none;}
 @keyframes group-delivery-spin {to {rotate:360deg;}}
 @media(hover:hover) and (pointer:fine) {
  .group-delivery .theme-btn:hover:not(:disabled) {transform:translateY(-1px);box-shadow:0 8px 20px #089bad35;}

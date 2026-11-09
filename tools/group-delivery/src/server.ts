@@ -8,7 +8,7 @@ import {Groups} from './groups.js';
 import {Shopify,type CartValidator} from './shopify.js';
 import {Auth,same} from './auth.js';
 import {adminPage,loginPage,adminCSS} from './admin.js';
-import {ApiError} from './domain.js';
+import {ApiError,type ErrorCode} from './domain.js';
 export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg)){
  const app=express(),groups=new Groups(db,cfg,validator),auth=new Auth(db,cfg);
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
@@ -48,19 +48,25 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.post('/admin/groups/:publicId/approve',async(req,res)=>{await groups.approve(req.params.publicId);res.redirect(303,'/admin');});
  app.post('/admin/api/groups/:publicId/approve',async(req,res)=>res.json({group:await groups.approve(req.params.publicId)}));
  app.post('/admin/logout',async(req,res)=>auth.logout(req,res));
- app.post('/api/v1/groups/find-or-create',async(req,res)=>res.json(await groups.find(req.body)));
+ // Search is read-only; groups are created only by the first join for an area (POST /groups/join).
+ app.post('/api/v1/groups/find',async(req,res)=>res.json(await groups.find(req.body)));
+ app.post('/api/v1/groups/join',async(req,res)=>res.status(201).json(await groups.joinArea(req.body)));
+ // DEPRECATED: legacy route for the theme live before the staged rollout; still creates on a miss. Never point new
+ // clients here. Remove after production traffic uses /groups/find (see README, Staged deployment).
+ app.post('/api/v1/groups/find-or-create',async(req,res)=>{res.set('Deprecation','true');res.json(await groups.legacyFindOrCreate(req.body));});
  app.get('/api/v1/groups/:publicId',async(req,res)=>res.json({group:await groups.get(req.params.publicId)}));
  app.post('/api/v1/groups/:publicId/join',async(req,res)=>res.status(201).json(await groups.join(req.params.publicId,req.body)));
  app.post('/api/v1/groups/:publicId/update-pledge',async(req,res)=>{
   const token=req.get('Authorization')?.replace(/^Bearer /,'')||'';
   res.json(await groups.update(req.params.publicId,token,req.body));
  });
- app.use((_req,res)=>res.status(404).json({error:'העמוד לא נמצא',code:'NOT_FOUND'}));
+ app.use((_req,res)=>res.status(404).json({error:'העמוד לא נמצא',code:'NOT_FOUND' satisfies ErrorCode}));
  app.use((error:any,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{
   const status=error instanceof ApiError?error.status:error?.status===413?413:error?.status===400?400:500;
   if(status===429)res.set('Retry-After','600');
+  const code:ErrorCode=error instanceof ApiError?error.code:status===413?'BODY_TOO_LARGE':status===400?'INVALID_INPUT':'SERVICE_UNAVAILABLE';
   // Never serialize exception/provider/database text, customer input, headers or config.
-  res.status(status).json({error:error instanceof ApiError?error.message:'לא ניתן להשלים את הבקשה כרגע.',code:error instanceof ApiError?error.code:status===413?'BODY_TOO_LARGE':status===400?'INVALID_INPUT':'SERVICE_UNAVAILABLE'});
+  res.status(status).json({error:error instanceof ApiError?error.message:'לא ניתן להשלים את הבקשה כרגע.',code});
  });
  return app;
 }

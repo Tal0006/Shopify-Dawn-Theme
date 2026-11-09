@@ -32,6 +32,7 @@
     <link href="{{ 'animate.css' | asset_url }}" rel="stylesheet">
     <link href="{{ 'themify-icons.css' | asset_url }}" rel="stylesheet">
     <link href="{{ 'style.css' | asset_url }}" rel="stylesheet">
+    <noscript><style>.preloader { display: none !important; }</style></noscript>
 
     {{ 'storefront.css' | asset_url | stylesheet_tag }}
     {% render 'storefront-design' %}
@@ -68,6 +69,30 @@
           </div>
         </div>
       </div>
+      <script>
+        (() => {
+          // Critical visibility path: plain JavaScript, independent of jQuery and the deferred legacy scripts.
+          // style.css also fades the overlay out on its own after a few seconds if this never runs.
+          const preloader = document.querySelector('.preloader');
+          if (!preloader) return;
+          let release;
+          window.fankeePreloader = {done: new Promise(resolve => { release = resolve; })};
+          let paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          try { paused = paused || JSON.parse(localStorage.getItem('punky-accessibility-v1'))?.motion === true; } catch {}
+          let finished = false;
+          const finish = () => {
+            if (finished) return;
+            finished = true;
+            preloader.setAttribute('data-preloader-done', '');
+            setTimeout(() => { preloader.hidden = true; release(); }, paused ? 0 : 500);
+          };
+          if (paused) { finish(); return; }
+          // Same timing as before (window load + 100ms), but slow media never holds the page past DOM ready + 1.5s.
+          if (document.readyState === 'complete') finish();
+          else window.addEventListener('load', () => setTimeout(finish, 100), {once: true});
+          document.addEventListener('DOMContentLoaded', () => setTimeout(finish, 1500), {once: true});
+        })();
+      </script>
       <!-- end preloader -->
       <!-- Start header -->
 

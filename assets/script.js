@@ -119,14 +119,11 @@
         = HIDE PRELOADER
     -------------------------------------------*/
   function preloader() {
-    if ($('.preloader').length) {
-      $('.preloader')
-        .delay(100)
-        .fadeOut(500, function () {
-          //active wow
-          wow.init();
-        });
-    }
+    // The overlay is hidden without jQuery by the inline controller in layout/theme.liquid.
+    // Start WOW once it is gone, as the previous fadeOut callback did.
+    var state = window.fankeePreloader;
+    if (state && state.done) state.done.then(function () { wow.init(); });
+    else wow.init();
   }
 
   /*------------------------------------------
