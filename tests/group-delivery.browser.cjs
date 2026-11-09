@@ -44,12 +44,12 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    .replace(/<script type="application\/json" data-group-errors>[\s\S]*?<\/script>/,'<script type="application/json" data-group-errors>'+JSON.stringify(errors)+'</script>')
    .replace(/{{ group_delivery_service_url \| escape }}/g,'https://groups.example.test')
    .replace(/{{ routes.cart_url }}/g,'/he/cart').replace(/{{ section.id }}/g,'fixture').replace(/{{ request.locale.iso_code }}/g,'he')
-   .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escape(key.split('.').reduce((a,k)=>a[k],tr).replace('{{ area }}','__AREA__').replace('{{ count }}','__COUNT__').replace('{{ amount }}','__AMOUNT__').replace('{{ target }}','__TARGET__')));
+   .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escape(key.split('.').reduce((a,k)=>a[k],tr).replace('{{ area }}','__AREA__').replace('{{ count }}','__COUNT__').replace('{{ amount }}','__AMOUNT__').replace('{{ target }}','__TARGET__').replace('{{ approved }}','__APPROVED__').replace('{{ waiting }}','__WAITING__').replace('{{ deadline }}','__DEADLINE__')));
   await ev('document.querySelector("main").innerHTML='+JSON.stringify(markup));
   await ev(`
    sessionStorage.clear();localStorage.clear();window.requests=[];window.logged=[];window.existing=true;window.updateResponse=null;window.getResponse=null;
    for(const level of ['log','info','warn','error','debug']){const original=console[level].bind(console);console[level]=(...args)=>{logged.push(args.map(String).join(' '));original(...args);};}window.geoCalls=0;window.apiFailure=false;window.quantity=1;
-   window.geoMode='success';window.nearestArea=null;
+   window.geoMode='success';window.nearestArea=null;window.verifications=0;window.approvals=[];window.member=undefined;
    window.geolocationMock={getCurrentPosition(success,fail){geoCalls++;if(geoMode==='denied')fail({code:1});else if(geoMode==='error')fail({code:2});else success({coords:{latitude:31.812345,longitude:34.654321}});}};
    Object.defineProperty(navigator,'geolocation',{configurable:true,value:geolocationMock});
    window.areaList=[{"publicId":"6f1a2c00-0001-4a00-8000-0000000000a1","name":"באר שבע"},{"publicId":"6f1a2c00-0002-4a00-8000-0000000000a2","name":"אשדוד"},{"publicId":"6f1a2c00-0003-4a00-8000-0000000000a3","name":"אשקלון"},{"publicId":"6f1a2c00-0004-4a00-8000-0000000000a4","name":"קריית גת"},{"publicId":"6f1a2c00-0005-4a00-8000-0000000000a5","name":"נתיבות"},{"publicId":"6f1a2c00-0006-4a00-8000-0000000000a6","name":"אופקים"},{"publicId":"6f1a2c00-0007-4a00-8000-0000000000a7","name":"שדרות"}];
@@ -61,6 +61,11 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
     if(window.apiNetworkError)throw new TypeError('Failed to fetch');
     if(window.apiResponse)return new Response(apiResponse.raw??JSON.stringify(apiResponse.body),{status:apiResponse.status});
     if(apiFailure)return new Response(JSON.stringify({code:'SERVICE_UNAVAILABLE',error:'upstream secret must not display'}),{status:503});
+    // Payment verification simulator endpoints (development provider) and receipt-authenticated membership.
+    if(url.pathname.endsWith('/api/v1/payment-verifications')){verifications++;return new Response(JSON.stringify(window.verificationCreate||{verification:{id:'99999999-9999-4999-8999-99999999999'+(verifications%10),status:'PENDING',expiresAt:'2050-01-01T00:00:00.000Z'},verificationToken:'d'.repeat(64),next:{type:'mock'}}),{status:201});}
+    if(url.pathname.endsWith('/mock-result')){const status={verified:'VERIFIED',failed:'FAILED',cancelled:'CANCELLED'}[body.outcome];return new Response(JSON.stringify({verification:{id:url.pathname.split('/').at(-2),status,expiresAt:'2050-01-01T00:00:00.000Z'}}));}
+    if(url.pathname.endsWith('/payment-approval')){approvals.push(body);if(window.approvalResponse)return new Response(JSON.stringify(approvalResponse.body),{status:approvalResponse.status});return new Response(JSON.stringify({group,member:window.memberAfterApproval}));}
+    if(url.pathname.endsWith('/membership')&&window.member!==undefined&&!window.getResponse)return new Response(JSON.stringify({group,member}));
     if(url.pathname.endsWith('/update-pledge')&&window.updateResponse)return new Response(JSON.stringify(updateResponse.body),{status:updateResponse.status});
     if(!body&&url.pathname.includes('/groups/')&&window.getResponse)return new Response(JSON.stringify(getResponse.body),{status:getResponse.status});
     if(url.pathname.endsWith('/api/v1/areas'))return new Response(JSON.stringify({areas:areaList}));
@@ -79,6 +84,11 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   const input='widget.querySelector("[data-area-input]")',list='widget.querySelector("[data-area-list]")';
   const key=name=>ev(input+'.dispatchEvent(new KeyboardEvent("keydown",{key:'+JSON.stringify(name)+',bubbles:true,cancelable:true}))');
   const type=value=>ev(input+'.value='+JSON.stringify(value)+';'+input+'.dispatchEvent(new Event("input",{bubbles:true}))');
+  // Development verification: start, then choose the simulated outcome.
+  const verifyPayment=async(outcome='verified')=>{
+   await ev('widget.querySelector("[data-verify-payment]").click()');await wait('!widget.hasAttribute("aria-busy")');
+   await ev('widget.querySelector("[data-mock-outcome='+outcome+']").click()');await wait('!widget.hasAttribute("aria-busy")');
+  };
   const optionNames=()=>ev('[...'+list+'.querySelectorAll("[role=option]")].map(o=>o.textContent)');
   await t.test('Areas load from the service; geolocation only on click, coarse coordinates sent once to suggest an area',async()=>{
    assert.equal(await ev('geoCalls'),0);
@@ -111,9 +121,16 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.equal(await ev('widget.querySelector("[data-group-panel]").hidden'),false);
   });
   await t.test('Join is guarded, stores only an opaque durable receipt and updates without payment',async()=>{
-   await ev('widget.querySelector("[name=email]").value="fixture@example.test";widget.querySelector("[name=phone]").value="0501234567";widget.querySelector("[data-join-group]").requestSubmit();widget.querySelector("[data-join-group]").requestSubmit()');
+   await ev('widget.querySelector("[name=email]").value="fixture@example.test";widget.querySelector("[name=phone]").value="0501234567"');
+   assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),true,'Join waits for a verified payment method');
+   await verifyPayment();
+   assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),false);
+   await ev('widget.querySelector("[data-join-group]").requestSubmit();widget.querySelector("[data-join-group]").requestSubmit()');
    await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('requests.filter(r=>r.url.endsWith("/join")).length'),1);
+   const joinBody=await ev('requests.find(r=>r.url.endsWith("/join")).body');
+   assert.equal(joinBody.verificationToken,'d'.repeat(64));assert.match(joinBody.verificationId,/^9{8}-/);
+   assert.equal(await ev('widget.querySelector("[data-payment-step]").hidden'),true,'members see no verification step');
    assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true);
    const receipt=await ev('JSON.parse(localStorage.getItem(widget.receiptPrefix+group.publicId))');
    assert.deepEqual(Object.keys(receipt).sort(),['memberToken','publicId','savedAt']);
@@ -134,7 +151,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.ok(!(await ev('widget.message.textContent')).includes('secret'));
    await ev('apiFailure=false;group.status="APPROVED";widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),true);
-   assert.ok(await ev('widget.querySelector("[data-group-state]").textContent.includes("התשלום עדיין")'));
+   assert.equal(await ev('widget.querySelector("[data-group-state]").textContent'),tr.group_delivery.status.approved);
   });
   await t.test('Receipt restoration needs no PII and does not duplicate listeners',async()=>{
    await ev('const parent=widget.parentNode;widget.remove();parent.append(widget)');
@@ -202,14 +219,17 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.equal(await ev('widget.querySelector("[data-group-state]").textContent'),tr.group_delivery.pending_state);
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.none_found);
    assert.equal(await ev('widget.querySelector("[data-join-button]").textContent'),tr.group_delivery.start);
-   assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),false);
+   assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),true,'disabled until payment verification');
    assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),false);
    for(const part of ['.group-delivery__totals','.group-delivery__progress','.group-delivery__stats','[data-refresh]'])assert.equal(await ev('getComputedStyle(widget.querySelector('+JSON.stringify(part)+')).display==="none"||!widget.querySelector('+JSON.stringify(part)+').getClientRects().length'),true,part);
    assert.equal(await ev('requests.filter(r=>r.url.endsWith("/groups/join")).length'),0,'nothing is created before Join');
-   await ev('widget.querySelector("[name=email]").value="starter@example.test";widget.querySelector("[name=phone]").value="0507654321";widget.querySelector("[data-join-group]").requestSubmit();widget.querySelector("[data-join-group]").requestSubmit()');
+   await ev('widget.querySelector("[name=email]").value="starter@example.test";widget.querySelector("[name=phone]").value="0507654321"');
+   await verifyPayment();
+   assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),false);
+   await ev('widget.querySelector("[data-join-group]").requestSubmit();widget.querySelector("[data-join-group]").requestSubmit()');
    await wait('!widget.hasAttribute("aria-busy")');
    const joins=await ev('requests.filter(r=>r.url.endsWith("/groups/join"))');
-   assert.equal(joins.length,1);assert.deepEqual(Object.keys(joins[0].body).sort(),['areaPublicId','email','lines','phone']);
+   assert.equal(joins.length,1);assert.deepEqual(Object.keys(joins[0].body).sort(),['areaPublicId','email','lines','phone','verificationId','verificationToken']);
    assert.equal(joins[0].body.areaPublicId,OFAKIM,'the join uses the searched area');
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.started);
    assert.equal(await ev(panel+'.hasAttribute("data-group-pending")'),false);
@@ -326,6 +346,137 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    await call('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
    await type('אשדוד');await key('Escape');
   });
+  await t.test('Payment verification gates Join: failed, cancelled, changed contact, rejection and fail-closed states',async()=>{
+   await ev('localStorage.clear();sessionStorage.clear();existing=true;quantity=1;group={...group,status:"OPEN",publicId:"11111111-1111-4111-8111-111111111111"};'+reconnect);
+   await wait('!widget.hasAttribute("aria-busy")');
+   await ev('widget.querySelector("[name=area]").value="אשדוד";void widget.perform(()=>widget.find())');await wait('!widget.hasAttribute("aria-busy")');
+   const step='widget.querySelector("[data-payment-step]")',status='widget.querySelector("[data-payment-status]").textContent',join='widget.querySelector("[data-join-button]")';
+   assert.equal(await ev(step+'.hidden'),false);assert.equal(await ev(step+'.dataset.state'),'required');
+   assert.equal(await ev(status),tr.group_delivery.pay_required);assert.equal(await ev(join+'.disabled'),true);
+   assert.equal(await ev(step+'.querySelectorAll("input,select,textarea,iframe").length'),0,'no payment-detail fields of our own');
+   await ev('widget.querySelector("[name=email]").value="verify@example.test";widget.querySelector("[name=phone]").value="0501112233"');
+   // Starting verification shows the clearly labelled development control.
+   await ev('widget.querySelector("[data-verify-payment]").click()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev(step+'.dataset.state'),'verifying');assert.equal(await ev('widget.querySelector("[data-mock-payment]").hidden'),false);
+   assert.equal(await ev('widget.querySelector(".group-delivery__mock-badge").textContent'),tr.group_delivery.pay_test_badge);
+   assert.equal(await ev('document.activeElement.dataset.mockOutcome'),'verified','focus moves to the test control');
+   assert.deepEqual(await ev('requests.filter(r=>r.url.endsWith("/payment-verifications")).at(-1).body'),{email:'verify@example.test',phone:'0501112233'});
+   for(const outcome of ['failed','cancelled']){
+    await ev('widget.querySelector("[data-mock-outcome='+outcome+']").click()');await wait('!widget.hasAttribute("aria-busy")');
+    assert.equal(await ev(step+'.dataset.state'),outcome);assert.equal(await ev(status),tr.group_delivery['pay_'+outcome]);
+    assert.equal(await ev('widget.message.textContent'),tr.group_delivery['pay_'+outcome]);
+    assert.equal(await ev(join+'.disabled'),true,outcome+' never enables Join');assert.equal(await ev('widget.querySelector("[data-verify-payment]").hidden'),false);
+    await ev('widget.querySelector("[data-verify-payment]").click()');await wait('!widget.hasAttribute("aria-busy")');
+   }
+   await ev('widget.querySelector("[data-mock-outcome=verified]").click()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev(step+'.dataset.state'),'verified');assert.equal(await ev(status),tr.group_delivery.pay_verified);
+   assert.equal(await ev(join+'.disabled'),false);assert.equal(await ev('document.activeElement===widget.querySelector("[data-join-button]")'),true);
+   assert.equal(await ev('widget.querySelector("[data-mock-payment]").hidden'),true);
+   const mockCalls=await ev('requests.filter(r=>r.url.endsWith("/mock-result"))');
+   assert.ok(mockCalls.length>=3&&mockCalls.every(r=>r.headers.Authorization==='Bearer '+'d'.repeat(64)),'verification secret travels only as a bearer header');
+   // Editing the contact voids the verification.
+   await ev('{const phone=widget.querySelector("[name=phone]");phone.value="0509998877";phone.dispatchEvent(new Event("input",{bubbles:true}));}');
+   assert.equal(await ev(step+'.dataset.state'),'reverify');assert.equal(await ev(status),tr.group_delivery.pay_reverify);assert.equal(await ev(join+'.disabled'),true);
+   await verifyPayment();assert.equal(await ev(join+'.disabled'),false);
+   // The service rejects the verification: no receipt, and the shopper starts verification again.
+   await ev('window.apiResponse={status:403,body:{code:"PAYMENT_VERIFICATION_REQUIRED"}};widget.querySelector("[data-join-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
+   await ev('window.apiResponse=null');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_payment_required);
+   assert.equal(await ev(step+'.dataset.state'),'expired');assert.equal(await ev(join+'.disabled'),true);
+   assert.equal(await ev('localStorage.length'),0,'no receipt without a successful join');
+   // No configured provider, or anything other than the simulator, fails closed without navigating anywhere.
+   await ev('window.apiResponse={status:503,body:{code:"PAYMENTS_UNAVAILABLE"}};widget.querySelector("[data-verify-payment]").click()');await wait('!widget.hasAttribute("aria-busy")');
+   await ev('window.apiResponse=null');assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_payments_unavailable);
+   await ev('window.verificationCreate={verification:{id:"99999999-9999-4999-8999-999999999990",status:"PENDING",expiresAt:"2050-01-01T00:00:00.000Z"},verificationToken:"d".repeat(64),next:{type:"redirect",url:"https://evil.example/pay"}};widget.querySelector("[data-verify-payment]").click()');await wait('!widget.hasAttribute("aria-busy")');
+   await ev('window.verificationCreate=null');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_payments_unavailable);assert.equal(await ev('location.hostname'),'127.0.0.1');
+   assert.equal(await ev('widget.querySelector("[data-mock-payment]").hidden'),true);assert.equal(await ev(join+'.disabled'),true);
+   const stored=await ev('JSON.stringify({...localStorage})+JSON.stringify({...sessionStorage})+document.documentElement.outerHTML+logged.join("\\n")');
+   assert.ok(!stored.includes('d'.repeat(64)),'verification secret is never stored, rendered or logged');
+   // A clean verified join still works and stores only the receipt.
+   await verifyPayment();await ev('widget.querySelector("[data-join-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.deepEqual(await ev('Object.keys(JSON.parse(localStorage.getItem('+receiptKey+')))'),['publicId','memberToken','savedAt']);
+   assert.equal(await ev(step+'.hidden'),true);
+  });
+  await t.test('Payment phase: awaiting store, exact-amount consent with deadline, changed and invalid carts, cancellation',async()=>{
+   const base={active:true,pledgedAgorot:1590,paymentMethod:'VERIFIED',approval:{status:'NOT_REQUIRED',amountAgorot:null,nonce:null,review:null},charge:{status:'NOT_STARTED',amountAgorot:null,chargedAt:null,failure:null},actions:{approve:false,decline:false}};
+   const required={...base,approval:{status:'REQUIRED',amountAgorot:1590,nonce:'e'.repeat(32),review:null},actions:{approve:true,decline:true}};
+   const setMember=member=>ev('window.member='+JSON.stringify(member));
+   const refresh=async()=>{await ev('widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');};
+   const box='widget.querySelector("[data-member-payment]")',approve='widget.querySelector("[data-approve-payment]")',decline='widget.querySelector("[data-decline-payment]")';
+   const title='widget.querySelector("[data-member-pay-title]").textContent',detail='widget.querySelector("[data-member-pay-detail]").textContent';
+   // Threshold reached, store has not approved yet: nothing to approve.
+   await ev('localStorage.clear();localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));group={...group,status:"THRESHOLD_REACHED",progressPercent:100,remainingAmountAgorot:0,approvals:{approved:0,waiting:0,approvedPledgeTotalAgorot:0,ready:false,deadline:null}}');
+   await setMember(base);await ev(reconnect);await wait('!widget.hasAttribute("aria-busy")');
+   const restore=await ev('requests.filter(r=>r.url.endsWith("/membership")).at(-1)');
+   assert.equal(restore.headers.Authorization,'Bearer '+'a'.repeat(64));assert.equal(restore.method,'GET');
+   assert.equal(await ev(box+'.dataset.state'),'awaiting_store');assert.equal(await ev(title),tr.group_delivery.member_awaiting_store_title);
+   assert.equal(await ev('widget.querySelector("[data-group-state]").textContent'),tr.group_delivery.status.threshold_reached);
+   assert.equal(await ev(approve+'.hidden'),true);assert.equal(await ev(decline+'.hidden'),true);
+   assert.equal(await ev('widget.querySelector("[data-approvals-summary]").hidden'),true);
+   // Merchant approved: exact amount, deadline and explicit approval.
+   await ev('group={...group,status:"PAYMENT_OPEN",approvals:{approved:1,waiting:4,approvedPledgeTotalAgorot:1590,ready:false,deadline:"2050-01-02T10:00:00.000Z"}}');
+   await setMember(required);await refresh();
+   assert.equal(await ev(box+'.dataset.state'),'required');assert.equal(await ev(title),tr.group_delivery.member_required_title);
+   assert.ok((await ev('widget.querySelector("[data-member-pay-amount]").textContent')).includes('15.90'));
+   assert.ok((await ev(approve+'.textContent')).includes('15.90'));assert.equal(await ev(decline+'.textContent'),tr.group_delivery.decline);
+   assert.equal(await ev('widget.querySelector("[data-member-pay-exact]").textContent'),tr.group_delivery.member_exact);
+   assert.ok((await ev('widget.querySelector("[data-member-pay-deadline]").textContent')).includes('2050'));
+   const summary=await ev('widget.querySelector("[data-approvals-summary]").textContent');
+   assert.ok(summary.startsWith(tr.group_delivery.approvals.replace('{{ approved }}','1').replace('{{ waiting }}','4'))&&summary.includes('15.90'));
+   assert.notEqual(await ev('widget.message.textContent'),tr.group_delivery.closed,'members in the payment phase are not told the group is closed');
+   // Double click: one request with the shown nonce and amount; the reply is consent only.
+   await setMember({...required,approval:{...required.approval,status:'APPROVED',nonce:null},actions:{approve:false,decline:true}});
+   await ev('window.memberAfterApproval=member;'+approve+'.click();'+approve+'.click()');await wait('!widget.hasAttribute("aria-busy")');
+   const sent=await ev('approvals');assert.equal(sent.length,1);
+   assert.deepEqual(sent[0],{decision:'approve',approvalNonce:'e'.repeat(32),amountAgorot:1590});
+   assert.equal(await ev(box+'.dataset.state'),'approved');assert.equal(await ev('widget.message.textContent'),tr.group_delivery.member_approved);
+   assert.equal(await ev(approve+'.hidden'),true);assert.equal(await ev(decline+'.textContent'),tr.group_delivery.withdraw,'consent can be withdrawn before execution');
+   assert.equal(await ev('widget.querySelector("[data-member-pay-deadline]").hidden'),false);
+   // Execution states.
+   for(const [charge,state] of [['AUTHORIZED','authorized'],['PENDING','processing']]){
+    await setMember({...base,approval:{status:'APPROVED',amountAgorot:1590,nonce:null,review:null},charge:{...base.charge,status:charge}});await refresh();
+    assert.equal(await ev(box+'.dataset.state'),state);assert.equal(await ev(approve+'.hidden'),true);assert.equal(await ev(decline+'.hidden'),true);
+   }
+   await setMember({...base,approval:{status:'APPROVED',amountAgorot:1590,nonce:null,review:null},charge:{status:'SUCCEEDED',amountAgorot:1590,chargedAt:'2050-01-01T00:00:00.000Z',failure:null}});await refresh();
+   assert.equal(await ev(box+'.dataset.state'),'paid');assert.ok((await ev('widget.querySelector("[data-member-pay-amount]").textContent')).includes(tr.group_delivery.member_charged));
+   await setMember({...required,approval:{status:'APPROVED',amountAgorot:1590,nonce:'e'.repeat(32),review:null},charge:{...base.charge,status:'FAILED',failure:'DECLINED'}});await refresh();
+   assert.equal(await ev(box+'.dataset.state'),'failed');assert.ok((await ev(approve+'.textContent')).startsWith(tr.group_delivery.retry.split('{{')[0]));
+   // Shopify revalidation changed the price: the old approval is void and the new amount needs approval.
+   await setMember({...required,pledgedAgorot:1690,approval:{status:'REQUIRED',amountAgorot:1690,nonce:'f'.repeat(32),review:'CART_CHANGED',previousAmountAgorot:1590}});await refresh();
+   assert.ok((await ev('widget.querySelector("[data-member-pay-previous]").textContent')).includes('15.90'),'previously approved amount shown');
+   assert.equal(await ev(box+'.dataset.state'),'changed');assert.equal(await ev(title),tr.group_delivery.member_changed_title);assert.equal(await ev(detail),tr.group_delivery.member_changed);
+   assert.ok((await ev(approve+'.textContent')).includes('16.90'));
+   // A stale screen: the server refuses and the panel refreshes to the current amount.
+   await setMember({...required,pledgedAgorot:3180,approval:{status:'REQUIRED',amountAgorot:3180,nonce:'c'.repeat(32),review:'CART_CHANGED'}});
+   await ev('window.approvalResponse={status:409,body:{code:"PAYMENT_AMOUNT_CHANGED"}};'+approve+'.click()');await wait('!widget.hasAttribute("aria-busy")');
+   await ev('window.approvalResponse=null');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_amount_changed);assert.ok((await ev(approve+'.textContent')).includes('31.80'));
+   // Decline is explicit.
+   await ev('window.memberAfterApproval={...member,approval:{...member.approval,status:"DECLINED"},actions:{approve:true,decline:false}};'+decline+'.click()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.deepEqual(await ev('approvals.at(-1)'),{decision:'decline'});
+   assert.equal(await ev(box+'.dataset.state'),'declined');assert.equal(await ev(decline+'.hidden'),true);assert.equal(await ev(approve+'.hidden'),false);
+   // Unavailable cart, cancelled group, legacy member: explanations only.
+   await setMember({...base,approval:{status:'INVALIDATED',amountAgorot:1590,nonce:null,review:'CART_UNAVAILABLE'}});await refresh();
+   assert.equal(await ev(box+'.dataset.state'),'invalidated');assert.equal(await ev(detail),tr.group_delivery.member_invalidated);assert.equal(await ev(approve+'.hidden'),true);
+   await ev('group={...group,status:"CANCELLED"}');
+   await setMember({...base,approval:{status:'APPROVED',amountAgorot:1590,nonce:null,review:null},charge:{...base.charge,status:'VOIDED'}});await refresh();
+   assert.equal(await ev(box+'.dataset.state'),'cancelled');assert.equal(await ev(detail),tr.group_delivery.member_cancelled);
+   await ev('group={...group,status:"PAYMENT_OPEN"}');
+   await setMember({...base,paymentMethod:'NOT_STARTED'});await refresh();
+   assert.equal(await ev(box+'.dataset.state'),'legacy');assert.equal(await ev(approve+'.hidden'),true);
+   // Narrow RTL fit with the approval panel open.
+   await setMember(required);await refresh();
+   for(const width of [320,390]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:800,deviceScaleFactor:1,mobile:false});
+    assert.equal(await ev('document.documentElement.scrollWidth>innerWidth'),false,'overflow '+width);
+    assert.equal(await ev('['+approve+','+decline+'].every(b=>b.getBoundingClientRect().height>=44)'),true);
+   }
+   await call('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
+   const stored=await ev('JSON.stringify({...localStorage})+JSON.stringify({...sessionStorage})');
+   for(const forbidden of ['e'.repeat(32),'f'.repeat(32),'approval','charge','VERIFIED'])assert.ok(!stored.includes(forbidden),'payment state stored: '+forbidden);
+   await ev('window.member=undefined;window.memberAfterApproval=undefined;group={...group,status:"OPEN",progressPercent:73,remainingAmountAgorot:13500};delete group.approvals;'+reconnect);await wait('!widget.hasAttribute("aria-busy")');
+  });
   await t.test('Member tokens never appear in logs or rendered content',async()=>{
    const page=await ev('document.documentElement.outerHTML'),logs=await ev('logged.join("\\n")');
    for(const token of ['a'.repeat(64),'b'.repeat(64),'c'.repeat(64)]){assert.ok(!page.includes(token),'rendered token');assert.ok(!logs.includes(token),'logged token');}
@@ -407,10 +558,12 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    await wait('!widget.hasAttribute("aria-busy")');
   });
   await t.test('Mobile and desktop RTL fit, keyboard targets are usable, progress respects reduced motion',async()=>{
+   // Measure the settled layout: wait for finite entrance animations (infinite shimmer/pulse never finish).
+   await ev('Promise.all(document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{})))');
    for(const width of [320,360,375,390,768,1440,1600]){
     await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
-    const m=await ev('({overflow:document.documentElement.scrollWidth>innerWidth,dir:getComputedStyle(widget).direction,buttons:[...widget.querySelectorAll("button")].filter(n=>n.getBoundingClientRect().width).every(n=>n.getBoundingClientRect().height>=44)})');
-    assert.equal(m.overflow,false,'overflow '+width);assert.equal(m.dir,'rtl');assert.equal(m.buttons,true);
+    const m=await ev('({overflow:document.documentElement.scrollWidth>innerWidth,dir:getComputedStyle(widget).direction,small:[...widget.querySelectorAll("button")].filter(n=>n.getBoundingClientRect().width&&n.getBoundingClientRect().height<44).map(n=>(n.textContent.trim()||n.outerHTML.slice(0,60))+" "+n.getBoundingClientRect().height.toFixed(1))})');
+    assert.equal(m.overflow,false,'overflow '+width);assert.equal(m.dir,'rtl');assert.deepEqual(m.small,[],'44px buttons '+width);
    }
 
    await ev(`

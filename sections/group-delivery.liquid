@@ -9,7 +9,10 @@
  data-found="{{ 'group_delivery.found' | t | escape }}" data-updated="{{ 'group_delivery.updated' | t | escape }}" data-area="{{ 'group_delivery.area' | t: area: '__AREA__' | escape }}"
  data-count="{{ 'group_delivery.participants' | t: count: '__COUNT__' | escape }}" data-remaining="{{ 'group_delivery.remaining' | t: amount: '__AMOUNT__' | escape }}"
  data-update-label="{{ 'group_delivery.update' | t | escape }}" data-join-label="{{ 'group_delivery.join' | t | escape }}" data-closed="{{ 'group_delivery.closed' | t | escape }}" data-setup="{{ 'group_delivery.setup' | t | escape }}"
- data-almost="{{ 'group_delivery.almost' | t | escape }}" data-reached="{{ 'group_delivery.reached' | t | escape }}" data-waiting="{{ 'group_delivery.waiting' | t | escape }}" data-share-text="{{ 'group_delivery.share_text' | t: area: '__AREA__', amount: '__AMOUNT__', target: '__TARGET__' | escape }}" data-count-one="{{ 'group_delivery.participant_one' | t | escape }}" data-estimate="{{ 'group_delivery.verified_cart' | t | escape }}" data-pledge-label="{{ 'group_delivery.your_pledge' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}" data-locale="{{ request.locale.iso_code }}">
+ data-almost="{{ 'group_delivery.almost' | t | escape }}" data-reached="{{ 'group_delivery.reached' | t | escape }}" data-waiting="{{ 'group_delivery.waiting' | t | escape }}" data-share-text="{{ 'group_delivery.share_text' | t: area: '__AREA__', amount: '__AMOUNT__', target: '__TARGET__' | escape }}" data-count-one="{{ 'group_delivery.participant_one' | t | escape }}" data-estimate="{{ 'group_delivery.verified_cart' | t | escape }}" data-pledge-label="{{ 'group_delivery.your_pledge' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}"
+ data-pay-required="{{ 'group_delivery.pay_required' | t | escape }}" data-pay-verifying="{{ 'group_delivery.pay_verifying' | t | escape }}" data-pay-verified="{{ 'group_delivery.pay_verified' | t | escape }}" data-pay-failed="{{ 'group_delivery.pay_failed' | t | escape }}" data-pay-cancelled="{{ 'group_delivery.pay_cancelled' | t | escape }}" data-pay-expired="{{ 'group_delivery.pay_expired' | t | escape }}" data-pay-reverify="{{ 'group_delivery.pay_reverify' | t | escape }}" data-member-title="{{ 'group_delivery.member_title' | t | escape }}" data-member-verified="{{ 'group_delivery.member_verified' | t | escape }}" data-member-legacy="{{ 'group_delivery.member_legacy' | t | escape }}" data-member-required-title="{{ 'group_delivery.member_required_title' | t | escape }}" data-member-required="{{ 'group_delivery.member_required' | t | escape }}" data-member-declined="{{ 'group_delivery.member_declined' | t | escape }}" data-member-processing-title="{{ 'group_delivery.member_processing_title' | t | escape }}" data-member-processing="{{ 'group_delivery.member_processing' | t | escape }}" data-member-paid-title="{{ 'group_delivery.member_paid_title' | t | escape }}" data-member-paid="{{ 'group_delivery.member_paid' | t | escape }}" data-member-failed-title="{{ 'group_delivery.member_failed_title' | t | escape }}" data-member-failed="{{ 'group_delivery.member_failed' | t | escape }}" data-member-expired="{{ 'group_delivery.member_expired' | t | escape }}" data-member-amount="{{ 'group_delivery.member_amount' | t | escape }}" data-member-charged="{{ 'group_delivery.member_charged' | t | escape }}"
+ data-member-awaiting-store-title="{{ 'group_delivery.member_awaiting_store_title' | t | escape }}" data-member-awaiting-store="{{ 'group_delivery.member_awaiting_store' | t | escape }}" data-member-changed-title="{{ 'group_delivery.member_changed_title' | t | escape }}" data-member-changed="{{ 'group_delivery.member_changed' | t | escape }}" data-member-approved-title="{{ 'group_delivery.member_approved_title' | t | escape }}" data-member-approved="{{ 'group_delivery.member_approved' | t | escape }}" data-member-authorized-title="{{ 'group_delivery.member_authorized_title' | t | escape }}" data-member-authorized="{{ 'group_delivery.member_authorized' | t | escape }}" data-member-invalidated-title="{{ 'group_delivery.member_invalidated_title' | t | escape }}" data-member-invalidated="{{ 'group_delivery.member_invalidated' | t | escape }}" data-member-cancelled-title="{{ 'group_delivery.member_cancelled_title' | t | escape }}" data-member-cancelled="{{ 'group_delivery.member_cancelled' | t | escape }}" data-member-refund="{{ 'group_delivery.member_refund' | t | escape }}" data-member-exact="{{ 'group_delivery.member_exact' | t | escape }}" data-withdraw="{{ 'group_delivery.withdraw' | t | escape }}" data-decline="{{ 'group_delivery.decline' | t | escape }}"
+ data-member-previous="{{ 'group_delivery.member_previous' | t: amount: '__AMOUNT__' | escape }}" data-member-deadline="{{ 'group_delivery.member_deadline' | t: deadline: '__DEADLINE__' | escape }}" data-approvals-value="{{ 'group_delivery.approvals_value' | t: amount: '__AMOUNT__', target: '__TARGET__' | escape }}" data-approve-label="{{ 'group_delivery.approve' | t: amount: '__AMOUNT__' | escape }}" data-retry-label="{{ 'group_delivery.retry' | t: amount: '__AMOUNT__' | escape }}" data-approvals="{{ 'group_delivery.approvals' | t: approved: '__APPROVED__', waiting: '__WAITING__' | escape }}" data-locale="{{ request.locale.iso_code }}">
  <header><p class="group-delivery__eyebrow">{{ 'group_delivery.heading' | t }}</p><h1>{{ 'group_delivery.intro' | t }}</h1><h2>{{ 'group_delivery.promise' | t }}</h2><p>{{ 'group_delivery.description' | t }}</p></header>
  <p class="group-delivery__notice">{{ 'group_delivery.notice' | t }}</p>
  <form data-find-group>
@@ -34,11 +37,37 @@
   <div class="group-delivery__stats"><p class="group-delivery__people"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m3 11v-3a6 6 0 0 0-3-5"/></svg> <span data-participants></span></p>
   <p class="group-delivery__hint">{{ 'group_delivery.expires' | t }} <time data-expiry></time></p></div>
   <p class="group-delivery__pledge" data-validated-pledge hidden><span data-pledge-label>{{ 'group_delivery.verified_cart' | t }}</span> <bdi></bdi></p>
+  <p class="group-delivery__approvals" data-approvals-summary hidden></p>
+  {% comment %}Member's own payment state (states: verified, awaiting_store, required, changed, declined, approved, processing, authorized, paid, failed, invalidated, expired, cancelled, refund, legacy) from the receipt-authenticated /membership lookup; filled by group-delivery.js.{% endcomment %}
+  <div class="group-delivery__member-pay" data-member-payment hidden aria-labelledby="GroupMemberPay-{{ section.id }}">
+   <h3 id="GroupMemberPay-{{ section.id }}" data-member-pay-title></h3>
+   <p data-member-pay-detail></p>
+   <p class="group-delivery__pay-amount" data-member-pay-amount hidden><span data-member-pay-amount-label></span> <bdi></bdi></p>
+   <p class="group-delivery__hint" data-member-pay-previous hidden></p>
+   <p class="group-delivery__hint" data-member-pay-exact hidden></p>
+   <p class="group-delivery__pay-deadline" data-member-pay-deadline hidden></p>
+   <div class="group-delivery__actions"><button type="button" class="theme-btn" data-approve-payment hidden></button><button type="button" class="group-delivery__secondary" data-decline-payment hidden>{{ 'group_delivery.decline' | t }}</button></div>
+  </div>
   <form data-join-group>
    <fieldset data-contact-fields><legend>{{ 'group_delivery.contact' | t }}</legend>
     <label for="GroupEmail-{{ section.id }}">{{ 'group_delivery.email' | t }}</label><input id="GroupEmail-{{ section.id }}" type="email" name="email" required maxlength="254" autocomplete="email">
     <label for="GroupPhone-{{ section.id }}">{{ 'group_delivery.phone' | t }}</label><input id="GroupPhone-{{ section.id }}" type="tel" name="phone" required maxlength="24" autocomplete="tel" dir="ltr">
    </fieldset>
+   {% comment %}
+     Payment-method verification before Join. Never collects card details here: a real provider verifies on its own
+     hosted page. The test control appears only when the service reports its development simulator.
+   {% endcomment %}
+   <div class="group-delivery__payment" data-payment-step data-state="required" role="group" aria-labelledby="GroupPayTitle-{{ section.id }}">
+    <h3 id="GroupPayTitle-{{ section.id }}">{{ 'group_delivery.pay_heading' | t }}</h3>
+    <p class="group-delivery__hint">{{ 'group_delivery.pay_intro' | t }}</p>
+    <p class="group-delivery__pay-status" data-payment-status>{{ 'group_delivery.pay_required' | t }}</p>
+    <button type="button" class="group-delivery__secondary" data-verify-payment>{{ 'group_delivery.pay_verify' | t }}</button>
+    <div class="group-delivery__mock" data-mock-payment hidden role="group" aria-labelledby="GroupMockTitle-{{ section.id }}">
+     <p id="GroupMockTitle-{{ section.id }}" class="group-delivery__mock-badge">{{ 'group_delivery.pay_test_badge' | t }}</p>
+     <p class="group-delivery__hint">{{ 'group_delivery.pay_test_intro' | t }}</p>
+     <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-mock-outcome="verified">{{ 'group_delivery.pay_test_verified' | t }}</button><button type="button" class="group-delivery__secondary" data-mock-outcome="failed">{{ 'group_delivery.pay_test_failed' | t }}</button><button type="button" class="group-delivery__secondary" data-mock-outcome="cancelled">{{ 'group_delivery.pay_test_cancelled' | t }}</button></div>
+    </div>
+   </div>
    <button class="theme-btn" type="submit" data-join-button disabled>{{ 'group_delivery.join' | t }}</button>
   </form>
   <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-refresh>{{ 'group_delivery.refresh' | t }}</button><button type="button" class="group-delivery__secondary" data-share disabled>{{ 'group_delivery.share' | t }}</button></div>
@@ -51,7 +80,7 @@
    tools/group-delivery/src/domain.ts; CART_EMPTY..INVALID_RESPONSE, AREA_REQUIRED and AREAS_EMPTY are browser-side. DEFAULT is the fallback.
    tools/group-delivery/tests/contract.test.ts fails when either side drifts.
  {% endcomment %}
- <script type="application/json" data-group-errors>{% assign group_errors = 'INVALID_INPUT:error,INVALID_LOCATION:error_location,INVALID_CART:invalid_cart,INVALID_CONTACT:error_contact,INVALID_PRICE:error,INVALID_CART_TOTAL:error_cart_total,CART_UNAVAILABLE:cart_unavailable,SHOPIFY_UNAVAILABLE:shopify_error,GROUP_NOT_FOUND:error_not_found,GROUP_CLOSED:closed,GROUP_FULL:error_full,GROUP_LIMIT:error_group_limit,LOCATION_OUTSIDE_GROUP:error_outside,ALREADY_JOINED:duplicate,MEMBER_AUTH_REQUIRED:error_receipt,RATE_LIMITED:error_rate_limited,INVALID_HOST:error_unavailable,INVALID_ORIGIN:error_unavailable,NOT_FOUND:error_unavailable,BODY_TOO_LARGE:error,SERVICE_UNAVAILABLE:error_unavailable,CART_EMPTY:empty_cart,CART_READ_FAILED:error_cart_read,CART_CURRENCY:error_currency,REQUEST_TIMEOUT:error_timeout,NETWORK_ERROR:error_network,INVALID_RESPONSE:error,INVALID_AREA:error_area,INVALID_COORDINATES:geo_error,AREA_REQUIRED:area_required,AREAS_EMPTY:areas_none,DEFAULT:error' | split: ',' %}{ {% for group_error in group_errors %}{% assign group_error_pair = group_error | split: ':' %}{% assign group_error_key = group_error_pair.last | prepend: 'group_delivery.' %}{{ group_error_pair.first | json }}:{{ group_error_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
+ <script type="application/json" data-group-errors>{% assign group_errors = 'INVALID_INPUT:error,INVALID_LOCATION:error_location,INVALID_CART:invalid_cart,INVALID_CONTACT:error_contact,INVALID_PRICE:error,INVALID_CART_TOTAL:error_cart_total,CART_UNAVAILABLE:cart_unavailable,SHOPIFY_UNAVAILABLE:shopify_error,GROUP_NOT_FOUND:error_not_found,GROUP_CLOSED:closed,GROUP_FULL:error_full,GROUP_LIMIT:error_group_limit,LOCATION_OUTSIDE_GROUP:error_outside,ALREADY_JOINED:duplicate,MEMBER_AUTH_REQUIRED:error_receipt,RATE_LIMITED:error_rate_limited,INVALID_HOST:error_unavailable,INVALID_ORIGIN:error_unavailable,NOT_FOUND:error_unavailable,BODY_TOO_LARGE:error,SERVICE_UNAVAILABLE:error_unavailable,CART_EMPTY:empty_cart,CART_READ_FAILED:error_cart_read,CART_CURRENCY:error_currency,REQUEST_TIMEOUT:error_timeout,NETWORK_ERROR:error_network,INVALID_RESPONSE:error,INVALID_AREA:error_area,INVALID_COORDINATES:geo_error,AREA_REQUIRED:area_required,AREAS_EMPTY:areas_none,PAYMENTS_UNAVAILABLE:error_payments_unavailable,PAYMENT_VERIFICATION_REQUIRED:error_payment_required,PAYMENT_METHOD_REQUIRED:error_payment_method,PAYMENT_APPROVAL_NOT_AVAILABLE:error_approval_unavailable,PAYMENT_AMOUNT_CHANGED:error_amount_changed,DEFAULT:error' | split: ',' %}{ {% for group_error in group_errors %}{% assign group_error_pair = group_error | split: ':' %}{% assign group_error_key = group_error_pair.last | prepend: 'group_delivery.' %}{{ group_error_pair.first | json }}:{{ group_error_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
 </fankee-group-delivery>
 <script src="{{ 'group-delivery.js' | asset_url }}" defer></script>
 {% stylesheet %}
@@ -199,6 +228,51 @@ body:has(.a11y-launcher:not([hidden])) .group-delivery {padding-inline-end:max(1
 @media(prefers-reduced-motion:reduce) {.group-delivery__progress span::after {display:none;}}
 html[data-a11y-paused] .group-delivery__progress span::after {display:none;}
 .group-delivery__pledge[data-joined=true] {background:#e5f5f0;border-inline-start-color:#087d68;}
+/* Payment verification before Join and the member's payment panel. States come from data-state set by group-delivery.js. */
+.group-delivery__payment,.group-delivery__member-pay {margin-block:4px 16px;padding:16px;border:1px solid var(--fk-border);border-radius:var(--fk-radius-lg);background:linear-gradient(160deg,var(--fk-cyan-50),#fff);box-shadow:inset 0 1px 0 #fff;}
+.group-delivery__payment h3,.group-delivery__member-pay h3 {display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:17px;font-weight:700;color:var(--fk-text);overflow-wrap:anywhere;}
+.group-delivery__payment h3::before,.group-delivery__member-pay h3::before {content:"";flex:0 0 20px;inline-size:20px;block-size:20px;background:var(--fk-accent);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 5 6v5c0 4.4 3 8.3 7 9.5 4-1.2 7-5.1 7-9.5V6z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E") center/contain no-repeat;}
+.group-delivery__payment .group-delivery__hint {margin-block:0 10px;}
+.group-delivery__pay-status {display:flex;align-items:flex-start;gap:8px;margin-block:0 12px;padding:8px 12px;border:1px solid #bfe3e8;border-radius:var(--fk-radius-md);background:#fff;color:var(--fk-accent);font-size:14px;font-weight:600;line-height:1.6;}
+.group-delivery__pay-status::before {content:"";flex:0 0 8px;inline-size:8px;block-size:8px;margin-block-start:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 18%,transparent);}
+.group-delivery__payment[data-state=verifying] .group-delivery__pay-status::before {animation:group-delivery-pulse calc(1400ms * var(--fk-motion-scale,1)) ease-in-out infinite;}
+.group-delivery__payment[data-state=verified] {border-color:#bfe5cf;background:linear-gradient(160deg,var(--fk-success-bg),#fff);}
+.group-delivery__payment[data-state=verified] .group-delivery__pay-status {border-color:#bfe5cf;color:var(--fk-success);}
+.group-delivery__payment:is([data-state=failed],[data-state=cancelled],[data-state=expired],[data-state=reverify]) .group-delivery__pay-status {border-color:#f0d9b0;background:var(--fk-warning-bg,#fff7e8);color:var(--fk-warning);}
+.group-delivery [data-verify-payment] {display:inline-flex;align-items:center;justify-content:center;gap:8px;}
+.group-delivery__mock {margin-block-start:12px;padding:12px 14px;border:1px dashed #d9b679;border-radius:var(--fk-radius-md);background:#fffaf0;animation:fk-fade var(--fk-dur) var(--fk-ease-out);}
+.group-delivery__mock[hidden] {display:none;}
+.group-delivery__mock-badge {display:inline-flex;align-items:center;margin:0 0 6px;padding:3px 10px;border-radius:var(--fk-radius-pill);background:#f6e3bf;color:#6b4300;font-size:12px;font-weight:700;}
+.group-delivery__mock .group-delivery__hint {margin:0;}
+.group-delivery__mock .group-delivery__actions {margin-block:10px 0;}
+.group-delivery__approvals {display:inline-flex;margin-block:4px 12px;padding:5px 12px;border:1px solid #bfe3e8;border-radius:var(--fk-radius-pill);background:var(--fk-cyan-50);color:var(--fk-accent);font-size:13px;font-weight:600;}
+.group-delivery__approvals[hidden],.group-delivery__member-pay[hidden] {display:none;}
+.group-delivery__member-pay {margin-block:14px;animation:fk-rise var(--fk-dur) var(--fk-ease-out);}
+.group-delivery__member-pay p {margin-block:0 10px;line-height:1.7;}
+.group-delivery__member-pay:is([data-state=required],[data-state=declined]) {border-color:var(--fk-border-strong);box-shadow:var(--fk-shadow-md),inset 0 1px 0 #fff;}
+.group-delivery__member-pay[data-state=paid] {border-color:#bfe5cf;background:linear-gradient(160deg,var(--fk-success-bg),#fff);}
+.group-delivery__member-pay[data-state=paid] h3::before {background:var(--fk-success);}
+.group-delivery__member-pay[data-state=failed] {border-color:#f0d9b0;background:linear-gradient(160deg,#fff7e8,#fff);}
+.group-delivery__member-pay[data-state=failed] h3::before {background:var(--fk-warning);}
+.group-delivery__member-pay[data-state=processing] h3::before {animation:group-delivery-pulse calc(1400ms * var(--fk-motion-scale,1)) ease-in-out infinite;}
+.group-delivery__pay-amount {display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border-radius:var(--fk-radius-md);background:#fff;border:1px solid var(--fk-border);font-size:14px;}
+.group-delivery__pay-amount[hidden],.group-delivery__member-pay [hidden] {display:none;}
+.group-delivery__pay-deadline {display:inline-flex;align-items:center;gap:8px;margin-block:10px 0;padding:5px 12px;border:1px solid #bfe3e8;border-radius:var(--fk-radius-pill);background:#fff;color:var(--fk-accent);font-size:13px;font-weight:600;}
+.group-delivery__member-pay .group-delivery__hint {margin-block:8px 0;}
+.group-delivery__member-pay:is([data-state=changed],[data-state=invalidated]) {border-color:#f0d9b0;background:linear-gradient(160deg,#fff7e8,#fff);}
+.group-delivery__member-pay:is([data-state=changed],[data-state=invalidated]) h3::before {background:var(--fk-warning);}
+.group-delivery__member-pay:is([data-state=approved],[data-state=authorized]) {border-color:#bfe5cf;}
+.group-delivery__member-pay[data-state=authorized] h3::before {animation:group-delivery-pulse calc(1400ms * var(--fk-motion-scale,1)) ease-in-out infinite;}
+.group-delivery__pay-amount bdi {font-size:22px;font-weight:800;color:var(--fk-teal-900);}
+.group-delivery__member-pay .group-delivery__actions {margin-block:12px 0;}
+.group-delivery [data-approve-payment] {flex:1 1 220px;}
+@keyframes group-delivery-pulse {50% {opacity:.35;}}
+@media(max-width:599px) {
+ .group-delivery__payment,.group-delivery__member-pay {padding:14px;}
+ .group-delivery [data-verify-payment],.group-delivery__mock .group-delivery__actions>button {inline-size:100%;}
+}
+@media(prefers-reduced-motion:reduce) {.group-delivery__payment .group-delivery__pay-status::before,.group-delivery__member-pay h3::before,.group-delivery__mock,.group-delivery__member-pay {animation:none;}}
+html[data-a11y-paused] :is(.group-delivery__payment .group-delivery__pay-status,.group-delivery__member-pay h3)::before {animation:none;}
 {% endstylesheet %}
 {% schema %}
 {"name":"t:storefront_editor.group_delivery","settings":[{"type":"url","id":"service_url","label":"t:storefront_editor.group_delivery_url"}],"presets":[{"name":"t:storefront_editor.group_delivery"}]}

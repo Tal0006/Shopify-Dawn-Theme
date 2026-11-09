@@ -1,6 +1,6 @@
 
 import {agorot} from './domain.js';
-export interface Config {port:number;production:boolean;origin:string;storefrontOrigins:string[];databaseUrl:string;username:string;password:string;secret:string;domain:string;version:string;token:string;standardRadius:number;threshold:bigint;expiryDays:number;proxyHops:number;areaSuggestionRadius:number;storeLocation?:{lat:number;lng:number}}
+export interface Config {port:number;production:boolean;origin:string;storefrontOrigins:string[];databaseUrl:string;username:string;password:string;secret:string;domain:string;version:string;token:string;standardRadius:number;threshold:bigint;expiryDays:number;proxyHops:number;areaSuggestionRadius:number;paymentProvider:'none'|'mock';paymentApprovalHours:number;paymentExecutionPolicy:'require_authorization'|'allow_direct_charge';maintenanceToken?:string;storeLocation?:{lat:number;lng:number}}
 export function config(env:NodeJS.ProcessEnv=process.env):Config{
  const required=(key:string)=>{const value=env[key]?.trim();if(!value)throw Error('Configure '+key);return value;};
  const integer=(key:string,fallback:number,min:number,max:number)=>{const value=Number(env[key]?.trim()||fallback);if(!Number.isInteger(value)||value<min||value>max)throw Error('Invalid '+key);return value;};
@@ -12,7 +12,21 @@ export function config(env:NodeJS.ProcessEnv=process.env):Config{
  const password=required('ADMIN_PASSWORD'),secret=required('SESSION_SECRET');
  if(password.length<16||secret.length<32)throw Error('ADMIN_PASSWORD needs 16+ characters; SESSION_SECRET needs 32+ characters');
  const threshold=agorot(env.GROUP_THRESHOLD_ILS?.trim()||'500');if(threshold<100n||threshold>100000000n)throw Error('Invalid group threshold');
+ // Payments fail closed: no provider means joins are refused. The simulator needs an explicit second opt-in so a
+ // stray PAYMENT_PROVIDER=mock can never quietly stand in for a real provider (startup fails instead).
+ const providerName=(env.PAYMENT_PROVIDER?.trim()||'none').toLowerCase();
+ if(!['none','mock'].includes(providerName))throw Error('Invalid PAYMENT_PROVIDER');
+ if(providerName==='mock'&&env.ALLOW_MOCK_PAYMENTS?.trim()!=='true')throw Error('PAYMENT_PROVIDER=mock requires ALLOW_MOCK_PAYMENTS=true (simulated payments only)');
+ const paymentProvider=providerName as Config['paymentProvider'];
+ // Production requires authorize/capture: direct charges are not approved until a real adapter has a verified refund
+ // operation. The policy is server configuration only; nothing from a browser can change it.
+ const paymentExecutionPolicy=(env.PAYMENT_EXECUTION_POLICY?.trim()||'require_authorization') as Config['paymentExecutionPolicy'];
+ if(!['require_authorization','allow_direct_charge'].includes(paymentExecutionPolicy))throw Error('Invalid PAYMENT_EXECUTION_POLICY');
+ if(production&&paymentExecutionPolicy==='allow_direct_charge')throw Error('PAYMENT_EXECUTION_POLICY=allow_direct_charge is not approved for production (no verified refund operation)');
+ // Optional bearer secret for the internal maintenance route; without it the route does not exist.
+ const maintenanceToken=env.MAINTENANCE_TOKEN?.trim()||undefined;
+ if(maintenanceToken!==undefined&&maintenanceToken.length<32)throw Error('MAINTENANCE_TOKEN needs 32+ characters');
  let storeLocation:Config['storeLocation'];
  if(env.STORE_LATITUDE||env.STORE_LONGITUDE){const lat=Number(required('STORE_LATITUDE')),lng=Number(required('STORE_LONGITUDE'));if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)throw Error('Invalid store coordinates');storeLocation={lat,lng};}
- return {port,production,origin:appOrigin,storefrontOrigins:(env.STOREFRONT_ORIGINS||'').split(',').map(v=>v.trim()).filter(Boolean).map(origin),databaseUrl:required('DATABASE_URL'),username:required('ADMIN_USERNAME'),password,secret,domain,version,token:required('SHOPIFY_STOREFRONT_PRIVATE_TOKEN'),standardRadius:integer('STANDARD_DELIVERY_RADIUS_KM',20,1,200),threshold,expiryDays:integer('GROUP_EXPIRY_DAYS',7,1,30),areaSuggestionRadius:integer('AREA_SUGGESTION_RADIUS_KM',25,1,100),proxyHops:integer('TRUST_PROXY_HOPS',production?1:0,0,2),storeLocation};
+ return {port,production,origin:appOrigin,storefrontOrigins:(env.STOREFRONT_ORIGINS||'').split(',').map(v=>v.trim()).filter(Boolean).map(origin),databaseUrl:required('DATABASE_URL'),username:required('ADMIN_USERNAME'),password,secret,domain,version,token:required('SHOPIFY_STOREFRONT_PRIVATE_TOKEN'),standardRadius:integer('STANDARD_DELIVERY_RADIUS_KM',20,1,200),threshold,expiryDays:integer('GROUP_EXPIRY_DAYS',7,1,30),areaSuggestionRadius:integer('AREA_SUGGESTION_RADIUS_KM',25,1,100),proxyHops:integer('TRUST_PROXY_HOPS',production?1:0,0,2),paymentProvider,paymentApprovalHours:integer('PAYMENT_APPROVAL_HOURS',24,1,168),paymentExecutionPolicy,maintenanceToken,storeLocation};
 }

@@ -12,6 +12,7 @@ import {Shopify} from '../src/shopify.js';
 import {config} from '../src/config.js';
 import {agorot,placeName,distance,lines,contact,localityKey,hash,ApiError} from '../src/domain.js';
 import {migrate,type Database,type Connection} from '../src/db.js';
+import {MockPaymentProvider} from '../src/payments.js';
 // Seeded in migrations/002_delivery_areas.sql with fixed public IDs.
 const AREA={beerSheva:'6f1a2c00-0001-4a00-8000-0000000000a1',ashdod:'6f1a2c00-0002-4a00-8000-0000000000a2',ashkelon:'6f1a2c00-0003-4a00-8000-0000000000a3',kiryatGat:'6f1a2c00-0004-4a00-8000-0000000000a4',netivot:'6f1a2c00-0005-4a00-8000-0000000000a5',ofakim:'6f1a2c00-0006-4a00-8000-0000000000a6',sderot:'6f1a2c00-0007-4a00-8000-0000000000a7'};
 const SEEDED=['באר שבע','אשדוד','אשקלון','קריית גת','נתיבות','אופקים','שדרות'];
@@ -36,7 +37,7 @@ function harness(dir:string){
 test('Durable PostgreSQL group service',{timeout:180000},async t=>{
  const dir=await mkdtemp(join(tmpdir(),'fankee-group-db-'));const {state,db}=harness(dir);
  const writes=()=>state.log!.filter(entry=>/^(INSERT|UPDATE|DELETE|TRUNCATE)/i.test(entry.sql)).map(entry=>entry.sql);
- const cfg=config({PORT:'4330',DATABASE_URL:'postgresql://test',ADMIN_USERNAME:'merchant',ADMIN_PASSWORD:'testing-password-long-only',SESSION_SECRET:'testing-session-secret-not-real-00000000',SHOPIFY_STORE_DOMAIN:'example.myshopify.com',SHOPIFY_STOREFRONT_PRIVATE_TOKEN:'test-private-shopify-token',APP_ORIGIN:'http://127.0.0.1:4330'});
+ const cfg=config({PORT:'4330',DATABASE_URL:'postgresql://test',ADMIN_USERNAME:'merchant',ADMIN_PASSWORD:'testing-password-long-only',SESSION_SECRET:'testing-session-secret-not-real-00000000',SHOPIFY_STORE_DOMAIN:'example.myshopify.com',SHOPIFY_STOREFRONT_PRIVATE_TOKEN:'test-private-shopify-token',APP_ORIGIN:'http://127.0.0.1:4330',PAYMENT_PROVIDER:'mock',ALLOW_MOCK_PAYMENTS:'true'});
  let mode='ok';
  // Barrier: both callers finish pre-lock Shopify validation before either may continue into the lock.
  let barrier:{waiting:number;gate:Promise<void>;release:()=>void}|null=null;
@@ -49,7 +50,8 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
   if(barrier){const b=barrier;if(++b.waiting<2)await b.gate;else{barrier=null;b.release();}}
   return new Response(JSON.stringify({data:{nodes:body.variables.ids.map((id:string)=>id.endsWith('/999')?null:{id,availableForSale:mode!=='sold',requiresComponents:false,quantityAvailable:100,price:{amount:mode==='wrong-currency'?'2.00':'125.00',currencyCode:mode==='wrong-currency'?'USD':'ILS'},quantityRule:{minimum:1,increment:1,maximum:null},product:{requiresSellingPlan:false}})}}));
  });
- const areas=new Areas(db,cfg),service=new Groups(db,cfg,validator,areas),app=createApp(db,cfg,validator);
+ const payments=new MockPaymentProvider();
+ const areas=new Areas(db,cfg),service=new Groups(db,cfg,validator,areas,payments),app=createApp(db,cfg,validator,payments);
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
  cfg.origin='http://127.0.0.1:'+(server.address() as any).port;
  const line=(quantity=2)=>[{variantId:'1',quantity}];
@@ -57,10 +59,16 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
  const person=()=>({email:'fixture'+(++personIndex)+'@example.test',phone:'+972501'+String(personIndex).padStart(6,'0')});
  const post=(path:string,body:any,extra:Record<string,string>={})=>fetch(cfg.origin+path,{method:'POST',headers:{Origin:cfg.origin,'Content-Type':'application/json',...extra},body:JSON.stringify(body),redirect:'manual'});
  const find=async(area=AREA.ashdod)=>service.find({areaPublicId:area});
- const start=(area=AREA.ashdod,quantity=2,who=person())=>service.joinArea({...who,areaPublicId:area,lines:line(quantity)});
+ // Mock-verified payment method for this contact: the fields a storefront join sends after verification.
+ const verify=async(who:{email:string;phone:string},outcome:'verified'|'failed'|'cancelled'='verified')=>{
+  const session=await service.verifications.create(who);
+  await service.verifications.simulate(session.verification.id,session.verificationToken,{outcome});
+  return {verificationId:session.verification.id,verificationToken:session.verificationToken};
+ };
+ const start=async(area=AREA.ashdod,quantity=2,who=person())=>service.joinArea({...who,...await verify(who),areaPublicId:area,lines:line(quantity)});
  const count=async(table:string)=>Number((await db.query('SELECT COUNT(*)::int AS n FROM '+table)).rows[0].n);
  const publicAreas=async()=>((await (await fetch(cfg.origin+'/api/v1/areas')).json()) as any).areas as {publicId:string;name:string}[];
- t.beforeEach(async()=>{mode='ok';state.log=null;state.failMemberInsert=false;barrier=null;await db.query('TRUNCATE group_members, delivery_groups, request_limits, admin_sessions CASCADE');});
+ t.beforeEach(async()=>{mode='ok';state.log=null;state.failMemberInsert=false;barrier=null;await db.query('TRUNCATE group_members, delivery_groups, payment_verifications, request_limits, admin_sessions CASCADE');});
  try{
   await migrate(db);await migrate(db);
   await t.test('seeded areas are idempotent, normalized and listed publicly without coordinates',async()=>{
@@ -249,7 +257,8 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
   });
   await t.test('duplicate membership and concurrent joins preserve integer totals',async()=>{
    const group=(await start()).group,who=person();
-   const attempts=await Promise.allSettled([service.join(group.publicId,{...who,areaPublicId:AREA.ashdod,lines:line()}),service.join(group.publicId,{...who,areaPublicId:AREA.ashdod,lines:line()})]);
+   const [v1,v2]=[await verify(who),await verify(who)];
+   const attempts=await Promise.allSettled([service.join(group.publicId,{...who,...v1,areaPublicId:AREA.ashdod,lines:line()}),service.join(group.publicId,{...who,...v2,areaPublicId:AREA.ashdod,lines:line()})]);
    assert.equal(attempts.filter(a=>a.status==='fulfilled').length,1);
    const after=await service.get(group.publicId);assert.equal(after.participantCount,2);assert.equal(after.pledgedTotalAgorot,50000);
   });
@@ -286,16 +295,16 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    const searched=await response.json() as any;assert.equal(searched.validatedPledgeAgorot,25000);
    assert.equal(searched.group,null);assert.equal(searched.canCreateOnJoin,true);
    const privateContact=person();
-   const joined=await post('/api/v1/groups/join',{...privateContact,areaPublicId:AREA.ashdod,areaName:'שדרות',lines:line(),pledged_total_agorot:99999999});
+   const joined=await post('/api/v1/groups/join',{...privateContact,...await verify(privateContact),areaPublicId:AREA.ashdod,areaName:'שדרות',lines:line(),pledged_total_agorot:99999999});
    assert.equal(joined.status,201);const result=await joined.json() as any;assert.equal(result.group.pledgedTotalAgorot,25000);assert.equal(result.created,true);
    assert.equal(result.group.areaName,'אשדוד','client-supplied names are ignored');
    for(const forbidden of [privateContact.email,privateContact.phone,'approx_lat','anchor','snapshot','latitude','34.64'])assert.ok(!JSON.stringify(result).includes(forbidden),forbidden);
    const found=await (await post('/api/v1/groups/find',{areaPublicId:AREA.ashdod})).json() as any;
    assert.equal(found.group.publicId,result.group.publicId);assert.equal(found.canCreateOnJoin,false);
-   assert.equal((await post('/api/v1/groups/'+found.group.publicId+'/join',{...person(),areaPublicId:AREA.ashdod,lines:line()})).status,201);
+   const second=person();assert.equal((await post('/api/v1/groups/'+found.group.publicId+'/join',{...second,...await verify(second),areaPublicId:AREA.ashdod,lines:line()})).status,201);
    const publicResponse=await fetch(cfg.origin+'/api/v1/groups/'+found.group.publicId),body=await publicResponse.text();
    for(const forbidden of [privateContact.email,privateContact.phone,'approx_lat','center_lat','snapshot','memberToken','test-private-shopify-token','testing-password'])assert.ok(!body.includes(forbidden),forbidden);
-   assert.deepEqual(Object.keys(JSON.parse(body).group).sort(),['areaName','currency','expiresAt','participantCount','pledgedTotalAgorot','progressPercent','publicId','remainingAmountAgorot','status','thresholdAgorot'].sort());
+   assert.deepEqual(Object.keys(JSON.parse(body).group).sort(),['approvals','areaName','currency','expiresAt','participantCount','pledgedTotalAgorot','progressPercent','publicId','remainingAmountAgorot','status','thresholdAgorot'].sort());
    const areasBody=await (await fetch(cfg.origin+'/api/v1/areas')).text();
    for(const forbidden of ['31.8014','34.6435','latitude','slug'])assert.ok(!areasBody.includes(forbidden),'areas list exposes '+forbidden);
    const update=await post('/api/v1/groups/'+found.group.publicId+'/update-pledge',{lines:line(3)},{Authorization:'Bearer '+result.memberToken});assert.equal(update.status,200);
@@ -330,8 +339,8 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    const group=(await start(AREA.ashdod,1)).group;
    const approve=(token=csrf)=>post('/admin/api/groups/'+group.publicId+'/approve',{},{Cookie:cookie,'X-CSRF-Token':token});
    assert.equal((await approve('bad')).status,403);assert.equal((await approve()).status,409);
-   const member=await service.join(group.publicId,{...person(),areaPublicId:AREA.ashdod,lines:line(4)});
-   const approved=await approve();assert.equal(approved.status,200);assert.equal((await approved.json() as any).group.status,'APPROVED');
+   const buyer=person(),member=await service.join(group.publicId,{...buyer,...await verify(buyer),areaPublicId:AREA.ashdod,lines:line(4)});
+   const approved=await approve();assert.equal(approved.status,200);assert.equal((await approved.json() as any).group.status,'PAYMENT_OPEN','merchant approval opens the payment phase');
    assert.equal((await fetch(cfg.origin+'/admin/api/groups',{headers:{Cookie:cookie}})).status,200);
    await assert.rejects(()=>service.update(group.publicId,member.memberToken,{lines:line()}),(e:any)=>e.status===409);
    assert.equal((await post('/admin/logout',{},{Cookie:cookie,'X-CSRF-Token':csrf})).status,303);
@@ -421,7 +430,7 @@ test('Delivery-areas migration maps only exact text-only legacy groups and rewri
   assert.deepEqual(after,before,'names, keys, coordinates, status and totals unchanged');
   assert.equal(Number((await db.query('SELECT COUNT(*)::int AS n FROM group_members')).rows[0].n),1);
   // Mapped groups join area matching; unmapped groups stay readable and their members keep updating via receipts.
-  const cfg=config({PORT:'4330',DATABASE_URL:'postgresql://test',ADMIN_USERNAME:'merchant',ADMIN_PASSWORD:'testing-password-long-only',SESSION_SECRET:'testing-session-secret-not-real-00000000',SHOPIFY_STORE_DOMAIN:'example.myshopify.com',SHOPIFY_STOREFRONT_PRIVATE_TOKEN:'test-private-shopify-token',APP_ORIGIN:'http://127.0.0.1:4330'});
+  const cfg=config({PORT:'4330',DATABASE_URL:'postgresql://test',ADMIN_USERNAME:'merchant',ADMIN_PASSWORD:'testing-password-long-only',SESSION_SECRET:'testing-session-secret-not-real-00000000',SHOPIFY_STORE_DOMAIN:'example.myshopify.com',SHOPIFY_STOREFRONT_PRIVATE_TOKEN:'test-private-shopify-token',APP_ORIGIN:'http://127.0.0.1:4330',PAYMENT_PROVIDER:'mock',ALLOW_MOCK_PAYMENTS:'true'});
   const validator={validate:async()=>({total:12500n,snapshot:[{variantId:'gid://shopify/ProductVariant/1',quantity:1,unitAgorot:'12500'}]})};
   const service=new Groups(db,cfg,validator);
   assert.equal((await service.find({areaPublicId:AREA.kiryatGat})).group.publicId,ids.kiryat);

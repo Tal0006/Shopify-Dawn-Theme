@@ -10,8 +10,12 @@ import {Shopify,type CartValidator} from './shopify.js';
 import {Auth,same} from './auth.js';
 import {adminPage,loginPage,adminCSS} from './admin.js';
 import {ApiError,type ErrorCode} from './domain.js';
-export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg)){
- const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),auth=new Auth(db,cfg);
+import {paymentProvider,type PaymentProvider} from './payments.js';
+export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),payments:PaymentProvider=paymentProvider(cfg)){
+ const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas,payments),auth=new Auth(db,cfg);
+ // Bearer credentials (member receipts, verification secrets) travel only in Authorization, never cookies or URLs,
+ // so cross-site pages cannot replay them; the Origin/JSON checks below still apply to every write.
+ const bearer=(req:express.Request)=>req.get('Authorization')?.replace(/^Bearer /,'')||'';
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
  app.use((_req,res,next)=>{
   res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
@@ -31,8 +35,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   if(req.method==='OPTIONS'){res.set({'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600'});res.status(204).end();return;}
   if(!['GET','HEAD'].includes(req.method)&&(!origin||!allowed.includes(origin)||!req.is('application/json')))throw new ApiError(403,'INVALID_ORIGIN');
   // Nearest-area lookups get their own small bucket so location attempts cannot use up the join budget (or vice versa).
-  const read=['GET','HEAD'].includes(req.method),nearest=req.method==='POST'&&req.path==='/areas/nearest';
-  await auth.limit(req,nearest?'area-nearest':read?'public-read':'public-write',nearest?10:read?120:20,600);
+  const read=['GET','HEAD'].includes(req.method),nearest=req.method==='POST'&&req.path==='/areas/nearest',payment=!read&&req.path.startsWith('/payment-verifications');
+  await auth.limit(req,nearest?'area-nearest':payment?'payment-verify':read?'public-read':'public-write',nearest?10:payment?15:read?120:20,600);
   next();
  });
  app.use(express.json({limit:'24kb'}));
@@ -50,6 +54,9 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.get('/admin/api/groups',async(_req,res)=>res.json({groups:await groups.list()}));
  app.post('/admin/groups/:publicId/approve',async(req,res)=>{await groups.approve(req.params.publicId);res.redirect(303,'/admin');});
  app.post('/admin/api/groups/:publicId/approve',async(req,res)=>res.json({group:await groups.approve(req.params.publicId)}));
+ // Merchant approval opens PAYMENT_OPEN (above); execution normally starts by itself, "execute now" starts it early.
+ app.post('/admin/groups/:publicId/execute',async(req,res)=>{await groups.execute(req.params.publicId);res.redirect(303,'/admin');});
+ app.post('/admin/api/groups/:publicId/execute',async(req,res)=>res.json({group:await groups.execute(req.params.publicId)}));
  app.post('/admin/logout',async(req,res)=>auth.logout(req,res));
  // Delivery areas: same admin session, Origin and CSRF checks as group approval. HTML forms redirect; JSON API returns data.
  app.get('/admin/api/areas',async(_req,res)=>res.json({areas:await areas.adminList()}));
@@ -65,9 +72,22 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.post('/api/v1/groups/join',async(req,res)=>res.status(201).json(await groups.joinArea(req.body)));
  app.get('/api/v1/groups/:publicId',async(req,res)=>res.json({group:await groups.get(req.params.publicId)}));
  app.post('/api/v1/groups/:publicId/join',async(req,res)=>res.status(201).json(await groups.join(req.params.publicId,req.body)));
- app.post('/api/v1/groups/:publicId/update-pledge',async(req,res)=>{
-  const token=req.get('Authorization')?.replace(/^Bearer /,'')||'';
-  res.json(await groups.update(req.params.publicId,token,req.body));
+ app.post('/api/v1/groups/:publicId/update-pledge',async(req,res)=>res.json(await groups.update(req.params.publicId,bearer(req),req.body)));
+ // Payment verification (no charge). The browser gets an id + one-time secret; results come from the provider.
+ app.post('/api/v1/payment-verifications',async(req,res)=>res.status(201).json(await groups.verifications.create(req.body)));
+ app.get('/api/v1/payment-verifications/:id',async(req,res)=>res.json(await groups.verifications.status(req.params.id,bearer(req))));
+ // Development simulator only (PAYMENT_PROVIDER=mock with ALLOW_MOCK_PAYMENTS=true); 404 for every other provider.
+ app.post('/api/v1/payment-verifications/:id/mock-result',async(req,res)=>res.json(await groups.verifications.simulate(req.params.id,bearer(req),req.body)));
+ // Receipt-authenticated member state and the explicit payment approval (idempotent; amount is server-held).
+ app.get('/api/v1/groups/:publicId/membership',async(req,res)=>res.json(await groups.membership(req.params.publicId,bearer(req))));
+ app.post('/api/v1/groups/:publicId/payment-approval',async(req,res)=>res.json(await groups.approvePayment(req.params.publicId,bearer(req),req.body)));
+ // Scheduler entry point for payment maintenance (vendor-neutral: any cron/HTTP scheduler). Exists only when
+ // MAINTENANCE_TOKEN is configured; bearer secret only (no cookies, no CORS, no query-string tokens). Counts only.
+ app.post('/internal/payment-maintenance',async(req,res,next)=>{
+  if(!cfg.maintenanceToken){next();return;}
+  await auth.limit(req,'maintenance',30,600);
+  if(!same(bearer(req),cfg.maintenanceToken))throw new ApiError(401,'MAINTENANCE_AUTH_REQUIRED','גישה אינה מורשית');
+  res.json({maintenance:await groups.maintain()});
  });
  app.use((_req,res)=>res.status(404).json({error:'העמוד לא נמצא',code:'NOT_FOUND' satisfies ErrorCode}));
  app.use((error:any,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{
@@ -83,6 +103,7 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  let db:ReturnType<typeof database>|undefined;
  try{
   const cfg=config();db=database(cfg.databaseUrl);await migrate(db);
+  if(cfg.paymentProvider==='mock')console.warn('Group delivery: SIMULATED payments are active (PAYMENT_PROVIDER=mock). No real payment can be verified or charged.');
   const server=createApp(db,cfg).listen(cfg.port,'0.0.0.0',()=>console.info('Group delivery listening on port '+cfg.port));
   const stop=()=>{server.close(()=>{void db!.end().then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);

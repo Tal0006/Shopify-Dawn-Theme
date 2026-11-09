@@ -10,7 +10,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "migrate": "tsx --env-file=.env src/migrate.ts",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "maintain": "tsx --env-file=.env src/maintain.ts",
+    "maintain:dist": "node dist/maintain.js"
   },
   "dependencies": {
     "express": "^5.1.0",
