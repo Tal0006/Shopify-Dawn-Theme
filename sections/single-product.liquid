@@ -65,6 +65,7 @@
           {% if form.errors %}<div role="alert" class="storefront-form-errors">{{ form.errors | default_errors }}</div>{% endif %}
           {% if section.settings.show_dynamic_checkout and selected_variant.available %}{{ form | payment_button }}{% endif %}
         {% endform %}
+        {% unless selected_variant.available %}{% render 'back-in-stock-trigger', bis_product: product, bis_variant: selected_variant, bis_class: 'product-page__notify' %}{% endunless %}
         {% render 'product-trust' %}
         {% if section.settings.shipping_text != blank or shop.shipping_policy.body != blank or section.settings.pickup_text != blank or pickup_locations.size > 0 %}
           <aside class="product-page__reassurance" aria-label="{{ 'storefront.product_delivery' | t }}">

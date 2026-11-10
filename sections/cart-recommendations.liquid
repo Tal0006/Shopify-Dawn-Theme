@@ -1,0 +1,89 @@
+{% comment %}
+  Section contract.
+  Cart page product suggestions. With items in the cart: up to 4 in-stock products from Shopify's Product
+  Recommendations API (related to the first cart item), excluding products already in the cart; loaded by
+  storefront.js recommendations() through this same section, hidden when there is nothing to show.
+  With an empty cart: up to 4 in-stock products from the chosen best-sellers collection.
+  @example
+  <!-- templates/cart.json, after main-cart; choose a collection sorted by best selling -->
+{% endcomment %}
+{% render 'product-discovery-styles' %}
+{%- liquid
+  assign rec_limit = 4
+  assign rec_in_cart = cart.items | map: 'product_id' | join: ','
+  assign rec_in_cart = ',' | append: rec_in_cart | append: ','
+-%}
+{%- if cart.item_count == 0 -%}
+  {%- assign rec_collection = section.settings.bestsellers_collection | default: collections['best-sellers'] -%}
+  {%- capture rec_cards -%}
+    {%- assign rec_count = 0 -%}
+    {%- for card_product in rec_collection.products -%}
+      {%- if card_product.available and rec_count < rec_limit -%}
+        {%- assign rec_count = rec_count | plus: 1 -%}
+        {% render 'product-card', card_product: card_product, refined_card: true %}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endcapture -%}
+  {%- if rec_cards != blank -%}
+    {%- assign rec_heading = section.settings.empty_heading | strip -%}{%- if rec_heading == blank -%}{%- assign rec_heading = 'cart_recommendations.bestsellers' | t -%}{%- endif -%}
+    <section class="catalog-section catalog-home container product-discovery" data-storefront-discovery data-cart-recommendations aria-labelledby="CartRecommendationsHeading-{{ section.id }}">
+      <header class="catalog-section-header"><h2 id="CartRecommendationsHeading-{{ section.id }}">{{ rec_heading | escape }}</h2></header>
+      <div class="product-discovery__grid">{{ rec_cards }}</div>
+    </section>
+  {%- endif -%}
+{%- else -%}
+  {%- capture rec_cards -%}
+    {%- if recommendations.performed -%}
+      {%- assign rec_count = 0 -%}
+      {%- for card_product in recommendations.products -%}
+        {%- assign rec_key = ',' | append: card_product.id | append: ',' -%}
+        {%- if card_product.available and rec_count < rec_limit -%}
+          {%- unless rec_in_cart contains rec_key -%}
+            {%- assign rec_count = rec_count | plus: 1 -%}
+            {% render 'product-card', card_product: card_product, refined_card: true %}
+          {%- endunless -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+  {%- endcapture -%}
+  <section class="catalog-section catalog-home container product-discovery" data-product-recommendations data-cart-recommendations data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ cart.items.first.product_id }}&limit=10&intent=related" data-storefront-discovery aria-labelledby="CartRecommendationsHeading-{{ section.id }}" {% if rec_cards == blank %}hidden{% endif %}>
+    {%- if rec_cards != blank -%}
+      <header class="catalog-section-header"><h2 id="CartRecommendationsHeading-{{ section.id }}">{% if section.settings.heading != blank %}{{ section.settings.heading | escape }}{% else %}{{ 'cart_recommendations.heading' | t }}{% endif %}</h2></header>
+      <div class="product-discovery__grid">{{ rec_cards }}</div>
+    {%- endif -%}
+  </section>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:cart_recommendations_editor.name",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:cart_recommendations_editor.heading",
+      "info": "t:cart_recommendations_editor.heading_info"
+    },
+    {
+      "type": "collection",
+      "id": "bestsellers_collection",
+      "label": "t:cart_recommendations_editor.bestsellers_collection",
+      "info": "t:cart_recommendations_editor.bestsellers_collection_info"
+    },
+    {
+      "type": "text",
+      "id": "empty_heading",
+      "label": "t:cart_recommendations_editor.empty_heading",
+      "info": "t:cart_recommendations_editor.empty_heading_info"
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:cart_recommendations_editor.name"
+    }
+  ],
+  "enabled_on": {
+    "templates": ["cart"]
+  }
+}
+{% endschema %}

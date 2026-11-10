@@ -3,9 +3,14 @@
     "main": {
       "type": "group-delivery",
       "settings": {}
+    },
+    "group_delivery_info": {
+      "type": "group-delivery-info",
+      "settings": {}
     }
   },
   "order": [
-    "main"
+    "main",
+    "group_delivery_info"
   ]
 }

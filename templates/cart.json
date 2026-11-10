@@ -3,9 +3,14 @@
     "main": {
       "type": "main-cart",
       "settings": {}
+    },
+    "cart_recommendations": {
+      "type": "cart-recommendations",
+      "settings": {}
     }
   },
   "order": [
-    "main"
+    "main",
+    "cart_recommendations"
   ]
 }

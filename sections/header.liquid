@@ -2,8 +2,8 @@
 <header id="header" class="storefront-header" data-cart-section="{{ section.id }}">
 <div class="site-header header-style-1"><nav class="navigation navbar navbar-expand-lg navbar-light"><div class="container-fluid"><div class="row">
   <a class="navbar-brand storefront-menu-logo" href="{{ routes.root_url }}">
-    {% assign header_logo = section.settings.logo | default: settings.logo %}
-    {% if header_logo != blank %}{{ header_logo | image_url: width: 400 | image_tag: widths: '100, 200, 400', alt: shop.name }}{% else %}<span class="storefront-logo-text">{{ shop.name | escape }}</span>{% endif %}
+    {% assign header_logo = section.settings.logo | default: settings.logo %}{% assign header_logo_alt = header_logo.alt | default: shop.name %}
+    {% if header_logo != blank %}{{ header_logo | image_url: width: 400 | image_tag: widths: '100, 200, 400', alt: header_logo_alt }}{% else %}<span class="storefront-logo-text">{{ shop.name | escape }}</span>{% endif %}
   </a>
   <div class="mobail-menu d-lg-none"><button type="button" class="navbar-toggler open-btn" aria-label="{{ 'sections.header.menu' | t }}"><span class="icon-bar first-angle"></span><span class="icon-bar middle-angle"></span><span class="icon-bar last-angle"></span></button></div>
     {% assign header_search_id = 'HeaderSearch-' | append: section.id %}
@@ -20,7 +20,7 @@
   <div class="storefront-header-tools">
     {% if shop.customer_accounts_enabled %}<a class="storefront-account" href="{{ routes.account_url }}" aria-label="{{ 'customer.account.title' | t }}"><i class="ti-user" aria-hidden="true"></i></a>{% endif %}
     <div class="mini-cart">
-      <button type="button" class="cart-toggle-btn" data-count-label="{{ 'general.cart.view' | t: count: '__COUNT__' | escape }}" aria-controls="MiniCart-{{ section.id }}" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><img src="{{ 'shopping-cart.png' | asset_url }}" width="24" height="24" alt=""></i><span class="cart-count">{{ cart.item_count }}</span></button>
+      <button type="button" class="cart-toggle-btn" data-count-label="{{ 'general.cart.view' | t: count: '__COUNT__' | escape }}" aria-controls="MiniCart-{{ section.id }}" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><img src="{{ 'shopping-cart.png' | asset_url }}" width="24" height="24" alt="" aria-hidden="true"></i><span class="cart-count">{{ cart.item_count }}</span></button>
       {% render 'cart-drawer', drawer_id: section.id %}
     </div>
   </div>

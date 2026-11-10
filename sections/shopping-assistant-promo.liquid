@@ -1,0 +1,64 @@
+{% comment %}
+  Section contract.
+  Homepage introduction to the shopping-list assistant (snippets/shopping-assistant.liquid). The button opens the
+  existing assistant panel through its own launcher, so the panel, validation and focus handling stay in one place.
+  Renders only when the assistant is enabled in Theme Settings; the section stays hidden until the assistant has
+  loaded and is available (storefront.js), so it never shows a control that does nothing. Empty settings fall back
+  to the translated defaults.
+  @example
+  <!-- Homepage: add "Shopping list assistant" -->
+{% endcomment %}
+{%- if settings.shopping_assistant_enabled -%}
+{%- liquid
+  assign promo_heading = section.settings.heading | strip
+  if promo_heading == blank
+    assign promo_heading = 'assistant_promo.heading' | t
+  endif
+  assign promo_text = section.settings.text | strip
+  if promo_text == blank
+    assign promo_text = 'assistant_promo.text' | t
+  endif
+  assign promo_button = section.settings.button_label | strip
+  if promo_button == blank
+    assign promo_button = 'assistant_promo.button' | t
+  endif
+-%}
+<section class="assistant-promo container section-padding" aria-labelledby="AssistantPromoHeading-{{ section.id }}" data-assistant-promo hidden>
+  <div class="assistant-promo__surface">
+    <span class="assistant-promo__icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" focusable="false"><path d="M8 6h11M8 12h11M8 18h11M4 6h.01M4 12h.01M4 18h.01" stroke-linecap="round"/></svg></span>
+    <div class="assistant-promo__body">
+      <h2 id="AssistantPromoHeading-{{ section.id }}" class="assistant-promo__heading">{{ promo_heading | escape }}</h2>
+      <p class="assistant-promo__text">{{ promo_text | escape }}</p>
+    </div>
+    <button type="button" class="theme-btn assistant-promo__button" data-open-shopping-assistant aria-haspopup="dialog" aria-controls="ShoppingAssistantDialog">{{ promo_button | escape }}</button>
+  </div>
+</section>
+{%- endif -%}
+
+{% stylesheet %}
+.assistant-promo__surface { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px 20px; padding: clamp(16px, 3vw, 24px); border: 1px solid var(--fk-border, #d7e9ec); border-radius: var(--fk-radius-xl, 22px); background: radial-gradient(ellipse at 100% 0%, rgb(18 167 187 / 12%), transparent 55%), linear-gradient(160deg, #fff, var(--fk-cyan-50, #f0fafb)); box-shadow: var(--fk-shadow-sm, 0 2px 10px rgb(11 79 88 / 8%)); }
+.assistant-promo__icon { display: grid; place-items: center; inline-size: 52px; block-size: 52px; border-radius: var(--fk-radius-md, 12px); background: var(--fk-cyan-100, #dff5f7); color: var(--fk-teal-700, #0b6571); }
+.assistant-promo__body { min-width: 0; }
+.assistant-promo__heading { margin: 0; font-size: clamp(19px, 2.2vw, 24px); line-height: 1.35; color: var(--fk-teal-900, #0a3f47); overflow-wrap: anywhere; }
+.assistant-promo__text { margin: 6px 0 0; color: var(--fk-text-muted, #4b636b); line-height: 1.6; overflow-wrap: anywhere; }
+.assistant-promo__button { min-height: 48px; white-space: nowrap; }
+@media (max-width: 767px) {
+ .assistant-promo__surface { grid-template-columns: auto minmax(0, 1fr); }
+ .assistant-promo__button { grid-column: 1 / -1; width: 100%; white-space: normal; }
+}
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "t:assistant_promo_editor.name",
+  "settings": [
+    { "type": "paragraph", "content": "t:assistant_promo_editor.info" },
+    { "type": "text", "id": "heading", "label": "t:assistant_promo_editor.heading", "info": "t:assistant_promo_editor.default_info" },
+    { "type": "textarea", "id": "text", "label": "t:assistant_promo_editor.text", "info": "t:assistant_promo_editor.default_info" },
+    { "type": "text", "id": "button_label", "label": "t:assistant_promo_editor.button_label", "info": "t:assistant_promo_editor.default_info" }
+  ],
+  "presets": [
+    { "name": "t:assistant_promo_editor.name" }
+  ]
+}
+{% endschema %}

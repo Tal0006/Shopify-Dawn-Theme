@@ -3478,7 +3478,9 @@
     "recently_viewed": "Recently viewed",
     "bundle": "Bought together",
     "group_delivery": "Group delivery",
-    "group_delivery_url": "Group delivery service origin"
+    "group_delivery_url": "Group delivery service origin",
+    "max_sold_out": "Maximum sold-out products per grid",
+    "max_sold_out_info": "In-stock products are shown first. 0 hides sold-out products."
   },
   "shopping_assistant_editor": {
     "name": "Shopping Assistant",
@@ -3548,5 +3550,62 @@
     "remaining_text_info": "Use {{ amount }} for the remaining amount. Blank uses the translated default.",
     "success_text": "Text after reaching the threshold",
     "success_text_info": "Blank uses the translated default."
+  },
+  "business_details_editor": {
+    "settings": "Business details",
+    "info": "Shown in the footer. Only filled fields are displayed.",
+    "legal_name": "Legal business name",
+    "business_id": "Business ID",
+    "address": "Address",
+    "phone": "Phone",
+    "email": "Email",
+    "hours": "Opening hours",
+    "hours_info": "One range per line."
+  },
+  "floating_whatsapp_editor": {
+    "settings": "Floating WhatsApp button",
+    "enabled": "Show floating WhatsApp button",
+    "number": "WhatsApp number",
+    "number_info": "International format, digits only, e.g. 972501234567. Blank hides the button."
+  },
+  "cart_recommendations_editor": {
+    "name": "Cart recommendations",
+    "heading": "Recommendations heading",
+    "heading_info": "Blank uses the translated default.",
+    "bestsellers_collection": "Best sellers collection (empty cart)",
+    "bestsellers_collection_info": "Choose a collection sorted by best selling. Without a choice, the best-sellers collection is used if it exists.",
+    "empty_heading": "Empty cart heading",
+    "empty_heading_info": "Blank uses the translated default."
+  },
+  "assistant_promo_editor": {
+    "name": "Shopping list assistant",
+    "info": "The button opens the existing shopping assistant and shows only when the assistant is enabled.",
+    "heading": "Heading",
+    "text": "Short explanation",
+    "button_label": "Button label",
+    "default_info": "Blank uses the translated default."
+  },
+  "group_delivery_info_editor": {
+    "name": "Group Delivery guide",
+    "info": "Blank fields use the translated default.",
+    "steps": "How it works",
+    "steps_heading": "Heading",
+    "step_1_title": "Step 1 title",
+    "step_1_text": "Step 1 text",
+    "step_2_title": "Step 2 title",
+    "step_2_text": "Step 2 text",
+    "step_3_title": "Step 3 title",
+    "step_3_text": "Step 3 text",
+    "faq": "FAQ",
+    "faq_info": "A question is shown only after its answer is filled in.",
+    "faq_heading": "Heading",
+    "faq_1_question": "Question 1 (target amount)",
+    "faq_1_answer": "Answer 1",
+    "faq_2_question": "Question 2 (towns)",
+    "faq_2_answer": "Answer 2",
+    "faq_3_question": "Question 3 (is it binding)",
+    "faq_3_answer": "Answer 3",
+    "faq_4_question": "Question 4 (payment)",
+    "faq_4_answer": "Answer 4"
   }
 }

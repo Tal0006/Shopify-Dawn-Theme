@@ -340,6 +340,8 @@ html[dir=rtl] .storefront-header #navbar .nav-mega-panel { transform: translateX
 .storefront-header #navbar .nav-mega-panel a { display: block; min-height: 44px; padding: 10px 12px; font-size: 15px; font-weight: 400; line-height: 1.5; color: var(--storefront-ink); border-radius: 6px; text-align: start; overflow-wrap: anywhere; }
 .storefront-header #navbar .nav-mega-panel a::before { display: none; }
 .storefront-header #navbar .nav-mega-group-heading > a { flex: 1; min-width: 0; padding-block: 8px; font-size: 17px; font-weight: 700; color: var(--storefront-green); }
+/* Menu group without its own URL ("#" in Shopify Navigation): heading text on desktop, labelled disclosure on mobile. */
+.storefront-header #navbar .nav-mega-group-label { flex: 1; min-width: 0; padding-block: 8px; font-size: 17px; font-weight: 700; color: var(--storefront-green); overflow-wrap: anywhere; }
 .storefront-header #navbar .nav-mega-panel a:is(:hover, :focus-visible) { background: #eef4ef; color: var(--storefront-green); }
 .storefront-header #navbar .nav-mega-panel a[aria-current=page], .storefront-header #navbar .nav-mega-trigger.is-active { color: var(--storefront-green); text-decoration: underline; text-underline-offset: 4px; font-weight: 700; }
 .storefront-header #navbar .nav-mega-panel :focus-visible, .storefront-header #navbar .nav-mega-trigger:focus-visible { outline-color: var(--storefront-green) !important; box-shadow: none; }
@@ -362,6 +364,9 @@ html[dir=rtl] .storefront-header #navbar .nav-mega-panel { transform: translateX
   .storefront-header #navbar .nav-mega-children a { font-size: 14px; color: #e1ebe5; }
   .storefront-header #navbar .nav-mega-group.has-children > .nav-mega-group-heading > a, .storefront-header #navbar .nav-mega-trigger.is-active { color: #fff; }
   .storefront-header #navbar .nav-group-toggle { display: inline-flex; position: static; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; border: 0; background: transparent; color: #fff; }
+  .storefront-header #navbar .nav-mega-group-label { min-height: 48px; display: flex; align-items: center; padding: 10px 12px; color: #fff; }
+  .storefront-header #navbar .nav-mega-group-label--desktop { display: none; }
+  .storefront-header #navbar .nav-group-toggle--labelled { flex: 1; width: auto; min-height: 48px; height: auto; justify-content: space-between; gap: 8px; padding: 10px 12px; font-size: 17px; font-weight: 700; text-align: start; }
   .storefront-header #navbar .nav-mega-panel a:is(:hover, :focus-visible) { background: #ffffff14; color: #fff; }
   .storefront-header #navbar .nav-mega-panel a[aria-current=page] { color: #fff; background: #ffffff14; }
   .storefront-header #navbar .nav-mega-panel :focus-visible, .storefront-header #navbar .nav-mega-trigger:focus-visible { outline-color: #fff !important; }

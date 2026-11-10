@@ -1366,6 +1366,63 @@
     ]
   },
   {
+    "name": "t:business_details_editor.settings",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "t:business_details_editor.info"
+      },
+      {
+        "type": "text",
+        "id": "business_legal_name",
+        "label": "t:business_details_editor.legal_name"
+      },
+      {
+        "type": "text",
+        "id": "business_id",
+        "label": "t:business_details_editor.business_id"
+      },
+      {
+        "type": "textarea",
+        "id": "business_address",
+        "label": "t:business_details_editor.address"
+      },
+      {
+        "type": "text",
+        "id": "business_phone",
+        "label": "t:business_details_editor.phone"
+      },
+      {
+        "type": "text",
+        "id": "business_email",
+        "label": "t:business_details_editor.email"
+      },
+      {
+        "type": "textarea",
+        "id": "business_hours",
+        "label": "t:business_details_editor.hours",
+        "info": "t:business_details_editor.hours_info"
+      }
+    ]
+  },
+  {
+    "name": "t:floating_whatsapp_editor.settings",
+    "settings": [
+      {
+        "type": "checkbox",
+        "id": "floating_whatsapp_enabled",
+        "label": "t:floating_whatsapp_editor.enabled",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "floating_whatsapp_number",
+        "label": "t:floating_whatsapp_editor.number",
+        "info": "t:floating_whatsapp_editor.number_info"
+      }
+    ]
+  },
+  {
     "name": "t:settings_schema.search_input.name",
     "settings": [
       {

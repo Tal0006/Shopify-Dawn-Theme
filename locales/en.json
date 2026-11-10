@@ -286,7 +286,7 @@
       "remove_title": "Remove {{ title }}",
       "estimated_total": "Estimated total",
       "new_estimated_total": "New estimated total",
-      "note": "Order special instructions",
+      "note": "Order notes / delivery coordination",
       "checkout": "Check out",
       "empty": "Your cart is empty",
       "cart_error": "There was an error while updating your cart. Please try again.",
@@ -615,6 +615,7 @@
     },
     "one_time_purchase": "One-time purchase",
     "product_type": "Product type",
+    "add_to_cart_label": "Add to cart: {{ title }}",
     "cart_adding": "Adding to cart...",
     "cart_add_error": "We could not add this product. Please try again.",
     "cart_refresh_error": "The product was added. We could not refresh the cart display; open your cart to review it.",
@@ -652,7 +653,8 @@
     "inventory_many": "Only {{ count }} units left in stock",
     "inventory_rule_max": "You can order up to {{ count }} units per order",
     "inventory_full": "All available stock is already in your cart",
-    "inventory_changed": "Stock has changed and this quantity cannot be added. Try a smaller quantity."
+    "inventory_changed": "Stock has changed and this quantity cannot be added. Try a smaller quantity.",
+    "optional": "optional"
   },
   "date_formats": {
     "date": "%d/%m/%Y",
@@ -871,8 +873,52 @@
     "new_tab": "opens in a new tab"
   },
   "free_shipping": {
-    "remaining": "Add {{ amount }} more for free shipping",
-    "reached": "Great! You get free shipping 🎉",
+    "remaining": "{{ amount }} more for free shipping",
+    "reached": "You get free shipping!",
     "progress_label": "Progress to free shipping"
+  },
+  "back_in_stock": {
+    "button": "Notify me when back in stock",
+    "button_label": "Notify me when back in stock: {{ title }}",
+    "title": "Back-in-stock notification",
+    "close": "Close",
+    "note": "We will let you know when the product is back in stock. Your details are used only for this update.",
+    "submit": "Send request",
+    "success": "Thank you! We will let you know when the product is back in stock.",
+    "message": "Back-in-stock request\nProduct: {{ title }}\nLink: {{ url }}"
+  },
+  "cart_recommendations": {
+    "heading": "You may also like",
+    "bestsellers": "Best sellers"
+  },
+  "business_details": {
+    "heading": "Business details",
+    "business_id": "Business ID:",
+    "address": "Address:",
+    "phone": "Phone:",
+    "email": "Email:",
+    "hours": "Opening hours:"
+  },
+  "floating_whatsapp": {
+    "label": "Chat with {{ shop }} on WhatsApp"
+  },
+  "assistant_promo": {
+    "heading": "Make a shopping list and let us find the products",
+    "text": "Write what you need for your home in your own words, and the shopping assistant will suggest matching products and add them to your cart with your approval.",
+    "button": "Open the shopping assistant"
+  },
+  "group_delivery_info": {
+    "steps_heading": "How it works",
+    "step_1_title": "Choose your area and join",
+    "step_1_text": "Choose your delivery area and join a group with the products in your cart.",
+    "step_2_title": "The group fills up",
+    "step_2_text": "More customers from the same area join until the combined order reaches the target.",
+    "step_3_title": "The store approves and coordinates",
+    "step_3_text": "When the group reaches the target, the store reviews the orders and coordinates delivery with you.",
+    "faq_heading": "Frequently asked questions",
+    "faq_1_question": "What is the group target amount?",
+    "faq_2_question": "Which towns does group delivery reach?",
+    "faq_3_question": "Is joining a group binding?",
+    "faq_4_question": "When and how do I pay?"
   }
 }

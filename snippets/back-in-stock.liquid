@@ -1,0 +1,62 @@
+{% doc %}
+  Shared back-in-stock request dialog, rendered once per page from the layout. It posts Shopify's native contact
+  form (the store receives it like any contact message); storefront.js fills the product title/URL from the
+  trigger (snippets/back-in-stock-trigger.liquid) and opens it. Shopify's contact form requires an email address,
+  so email is required and phone is optional. After submitting, the page reloads and the dialog reopens with the
+  success or error message.
+  @example
+  {% render 'back-in-stock' %}
+{% enddoc %}
+<dialog id="BackInStockDialog" class="back-in-stock" aria-labelledby="BackInStockTitle" data-back-in-stock-dialog data-message="{{ 'back_in_stock.message' | t: title: '__TITLE__', url: '__URL__' | escape }}">
+  <div class="back-in-stock__shell">
+    <button type="button" class="back-in-stock__close" data-back-in-stock-close aria-label="{{ 'back_in_stock.close' | t | escape }}"><span aria-hidden="true">×</span></button>
+    <h2 id="BackInStockTitle" class="back-in-stock__title">{{ 'back_in_stock.title' | t }}</h2>
+    <p class="back-in-stock__product" data-back-in-stock-product></p>
+    {% form 'contact', id: 'BackInStockForm', class: 'back-in-stock__form storefront-validated-form' %}
+      {%- if form.posted_successfully? -%}
+        <p class="back-in-stock__success" role="status" data-back-in-stock-result>{{ 'back_in_stock.success' | t }}</p>
+      {%- endif -%}
+      {%- if form.errors -%}
+        <div class="storefront-form-errors" role="alert" id="BackInStockErrors" data-back-in-stock-result>{{ form.errors | default_errors }}</div>
+      {%- endif -%}
+      <input type="hidden" name="contact[product]" value="" data-back-in-stock-field="title">
+      <input type="hidden" name="contact[product_url]" value="" data-back-in-stock-field="url">
+      <input type="hidden" name="contact[body]" value="" data-back-in-stock-field="body">
+      <div class="back-in-stock__field">
+        <label for="BackInStockName">{{ 'templates.contact.form.name' | t }}</label>
+        <input id="BackInStockName" type="text" name="contact[name]" autocomplete="name" required value="{{ customer.name | escape }}">
+      </div>
+      <div class="back-in-stock__field">
+        <label for="BackInStockEmail">{{ 'templates.contact.form.email' | t }}</label>
+        <input id="BackInStockEmail" type="email" name="contact[email]" autocomplete="email" required value="{{ customer.email | escape }}" {% if form.errors contains 'email' %}aria-invalid="true" aria-describedby="BackInStockErrors"{% endif %}>
+      </div>
+      <div class="back-in-stock__field">
+        <label for="BackInStockPhone">{{ 'templates.contact.form.phone' | t }} <span class="back-in-stock__optional">({{ 'storefront.optional' | t }})</span></label>
+        <input id="BackInStockPhone" type="tel" name="contact[phone]" autocomplete="tel" inputmode="tel" dir="ltr">
+      </div>
+      <p class="back-in-stock__note">{{ 'back_in_stock.note' | t }}</p>
+      <button type="submit" class="theme-btn back-in-stock__submit">{{ 'back_in_stock.submit' | t }}</button>
+    {% endform %}
+  </div>
+</dialog>
+{% stylesheet %}
+.back-in-stock { box-sizing: border-box; width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--fk-border, #d7e9ec); border-radius: var(--fk-radius-lg, 16px); background: linear-gradient(180deg, #fff, var(--fk-cyan-50, #f0fafb)); color: var(--fk-text, #173b44); box-shadow: var(--fk-shadow-lg, 0 24px 60px rgb(11 79 88 / 18%)); }
+.back-in-stock::backdrop { background: rgb(7 46 53 / 40%); }
+.back-in-stock[open] { animation: fk-rise var(--fk-dur, 240ms) var(--fk-ease-out, ease); }
+.back-in-stock__shell { position: relative; display: grid; gap: 12px; padding: 22px 20px 20px; }
+.back-in-stock__close { position: absolute; inset-block-start: 10px; inset-inline-end: 10px; width: 44px; height: 44px; border: 1px solid var(--fk-border, #d7e9ec); border-radius: var(--fk-radius-md, 12px); background: #fff; color: var(--fk-text, #173b44); font-size: 22px; line-height: 1; }
+.back-in-stock__title { margin: 0; padding-inline-end: 52px; font-size: 20px; line-height: 1.4; color: var(--fk-teal-900, #0a3f47); }
+.back-in-stock__product { margin: 0; font-weight: 600; color: var(--fk-accent, #086b7b); overflow-wrap: anywhere; }
+.back-in-stock__product:empty { display: none; }
+.back-in-stock__form { display: grid; gap: 12px; margin: 0; }
+.back-in-stock__field { display: grid; gap: 4px; }
+.back-in-stock__field label { font-weight: 600; font-size: 14px; }
+.back-in-stock__field input { min-height: 44px; padding: 8px 12px; border: 1px solid var(--fk-border-strong, #9fcfd7); border-radius: var(--fk-radius-md, 12px); background: #fff; font-size: 16px; }
+.back-in-stock__field input[dir=ltr] { text-align: end; }
+.back-in-stock__optional { font-weight: 400; color: var(--fk-text-muted, #4b636b); }
+.back-in-stock__note { margin: 0; font-size: 13px; color: var(--fk-text-muted, #4b636b); }
+.back-in-stock__submit { width: 100%; min-height: 48px; }
+.back-in-stock__success { margin: 0; padding: 10px 12px; border-radius: var(--fk-radius-md, 12px); background: var(--fk-success-bg, #e9f8f2); color: var(--fk-success, #0c5a3f); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .back-in-stock[open] { animation: none; } }
+html[data-a11y-paused] .back-in-stock[open] { animation: none; }
+{% endstylesheet %}

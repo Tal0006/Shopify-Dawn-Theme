@@ -14,7 +14,7 @@
               </div>
               <div class="features-text">
                 <h3>
-                  <span><img src="{{ 'shape1.png' | asset_url }}" width="" height="" alt=""></span>
+                  <span><img src="{{ 'shape1.png' | asset_url }}" width="" height="" alt="" aria-hidden="true"></span>
                   {% if block.settings.feature_title != blank %}{{ block.settings.feature_title | escape }}{% else %}{{ 'storefront.feature_title' | t }}{% endif %}
                 </h3>
                 <p>
@@ -31,6 +31,7 @@
           width="90px"
           height="90px"
           alt=""
+          aria-hidden="true"
           class=""
         >
       </div>
@@ -40,6 +41,7 @@
           width=""
           height=""
           alt=""
+          aria-hidden="true"
         >
       </div>
     </div>

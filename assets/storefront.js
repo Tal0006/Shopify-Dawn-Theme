@@ -276,9 +276,20 @@
     const action = focused?.matches('[data-cart-quantity]') ? '[data-cart-quantity]' : focused?.matches('[data-cart-remove]') ? '[data-cart-remove]' : focused?.matches('[data-cart-delta]') ? '[data-cart-delta="' + focused.dataset.cartDelta + '"]' : null;
     const previousMeter = items.querySelector('[data-shipping-meter]');
     const previousShipping = previousMeter ? {progress: Number(previousMeter.dataset.progress), reached: previousMeter.dataset.reached === 'true'} : null;
+    // An order note still being typed (not yet saved) survives the re-render, with its open state and focus.
+    const previousNote = items.querySelector('[data-cart-note]');
+    const noteDraft = previousNote && previousNote.value !== previousNote.defaultValue ? previousNote.value : null;
+    const noteOpen = previousNote?.closest('details')?.open;
     items.replaceChildren(...freshItems.childNodes);
     shippingMeterUpdated(items, previousShipping);
-    if (focused && drawer()?.open) {
+    const freshNote = items.querySelector('[data-cart-note]');
+    if (freshNote) {
+      if (noteDraft !== null) freshNote.value = noteDraft;
+      if (noteOpen) freshNote.closest('details').open = true;
+    }
+    if (focused && focused === previousNote && freshNote && drawer()?.open) {
+      freshNote.focus({preventScroll: true});
+    } else if (focused && drawer()?.open) {
       const line = [...items.querySelectorAll('[data-cart-line]')].find(item => item.dataset.cartLine === lineKey);
       const target = action && line?.querySelector(action);
       (target && !target.disabled ? target : drawer().querySelector('.mini-cart-close')).focus({preventScroll: true});
@@ -731,5 +742,91 @@
   document.addEventListener('shopify:section:load', event => reviewReveal(event.target));
   document.addEventListener('shopify:section:unload', event => {
     for (const card of event.target.querySelectorAll('[data-review-cta]')) { reviewObservers.get(card)?.disconnect(); reviewObservers.delete(card); }
+  });
+
+  // Drawer order note: saved to cart.note when the field is committed, through the shared cart queue so it never
+  // races quantity changes. The drawer form also posts the note with checkout.
+  document.addEventListener('change', event => {
+    const note = event.target;
+    if (!(note instanceof HTMLTextAreaElement) || !note.matches('.cart-drawer [data-cart-note]')) return;
+    const value = note.value;
+    const operation = cardCartQueue.then(async () => {
+      try {
+        const response = await fetch(cartRoot() + 'cart/update.js', {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, credentials: 'same-origin', body: JSON.stringify({note: value})});
+        if (!response.ok) throw Error('Note rejected');
+        if (note.isConnected && note.value === value) note.defaultValue = value;
+      } catch { cartStatus(drawer()?.dataset.cartError || '', true); }
+    });
+    cardCartQueue = operation.catch(() => {});
+  });
+
+  // Back-in-stock requests (snippets/back-in-stock.liquid): one shared dialog posting Shopify's contact form.
+  let backInStockOpener = null;
+  const backInStockDialog = () => document.querySelector('[data-back-in-stock-dialog]');
+  document.addEventListener('click', event => {
+    const dialog = backInStockDialog();
+    if (!dialog) return;
+    const trigger = event.target.closest('[data-back-in-stock]');
+    if (trigger) {
+      event.preventDefault();
+      const title = trigger.dataset.productTitle || '', url = trigger.dataset.productUrl || '';
+      dialog.querySelector('[data-back-in-stock-product]').textContent = title;
+      dialog.querySelector('[data-back-in-stock-field=title]').value = title;
+      dialog.querySelector('[data-back-in-stock-field=url]').value = url;
+      dialog.querySelector('[data-back-in-stock-field=body]').value = (dialog.dataset.message || '').replace('__TITLE__', title).replace('__URL__', url);
+      dialog.querySelectorAll('[data-back-in-stock-result]').forEach(node => node.remove());
+      backInStockOpener = trigger;
+      if (!dialog.open) dialog.showModal();
+      dialog.querySelector('input:not([type=hidden])')?.focus();
+    } else if (event.target.closest('[data-back-in-stock-close]') || event.target === dialog) dialog.close();
+  });
+  document.addEventListener('close', event => {
+    if (event.target !== backInStockDialog()) return;
+    if (backInStockOpener?.isConnected) backInStockOpener.focus({preventScroll: true});
+    backInStockOpener = null;
+  }, true);
+  // After Shopify reloads the page with the result, reopen the dialog to show it (only when it is ours).
+  (() => {
+    const dialog = backInStockDialog();
+    const result = dialog?.querySelector('[data-back-in-stock-result]');
+    if (!result) return;
+    const ours = location.hash === '#BackInStockForm' || document.querySelectorAll('form[action$="/contact"], form[action*="/contact#"], form[action*="/contact?"]').length === 1;
+    if (!ours) return;
+    dialog.showModal();
+    (result.matches('[role=alert]') ? dialog.querySelector('input:not([type=hidden])') : dialog.querySelector('[data-back-in-stock-close]'))?.focus();
+  })();
+
+  // Homepage shopping-assistant promo: shown only once the assistant is available; opens it through its launcher
+  // and returns focus to the promo button when the panel closes.
+  async function assistantPromo(root) {
+    const promos = root.querySelectorAll('[data-assistant-promo]');
+    if (!promos.length || !window.customElements) return;
+    await customElements.whenDefined('fankee-shopping-assistant');
+    const launcher = document.querySelector('fankee-shopping-assistant [data-launch]');
+    if (!launcher || launcher.hidden) return;
+    promos.forEach(promo => { promo.hidden = false; });
+  }
+  document.addEventListener('click', event => {
+    const button = event.target.closest('[data-open-shopping-assistant]');
+    const assistant = document.querySelector('fankee-shopping-assistant');
+    const launcher = assistant?.querySelector('[data-launch]');
+    if (!button || !launcher || launcher.hidden) return;
+    launcher.click();
+    assistant.querySelector('dialog')?.addEventListener('close', () => setTimeout(() => { if (button.isConnected) button.focus({preventScroll: true}); }, 0), {once: true});
+  });
+  assistantPromo(document);
+  document.addEventListener('shopify:section:load', event => assistantPromo(event.target));
+
+  // Cart page suggestions add through the shared card flow; reload once afterwards so the cart table and totals
+  // (server-rendered, not AJAX) show the new line.
+  // Only a successful add (the server-rendered cart count changed) reloads; a failed add keeps its error visible.
+  let cartSuggestionCount = null;
+  const cartCount = () => document.querySelector('.storefront-header .cart-count')?.textContent.trim() ?? null;
+  document.addEventListener('submit', event => { if (event.target.closest?.('[data-cart-recommendations]') && event.target.matches('[data-card-cart]')) cartSuggestionCount = cartCount(); }, true);
+  document.addEventListener('storefront:cart:updated', () => {
+    if (cartSuggestionCount === null) return;
+    const changed = cartCount() !== cartSuggestionCount;
+    cartSuggestionCount = null;
+    if (changed && document.querySelector('[data-cart-recommendations]')) window.location.reload();
   });
 })();

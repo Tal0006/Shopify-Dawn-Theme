@@ -1,0 +1,24 @@
+{% doc %}
+  "Notify me when back in stock" button for a sold-out product or variant. Opens the shared dialog
+  (snippets/back-in-stock.liquid) with this product's title and URL. Without JavaScript it falls back to a link to
+  the contact page.
+  @param {product} bis_product - The sold-out product.
+  @param {variant} [bis_variant] - Selected sold-out variant, when the product has real variants.
+  @param {string} [bis_class] - Extra classes for the button.
+  @example {% render 'back-in-stock-trigger', bis_product: product, bis_variant: selected_variant %}
+{% enddoc %}
+{%- liquid
+  assign bis_title = bis_product.title
+  assign bis_url = shop.url | append: bis_product.url
+  if bis_variant and bis_product.has_only_default_variant == false
+    assign bis_title = bis_title | append: ' - ' | append: bis_variant.title
+    assign bis_url = bis_url | append: '?variant=' | append: bis_variant.id
+  endif
+  assign bis_contact = pages['contact'].url | default: routes.root_url
+-%}
+<button type="button" class="theme-btn back-in-stock-trigger {{ bis_class }}" data-back-in-stock data-product-title="{{ bis_title | escape }}" data-product-url="{{ bis_url | escape }}" aria-haspopup="dialog" aria-controls="BackInStockDialog" aria-label="{{ 'back_in_stock.button_label' | t: title: bis_title | escape }}">{{ 'back_in_stock.button' | t }}</button>
+<noscript><a class="back-in-stock-trigger" href="{{ bis_contact }}">{{ 'back_in_stock.button' | t }}</a></noscript>
+{% stylesheet %}
+.back-in-stock-trigger { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; }
+.product-page__notify { width: 100%; margin-block-start: 10px; }
+{% endstylesheet %}

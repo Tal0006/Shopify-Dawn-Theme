@@ -42,6 +42,11 @@
         </div>
         <footer class="cart-drawer__summary">
           {% render 'free-shipping-meter', context: 'drawer' %}
+          <details class="cart-drawer__note"{% if cart.note != blank %} open{% endif %}>
+            <summary>{{ 'sections.cart.note' | t }}</summary>
+            <label class="sr-only" for="DrawerNote-{{ drawer_id }}">{{ 'sections.cart.note' | t }}</label>
+            <textarea id="DrawerNote-{{ drawer_id }}" name="note" rows="3" maxlength="1000" data-cart-note>{{ cart.note | escape }}</textarea>
+          </details>
           <p class="cart-drawer__total"><span>{{ 'storefront.drawer_total' | t }}</span><bdi>{{ cart.total_price | money }}</bdi></p>
           <button type="submit" name="checkout" class="theme-btn">{{ 'sections.cart.checkout' | t }}</button>
           <a class="cart-drawer__view" href="{{ routes.cart_url }}">{{ 'storefront.drawer_view' | t }}</a>
@@ -87,6 +92,10 @@ html:has(.cart-drawer[open]) { overflow: hidden; }
 .cart-drawer__summary .theme-btn { width: 100%; min-height: 54px; font-size: 17px; background: var(--fk-gradient-primary); color: #fff; border: 1px solid var(--fk-primary); box-shadow: var(--fk-shadow-cta); }
 .cart-drawer__view { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--storefront-green); text-decoration: underline; }
 .cart-drawer__empty { padding: 32px 20px; text-align: center; }
+.cart-drawer__note { margin-block: 0 12px; border: 1px solid var(--fk-border, #d7e9ec); border-radius: var(--fk-radius-md, 12px); background: #fff; }
+.cart-drawer__note summary { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; font-size: 14px; font-weight: 600; color: var(--fk-teal-900, #0a3f47); cursor: pointer; }
+.cart-drawer__note summary:focus-visible { outline: 3px solid var(--fk-teal-800, #0b4f58); outline-offset: 2px; }
+.cart-drawer__note textarea { display: block; box-sizing: border-box; width: calc(100% - 24px); min-height: 72px; margin: 0 12px 12px; padding: 8px 10px; border: 1px solid var(--fk-border-strong, #9fcfd7); border-radius: var(--fk-radius-md, 12px); font-size: 16px; resize: vertical; }
 .cart-drawer__empty .theme-btn { background: var(--storefront-green); color: #fff; }
 .cart-drawer__status { margin: 0; padding: 0 20px; font-size: 14px; }
 .cart-drawer__status:not(:empty) { padding-block: 10px; padding-inline-end: 76px; }

@@ -157,7 +157,7 @@
           "show_policies": true,
           "show_footer_links": false,
           "show_newsletter": false,
-          "show_payment_icons": false,
+          "show_payment_icons": true,
           "accessibility_statement_page": "הצהרת-נגישות"
         }
       }
@@ -219,7 +219,9 @@
           "shadow": "#121212"
         }
       }
-    }
+    },
+    "floating_whatsapp_enabled": true,
+    "floating_whatsapp_number": "972543966168"
   },
   "presets": {
     "Default": {

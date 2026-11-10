@@ -19,10 +19,11 @@ test('Contract: Theme Settings, placement, cart value and no hard-coded threshol
  const schemaHe=JSON.parse(read('locales/he.schema.json')).free_shipping_editor;
  assert.match(schemaHe.threshold_info,/יש לוודא שסכום זה תואם להגדרת המשלוח החינם ב-Shopify\./);
  for(const locale of ['he.schema.json','en.default.schema.json']){const keys=JSON.parse(read('locales/'+locale)).free_shipping_editor;for(const item of [group,...group.settings])for(const value of [item.name,item.label,item.info,item.content].filter(Boolean))assert.ok(keys[value.replace('t:free_shipping_editor.','')],locale+' '+value);}
- assert.equal(he.free_shipping.remaining,'חסרים לך עוד {{ amount }} למשלוח חינם');assert.equal(he.free_shipping.reached,'מעולה! קיבלת משלוח חינם 🎉');
+ assert.equal(he.free_shipping.remaining,'עוד {{ amount }} למשלוח חינם');assert.equal(he.free_shipping.reached,'מגיע לך משלוח חינם!');
  // One reusable snippet, rendered in the drawer summary (before the total) and on the cart page.
  const drawer=read('snippets/cart-drawer.liquid'),cart=read('sections/main-cart.liquid');
- assert.match(drawer,/<footer class="cart-drawer__summary">\s*{% render 'free-shipping-meter', context: 'drawer' %}\s*<p class="cart-drawer__total">/);
+ // Meter first in the summary, then the optional order note, then total and checkout.
+ assert.match(drawer,/<footer class="cart-drawer__summary">\s*{% render 'free-shipping-meter', context: 'drawer' %}\s*<details class="cart-drawer__note"[\s\S]*?<\/details>\s*<p class="cart-drawer__total">/);
  assert.match(cart,/{% render 'free-shipping-meter', context: 'cart' %}\s*<p class="catalog-cart-total">/);
  assert.match(drawer,/data-shipping-announcer/);
  assert.doesNotMatch(read('sections/header.liquid'),/free_shipping|shipping_threshold/,'old header threshold removed');
@@ -74,8 +75,8 @@ test('Liquid rendering: thresholds, amounts, progress and settings',{skip:SKIP},
   const m=parse(await render({total}));
   assert.equal(m.reached,reached,total);assert.equal(m.progress,progress,total);assert.equal(m.now,progress);assert.equal(m.bar,progress);
   assert.equal(m.amount,amount,total);
-  if(amount){assert.equal(m.text,'חסרים לך עוד '+amount+' למשלוח חינם');assert.equal(m.valuetext,'חסרים לך עוד '+amount+' למשלוח חינם');}
-  else{assert.equal(m.text,'מעולה! קיבלת משלוח חינם 🎉');assert.equal(m.valuetext,m.text);assert.match(m.html,/free-shipping--reached/);}
+  if(amount){assert.equal(m.text,'עוד '+amount+' למשלוח חינם');assert.equal(m.valuetext,'עוד '+amount+' למשלוח חינם');}
+  else{assert.equal(m.text,'מגיע לך משלוח חינם!');assert.equal(m.valuetext,m.text);assert.match(m.html,/free-shipping--reached/);}
   assert.ok(m.progress>=0&&m.progress<=100);assert.doesNotMatch(m.html,/₪-|-₪/,'never negative');
  }
  // Nothing for an empty cart, when disabled, for a non-positive/missing threshold, or another currency.
@@ -91,7 +92,7 @@ test('Liquid rendering: thresholds, amounts, progress and settings',{skip:SKIP},
  assert.equal(custom.text,'עוד ₪50.00 &lt;b&gt;ומשלוח&lt;/b&gt; עלינו');assert.equal(custom.amount,'₪50.00');
  assert.match(parse(await render({total:15000,settings:{free_shipping_success_text:'יש! "חינם"'}})).html,/יש! &(quot|#34);חינם&(quot|#34);/);
  // English locale keeps the placeholder working.
- assert.equal(parse(await engine(en)({total:11750})).text,'Add ₪32.50 more for free shipping');
+ assert.equal(parse(await engine(en)({total:11750})).text,'₪32.50 more for free shipping');
  assert.match(await render({total:5000,context:'cart'}),/free-shipping--cart/);
 });
 
@@ -150,7 +151,7 @@ test('Browser: drawer and cart page update live, RTL, mobile, accessibility and 
   await t.test('Initial drawer: remaining amount, progress semantics and RTL fill from the right',async()=>{
    await open();await setup({count:3});
    await ev('document.querySelector(".cart-toggle-btn").click()');await settle();
-   assert.deepEqual(await ev('state()'),{reached:'false',now:'80',valuetext:'חסרים לך עוד ₪30.00 למשלוח חינם',text:'חסרים לך עוד ₪30.00 למשלוח חינם'});
+   assert.deepEqual(await ev('state()'),{reached:'false',now:'80',valuetext:'עוד ₪30.00 למשלוח חינם',text:'עוד ₪30.00 למשלוח חינם'});
    assert.equal(await ev(transformX),80);
    const g=await ev('(()=>{const t=panel.querySelector(".free-shipping__track").getBoundingClientRect(),b=panel.querySelector(".free-shipping__bar").getBoundingClientRect(),label=panel.querySelector("[role=progressbar]").getAttribute("aria-label");return {right:Math.abs(t.right-b.right)<1,left:b.left>t.left+1,within:b.left>=t.left-0.5&&b.right<=t.right+0.5,label,icon:panel.querySelector(".free-shipping__icon").getAttribute("aria-hidden")}})()');
    assert.deepEqual(g,{right:true,left:true,within:true,label:'התקדמות למשלוח חינם',icon:'true'});
@@ -162,9 +163,9 @@ test('Browser: drawer and cart page update live, RTL, mobile, accessibility and 
    assert.equal(await ev('panel.querySelector("[data-shipping-meter]").hasAttribute("data-celebrate")'),true);
    assert.equal(await ev('getComputedStyle(panel.querySelector(".free-shipping__bar")).transitionDuration!=="0s"'),true,'smooth bar');
    await settle();await sleep(250);
-   assert.deepEqual(await ev('state()'),{reached:'true',now:'100',valuetext:'מעולה! קיבלת משלוח חינם 🎉',text:'מעולה! קיבלת משלוח חינם 🎉'});
+   assert.deepEqual(await ev('state()'),{reached:'true',now:'100',valuetext:'מגיע לך משלוח חינם!',text:'מגיע לך משלוח חינם!'});
    assert.equal(await ev(transformX),100);
-   assert.equal(await ev('announcer.textContent'),'מעולה! קיבלת משלוח חינם 🎉');
+   assert.equal(await ev('announcer.textContent'),'מגיע לך משלוח חינם!');
    assert.deepEqual(await ev('calls.filter(c=>!c.url.endsWith("cart.js")).map(c=>c.method+" "+c.url.split("/").pop())'),['POST change.js'],'no extra cart requests');
    assert.equal(await ev('getComputedStyle(panel.querySelector(".free-shipping__icon")).animationIterationCount'),'1');
    // Staying above the threshold does not announce again.
@@ -174,9 +175,9 @@ test('Browser: drawer and cart page update live, RTL, mobile, accessibility and 
   await t.test('Quantity decrease below the threshold shows the remaining amount again and announces once',async()=>{
    await ev('panel.querySelectorAll("[data-cart-delta]")[0].click()');await settle();
    await ev('panel.querySelectorAll("[data-cart-delta]")[0].click()');await settle();await sleep(250);
-   assert.deepEqual(await ev('state()'),{reached:'false',now:'80',valuetext:'חסרים לך עוד ₪30.00 למשלוח חינם',text:'חסרים לך עוד ₪30.00 למשלוח חינם'});
+   assert.deepEqual(await ev('state()'),{reached:'false',now:'80',valuetext:'עוד ₪30.00 למשלוח חינם',text:'עוד ₪30.00 למשלוח חינם'});
    assert.equal(await ev(transformX),80);
-   assert.equal(await ev('announcer.textContent'),'חסרים לך עוד ₪30.00 למשלוח חינם');
+   assert.equal(await ev('announcer.textContent'),'עוד ₪30.00 למשלוח חינם');
   });
   await t.test('Rapid clicks, failed updates and reopening keep the meter consistent with the server cart',async()=>{
    await ev('const plus=panel.querySelectorAll("[data-cart-delta]")[1];plus.click();plus.click();plus.click()');await settle();
@@ -193,7 +194,7 @@ test('Browser: drawer and cart page update live, RTL, mobile, accessibility and 
    assert.equal(await ev('state()'),null);assert.equal(await ev('count'),0);
    await ev('panel.close()');await wait('!panel.open');
    await ev('form.requestSubmit(form.querySelector("[name=add]"))');await settle();
-   assert.deepEqual(await ev('state()'),{reached:'false',now:'26',valuetext:'חסרים לך עוד ₪110.00 למשלוח חינם',text:'חסרים לך עוד ₪110.00 למשלוח חינם'});
+   assert.deepEqual(await ev('state()'),{reached:'false',now:'26',valuetext:'עוד ₪110.00 למשלוח חינם',text:'עוד ₪110.00 למשלוח חינם'});
    assert.equal(await ev('panel.open'),false,'adding does not open the drawer');
    assert.equal(await ev('announcer.textContent'),'','no announcement below the threshold');
   });
@@ -201,7 +202,7 @@ test('Browser: drawer and cart page update live, RTL, mobile, accessibility and 
    await open();await setup({count:3,unit:5000});
    assert.equal((await ev('state()')).reached,'true');
    await open();await setup({count:4,unit:5000,discount:5001});
-   assert.equal((await ev('state()')).text,'חסרים לך עוד ₪0.01 למשלוח חינם');
+   assert.equal((await ev('state()')).text,'עוד ₪0.01 למשלוח חינם');
   });
   await t.test('Cart page meter uses the same snippet and follows drawer changes without a reload',async()=>{
    await open();await setup({count:3,cartPage:true});
@@ -225,7 +226,7 @@ test('Browser: drawer and cart page update live, RTL, mobile, accessibility and 
      return {overflow:panel.scrollWidth>panel.clientWidth||document.documentElement.scrollWidth>innerWidth,meterInside:r.left>=panel.getBoundingClientRect().left&&r.right<=panel.getBoundingClientRect().right,amountInside:a.left>=r.left&&a.right<=r.right&&amount.scrollWidth<=amount.clientWidth+1,height:Math.round(r.height),checkoutVisible:checkout.bottom<=innerHeight&&checkout.top>=0,checkoutHeight:checkout.height,text:panel.querySelector("[data-shipping-text]").textContent}})()`);
     assert.equal(m.overflow,false,'overflow '+width);assert.equal(m.meterInside,true);assert.equal(m.amountInside,true,'amount clipped '+width);
     assert.ok(m.height<=96,'compact meter '+width+': '+m.height);assert.equal(m.checkoutVisible,true,'checkout visible '+width);assert.ok(m.checkoutHeight>=44);
-    assert.equal(m.text,'חסרים לך עוד ₪26.55 למשלוח חינם');
+    assert.equal(m.text,'עוד ₪26.55 למשלוח חינם');
    }
   });
   await t.test('Reduced motion and the accessibility pause: instant bar, no completion animation',async()=>{

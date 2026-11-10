@@ -10,7 +10,31 @@
     {% if section.settings.show_view_all and chosen_collection != blank %}<a class="catalog-section-header__link" href="{{ chosen_collection.url }}">{{ 'sections.featured_collection.view_all' | t }}</a>{% endif %}
   </header>
   {% if chosen_collection != blank %}
-    <div class="catalog-grid">{% for card_product in chosen_collection.products limit: section.settings.product_limit %}{% render 'product-card', card_product: card_product, refined_card: true %}{% else %}<p>{{ 'sections.collection_template.empty' | t }}</p>{% endfor %}</div>
+    {%- liquid
+      # Available products first (collection order kept), then at most max_sold_out sold-out products.
+      assign grid_limit = section.settings.product_limit
+      assign grid_sold_out_max = section.settings.max_sold_out
+      assign grid_count = 0
+      assign grid_sold_out = 0
+    -%}
+    <div class="catalog-grid">
+      {%- for card_product in chosen_collection.products -%}
+        {%- if card_product.available and grid_count < grid_limit -%}
+          {%- assign grid_count = grid_count | plus: 1 -%}
+          {% render 'product-card', card_product: card_product, refined_card: true %}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- for card_product in chosen_collection.products -%}
+        {%- unless card_product.available -%}
+          {%- if grid_count < grid_limit and grid_sold_out < grid_sold_out_max -%}
+            {%- assign grid_count = grid_count | plus: 1 -%}
+            {%- assign grid_sold_out = grid_sold_out | plus: 1 -%}
+            {% render 'product-card', card_product: card_product, refined_card: true %}
+          {%- endif -%}
+        {%- endunless -%}
+      {%- endfor -%}
+      {%- if grid_count == 0 -%}<p>{{ 'sections.collection_template.empty' | t }}</p>{%- endif -%}
+    </div>
   {% elsif request.design_mode %}<p class="catalog-editor-note">{{ 'storefront.choose_collection' | t }}</p>{% endif %}
 </section>
 {% endif %}
@@ -41,6 +65,16 @@
       "max": 24,
       "step": 1,
       "default": 8
+    },
+    {
+      "type": "range",
+      "id": "max_sold_out",
+      "label": "t:storefront_editor.max_sold_out",
+      "info": "t:storefront_editor.max_sold_out_info",
+      "min": 0,
+      "max": 4,
+      "step": 1,
+      "default": 2
     },
     {
       "type": "checkbox",

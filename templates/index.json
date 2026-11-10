@@ -140,6 +140,10 @@
       "settings": {
         "enabled": true
       }
+    },
+    "shopping_assistant_promo": {
+      "type": "shopping-assistant-promo",
+      "settings": {}
     }
   },
   "order": [
@@ -147,6 +151,7 @@
     "trust_benefits",
     "group_delivery_promo",
     "categories",
+    "shopping_assistant_promo",
     "laundry",
     "cleaning",
     "toiletries",

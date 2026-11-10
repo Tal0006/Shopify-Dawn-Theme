@@ -15,7 +15,7 @@
       {% for product in products limit: 6 %}
         <li role="presentation">
           <a href="{{ product.url }}" class="predictive-search__option{% unless product.available %} predictive-search__option--unavailable{% endunless %}" role="option" aria-selected="false">
-            <span class="predictive-search__image">
+            <span class="predictive-search__image" aria-hidden="true">
               {% if product.featured_image != blank %}
                 {{ product.featured_image | image_url: width: 108 | image_tag: loading: 'lazy', widths: '54, 108', sizes: '54px', alt: '' }}
               {% else %}<span aria-hidden="true">—</span>{% endif %}

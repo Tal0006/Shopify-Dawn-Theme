@@ -15,7 +15,7 @@
     <input id="{{ choice_id }}" type="checkbox" name="bundle_variant" value="{{ bundle_variant.id }}" data-price="{{ bundle_variant.price }}" {% if main_product %}data-bundle-main-choice{% endif %} {% if bundle_variant.available and choice_safe %}checked{% else %}disabled{% endif %}>
     <span class="sr-only">{{ 'bundle.select' | t: title: bundle_product.title | escape }}</span>
   </label>
-  <div class="bundle-item__image">
+  <div class="bundle-item__image" aria-hidden="true">
     {% if bundle_product.featured_image %}
       {{ bundle_product.featured_image | image_url: width: 160 | image_tag: loading: 'lazy', widths: '80, 160', sizes: '80px', alt: '' }}
     {% endif %}

@@ -10,13 +10,14 @@
           {% for child in link.links %}
             {% assign navigation_group_id = navigation_panel_id | append: '-Group-' | append: forloop.index %}
             <li class="nav-mega-group{% if child.links != blank %} has-children{% endif %}">
-              <div class="nav-mega-group-heading"><a href="{{ child.url }}" {% if child.current %}aria-current="page"{% endif %}>{{ child.title | escape }}</a>
-              {% if child.links != blank %}<button class="nav-group-toggle submenu-toggle" type="button" data-group-trigger aria-expanded="false" aria-controls="{{ navigation_group_id }}" aria-label="{{ child.title | escape }}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>{% endif %}</div>
+              {%- assign navigation_child_linked = true -%}{%- if child.url == '#' or child.url == blank -%}{%- assign navigation_child_linked = false -%}{%- endif -%}
+              <div class="nav-mega-group-heading">{% if navigation_child_linked %}<a href="{{ child.url }}" {% if child.current %}aria-current="page"{% endif %}>{{ child.title | escape }}</a>{% elsif child.links == blank %}<span class="nav-mega-group-label">{{ child.title | escape }}</span>{% else %}<span class="nav-mega-group-label nav-mega-group-label--desktop">{{ child.title | escape }}</span>{% endif %}
+              {% if child.links != blank %}<button class="nav-group-toggle submenu-toggle{% unless navigation_child_linked %} nav-group-toggle--labelled{% endunless %}" type="button" data-group-trigger aria-expanded="false" aria-controls="{{ navigation_group_id }}"{% if navigation_child_linked %} aria-label="{{ child.title | escape }}"{% endif %}>{% unless navigation_child_linked %}<span>{{ child.title | escape }}</span>{% endunless %}<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>{% endif %}</div>
               {% if child.links != blank %}<ul id="{{ navigation_group_id }}" class="nav-mega-children" role="list">{% for grandchild in child.links %}<li><a href="{{ grandchild.url }}" {% if grandchild.current %}aria-current="page"{% endif %}>{{ grandchild.title | escape }}</a></li>{% endfor %}</ul>{% endif %}
             </li>
           {% endfor %}
         </ul>
-        <div class="nav-mega-footer"><a href="{{ link.url }}" {% if link.current %}aria-current="page"{% endif %}>{{ link.title | escape }}</a>{% assign navigation_catalog_url = settings.catalog_collection.url | default: routes.all_products_collection_url %}{% if navigation_catalog_url != link.url %}<a href="{{ navigation_catalog_url }}">{{ 'storefront.all_products' | t }}</a>{% endif %}</div>
+        <div class="nav-mega-footer">{% unless link.url == '#' or link.url == blank %}<a href="{{ link.url }}" {% if link.current %}aria-current="page"{% endif %}>{{ link.title | escape }}</a>{% endunless %}{% assign navigation_catalog_url = settings.catalog_collection.url | default: routes.all_products_collection_url %}{% if navigation_catalog_url != link.url %}<a href="{{ navigation_catalog_url }}">{{ 'storefront.all_products' | t }}</a>{% endif %}</div>
       </div>
     </li>
   {% else %}<li><a href="{{ link.url }}" {% if link.current %}aria-current="page"{% endif %}>{{ link.title | escape }}</a></li>{% endif %}

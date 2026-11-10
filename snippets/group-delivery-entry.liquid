@@ -24,6 +24,8 @@
   endfor
  endfor
 %}
+{%- comment -%}On the Group Delivery page itself the footer entry would only link to the current page.{%- endcomment -%}
+{% if context == 'footer' and request.path == delivery_page.url %}{% assign delivery_present = true %}{% endif %}
 {% if delivery_page != blank and delivery_present == false %}
 <a class="group-delivery-entry group-delivery-entry--{{ context | escape }}" href="{{ delivery_page.url }}" {% if request.path == delivery_page.url %}aria-current="page"{% endif %}>{% if context == 'footer' %}{{ 'group_delivery_entry.footer' | t }}{% else %}{{ 'group_delivery_entry.navigation' | t }}{% endif %}</a>
 {% endif %}
