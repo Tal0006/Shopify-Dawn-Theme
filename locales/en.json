@@ -575,6 +575,7 @@
     "page_title": "Page {{ number }}",
     "tagged": "Tagged {{ tags }}",
     "facebook": "Facebook",
+    "facebook_profile": "{{ shop }} on Facebook",
     "whatsapp": "WhatsApp",
     "instagram": "Instagram",
     "tiktok": "TikTok",

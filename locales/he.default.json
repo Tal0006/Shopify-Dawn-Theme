@@ -575,6 +575,7 @@
     "page_title": "עמוד {{ number }}",
     "tagged": "תגיות: {{ tags }}",
     "facebook": "פייסבוק",
+    "facebook_profile": "פייסבוק של {{ shop }}",
     "whatsapp": "וואטסאפ",
     "instagram": "אינסטגרם",
     "tiktok": "טיקטוק",
