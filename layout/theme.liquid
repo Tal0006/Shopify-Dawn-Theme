@@ -1,6 +1,11 @@
 <!doctype html>
-<html class="js" lang="{{ request.locale.iso_code }}" dir="{% if request.locale.iso_code == 'he' or request.locale.iso_code == 'ar' %}rtl{% else %}ltr{% endif %}">
+<html
+  class="js"
+  lang="{{ request.locale.iso_code }}"
+  dir="{% if request.locale.iso_code == 'he' or request.locale.iso_code == 'ar' %}rtl{% else %}ltr{% endif %}"
+>
   <head>
+    <meta name="google-site-verification" content="JkrR2_njxj9bpVvv9wEM1ox8tUfhSNK6E8guHQt3jqQ" />
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -32,13 +37,28 @@
     <link href="{{ 'animate.css' | asset_url }}" rel="stylesheet">
     <link href="{{ 'themify-icons.css' | asset_url }}" rel="stylesheet">
     <link href="{{ 'style.css' | asset_url }}" rel="stylesheet">
-    <noscript><style>.preloader { display: none !important; }</style></noscript>
+    <noscript>
+      <style>
+        .preloader {
+          display: none !important;
+        }
+      </style>
+    </noscript>
 
     {{ 'storefront.css' | asset_url | stylesheet_tag }}
     {% render 'storefront-design' %}
-    {% if request.page_type == 'index' or request.page_type == 'collection' or request.page_type == 'product' %}<script src="{{ 'storefront-motion.js' | asset_url }}" defer></script>{% endif %}
-    {% if request.page_type == 'customers/account' or request.page_type == 'customers/login' or request.page_type contains 'customers/' %}{{ 'base.css' | asset_url | stylesheet_tag }}{% endif %}
-    <script>window.themeStrings = {quantityIncrease: {{ 'products.product.quantity.increase' | t: product: product.title | json }}, quantityDecrease: {{ 'products.product.quantity.decrease' | t: product: product.title | json }}, required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}, previousSlide: {{ 'general.slider.previous_slide' | t | json }}, nextSlide: {{ 'general.slider.next_slide' | t | json }}};</script>
+    {% if request.page_type == 'index' or request.page_type == 'collection' or request.page_type == 'product' %}
+      <script src="{{ 'storefront-motion.js' | asset_url }}" defer></script>
+    {% endif %}
+    {% if request.page_type == 'customers/account'
+      or request.page_type == 'customers/login'
+      or request.page_type contains 'customers/'
+    -%}
+      {{- 'base.css' | asset_url | stylesheet_tag -}}
+    {%- endif %}
+    <script>
+      window.themeStrings = {quantityIncrease: {{ 'products.product.quantity.increase' | t: product: product.title | json }}, quantityDecrease: {{ 'products.product.quantity.decrease' | t: product: product.title | json }}, required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}, previousSlide: {{ 'general.slider.previous_slide' | t | json }}, nextSlide: {{ 'general.slider.next_slide' | t | json }}};
+    </script>
     {% render 'cart-submit-guard' %}
     <script src="{{ 'storefront.js' | asset_url }}" defer></script>
     {{ 'accessibility.css' | asset_url | stylesheet_tag }}
@@ -76,21 +96,36 @@
           const preloader = document.querySelector('.preloader');
           if (!preloader) return;
           let release;
-          window.fankeePreloader = {done: new Promise(resolve => { release = resolve; })};
+          window.fankeePreloader = {
+            done: new Promise((resolve) => {
+              release = resolve;
+            }),
+          };
           let paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          try { paused = paused || JSON.parse(localStorage.getItem('punky-accessibility-v1'))?.motion === true; } catch {}
+          try {
+            paused = paused || JSON.parse(localStorage.getItem('punky-accessibility-v1'))?.motion === true;
+          } catch {}
           let finished = false;
           const finish = () => {
             if (finished) return;
             finished = true;
             preloader.setAttribute('data-preloader-done', '');
-            setTimeout(() => { preloader.hidden = true; release(); }, paused ? 0 : 500);
+            setTimeout(
+              () => {
+                preloader.hidden = true;
+                release();
+              },
+              paused ? 0 : 500
+            );
           };
-          if (paused) { finish(); return; }
+          if (paused) {
+            finish();
+            return;
+          }
           // Same timing as before (window load + 100ms), but slow media never holds the page past DOM ready + 1.5s.
           if (document.readyState === 'complete') finish();
-          else window.addEventListener('load', () => setTimeout(finish, 100), {once: true});
-          document.addEventListener('DOMContentLoaded', () => setTimeout(finish, 1500), {once: true});
+          else window.addEventListener('load', () => setTimeout(finish, 100), { once: true });
+          document.addEventListener('DOMContentLoaded', () => setTimeout(finish, 1500), { once: true });
         })();
       </script>
       <!-- end preloader -->
@@ -99,7 +134,13 @@
       {% section 'header' %}
       {% if settings.shopping_assistant_enabled %}{% render 'shopping-assistant' %}{% endif %}
 
-      <main id="MainContent" tabindex="-1"{% if request.page_type == 'index' %} data-storefront-home{% endif %}>
+      <main
+        id="MainContent"
+        tabindex="-1"
+        {% if request.page_type == 'index' %}
+          data-storefront-home
+        {% endif %}
+      >
         {{ content_for_layout }}
       </main>
 
