@@ -5,7 +5,7 @@ const {spawn}=require('node:child_process');const {test}=require('node:test');co
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
-const REVIEW_URL='https://g.page/r/CTAOXiuYPkeoECE/review';
+const REVIEW_URL='https://g.page/r/CTA0XiuYPkeoECE/review';
 const snippet=read('snippets/google-review-cta.liquid');
 const tr=JSON.parse(read('locales/he.default.json'));
 const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
