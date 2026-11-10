@@ -3628,5 +3628,10 @@
     "subtitle": "Subheading",
     "collection": "Collection to scan",
     "collection_info": "Blank = all products. Only in-stock products with a compare-at price are shown."
+  },
+  "sticky_header_editor": {
+    "settings": "Header",
+    "enabled": "Sticky header",
+    "info": "The header stays at the top while scrolling and shrinks to a compact height. The announcement bar scrolls with the page."
   }
 }

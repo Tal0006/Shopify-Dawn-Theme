@@ -14,7 +14,7 @@
               </div>
               <div class="features-text">
                 <h3>
-                  <span><img src="{{ 'shape1.png' | asset_url }}" width="170" height="147" alt="" aria-hidden="true" loading="lazy" decoding="async"></span>
+                  <span><img src="{{ 'shape1.png' | asset_url }}" class="fk-img-auto" width="170" height="147" alt="" aria-hidden="true" loading="lazy" decoding="async"></span>
                   {% if block.settings.feature_title != blank %}{{ block.settings.feature_title | escape }}{% else %}{{ 'storefront.feature_title' | t }}{% endif %}
                 </h3>
                 <p>
@@ -28,8 +28,9 @@
       <div class="left-shape">
         <img
           src="{{ '80MG.png' | asset_url }}"
+          class="fk-img-auto"
           width="90"
-          height="89"
+          height="90"
           alt=""
           aria-hidden="true"
           loading="lazy"
@@ -39,8 +40,9 @@
       <div class="right-shape">
         <img
           src="{{ 'features-right.png' | asset_url }}"
-          width="1578"
-          height="1687"
+          class="fk-img-auto"
+          width="100"
+          height="107"
           alt=""
           aria-hidden="true"
           loading="lazy"

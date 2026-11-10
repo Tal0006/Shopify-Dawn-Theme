@@ -260,6 +260,8 @@ html[data-a11y-paused] [data-card-cart] button.theme-btn[name=add]:is(:hover,:ac
 .storefront-header { box-shadow: inset 0 -1px 0 rgb(255 255 255 / 60%), 0 4px 18px rgb(11 79 88 / 6%); }
 .storefront-header .cart-count { background: var(--fk-gradient-primary); color: #fff; box-shadow: 0 0 0 2px #fff, 0 2px 6px rgb(11 79 88 / 25%); }
 .storefront-header .cart-count[data-bump] { animation: fk-bump calc(460ms * var(--fk-motion-scale)) var(--fk-ease-out); }
+@media (prefers-reduced-motion: reduce) { .storefront-header .cart-count[data-bump] { animation: none; } }
+html[data-a11y-paused] .storefront-header .cart-count[data-bump] { animation: none; }
 .storefront-header form[role=search] { background: #fff; border-color: var(--fk-border); border-radius: var(--fk-radius-md); box-shadow: inset 0 1px 2px rgb(11 79 88 / 6%), var(--fk-shadow-sm); transition: border-color var(--fk-dur-fast) ease, box-shadow var(--fk-dur-fast) ease; }
 .storefront-header form[role=search]:focus-within { border-color: var(--fk-accent); box-shadow: var(--fk-ring); }
 .storefront-header fankee-predictive-search input { background: transparent; }

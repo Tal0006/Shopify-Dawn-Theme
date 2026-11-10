@@ -1,6 +1,7 @@
 <!doctype html>
 <html
   class="js"
+  {% if settings.sticky_header %}data-sticky-header{% endif %}
   lang="{{ request.locale.iso_code }}"
   dir="{% if request.locale.iso_code == 'he' or request.locale.iso_code == 'ar' %}rtl{% else %}ltr{% endif %}"
 >

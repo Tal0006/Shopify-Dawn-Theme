@@ -1303,6 +1303,18 @@
     ]
   },
   {
+    "name": "t:sticky_header_editor.settings",
+    "settings": [
+      {
+        "type": "checkbox",
+        "id": "sticky_header",
+        "label": "t:sticky_header_editor.enabled",
+        "info": "t:sticky_header_editor.info",
+        "default": true
+      }
+    ]
+  },
+  {
     "name": "t:announcement_editor.settings",
     "settings": [
       {

@@ -431,3 +431,5 @@ html[dir=rtl] .storefront-header #navbar .nav-mega-panel { transform: translateX
   .catalog-home :is(.catalog-card, .catalog-category) { transition: none; }
   .catalog-home :is(.catalog-card, .catalog-category):hover { transform: none; }
 }
+/* Decorative images with intrinsic width/height: keep the aspect ratio when CSS caps the width. */
+.fk-img-auto { height: auto; }

@@ -20,15 +20,56 @@
   <div class="storefront-header-tools">
     {% if shop.customer_accounts_enabled %}<a class="storefront-account" href="{{ routes.account_url }}" aria-label="{{ 'customer.account.title' | t }}"><i class="ti-user" aria-hidden="true"></i></a>{% endif %}
     <div class="mini-cart">
-      <button type="button" class="cart-toggle-btn" data-count-label="{{ 'general.cart.view' | t: count: '__COUNT__' | escape }}" aria-controls="MiniCart-{{ section.id }}" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><img src="{{ 'shopping-cart.png' | asset_url }}" width="24" height="24" alt="" aria-hidden="true" decoding="async"></i><span class="cart-count">{{ cart.item_count }}</span></button>
+      <button type="button" class="cart-toggle-btn" data-count-label="{{ 'general.cart.view' | t: count: '__COUNT__' | escape }}" aria-controls="MiniCart-{{ section.id }}" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><svg class="cart-toggle-btn__icon" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 3.5h2.2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1l1.8-7.1H6"/><circle cx="9.5" cy="19.8" r="1.4"/><circle cx="17" cy="19.8" r="1.4"/></svg></i><span class="cart-count">{{ cart.item_count }}</span></button>
       {% render 'cart-drawer', drawer_id: section.id %}
     </div>
   </div>
   </div>
 </div></div></nav></div></header>
+{% stylesheet %}
+/* Sticky header (Theme Settings "header צף"). Only the header section sticks; the announcement bar above scrolls
+   away. The section keeps the header's full height in the layout (--header-expanded-height, measured by
+   storefront.js), so the compact state never shifts the page; the strip under a compact header lets clicks through. */
+html[data-sticky-header] .page-wrapper { overflow: clip; }
+html[data-sticky-header] .header-section { position: sticky; top: 0; z-index: 900; min-height: var(--header-expanded-height, 0px); pointer-events: none; }
+html[data-sticky-header] .header-section > .storefront-header { pointer-events: auto; background: rgb(255 255 255 / 97%); transition: box-shadow var(--fk-dur, 240ms) ease; }
+/* The legacy scroll script (script.js) switches the header to position: fixed with an entrance animation; the sticky
+   section replaces that behaviour, so neutralise it while sticky is on. */
+html[data-sticky-header] .header-section .site-header.header-fixed { position: static; width: auto; box-shadow: none; animation: none !important; }
+html[data-header-scrolled] .header-section > .storefront-header { box-shadow: 0 6px 20px rgb(11 79 88 / 10%); }
+html[data-sticky-header] { scroll-padding-top: calc(var(--header-compact-height, 56px) + 12px); }
+html[data-header-compact] .storefront-header .container-fluid > .row { min-height: 0; padding-block: 4px; row-gap: 6px; transition: padding var(--fk-dur, 240ms) var(--fk-ease, ease); }
+html[data-header-compact] .storefront-menu-logo img { max-height: 40px; max-width: 120px; }
+/* Desktop: the legacy nav item padding (17px) is what makes the row tall; compact trims it. */
+@media (min-width: 992px) {
+ html[data-header-compact] .storefront-header .site-header #navbar > ul > li { padding-block: 4px; }
+ html[data-header-compact] .storefront-header .container-fluid > .row { padding-block: 4px; }
+}
+.storefront-menu-logo img { transition: max-height var(--fk-dur, 240ms) var(--fk-ease, ease), max-width var(--fk-dur, 240ms) var(--fk-ease, ease); }
+@media (max-width: 991px) {
+ /* Compact mobile/tablet header: one row (logo, search, cart, menu), about 56px. Account stays in the full header. */
+ html[data-header-compact] .storefront-header .container-fluid > .row,
+ html[data-header-compact] .storefront-header .row:has(.storefront-account) { grid-template-columns: auto minmax(0, 1fr) auto auto; column-gap: 8px; }
+ html[data-header-compact] .storefront-header .storefront-account { display: none; }
+ html[data-header-compact] .storefront-header .row > fankee-predictive-search,
+ html[data-header-compact] .storefront-header form[role=search] { grid-column: 2; grid-row: 1; }
+ html[data-header-compact] .storefront-header .row > fankee-predictive-search form[role=search] { min-block-size: 40px; height: 40px; }
+ html[data-header-compact] .storefront-header-tools .mini-cart,
+ html[data-header-compact] .storefront-header .row:has(.storefront-account) .mini-cart { grid-column: 3; grid-row: 1; }
+ html[data-header-compact] .storefront-header .mobail-menu,
+ html[data-header-compact] .storefront-header .row:has(.storefront-account) .mobail-menu { grid-column: 4; grid-row: 1; }
+ html[data-header-compact] .storefront-menu-logo img { max-width: 64px; max-height: 32px; }
+ /* While typing, the search takes the full width again (the section height is reserved, so nothing shifts). */
+ html[data-header-compact] .storefront-header .row:has(fankee-predictive-search:focus-within) > fankee-predictive-search { grid-column: 1 / -1; grid-row: 2; }
+}
+.cart-toggle-btn__icon { display: block; color: var(--fk-teal-900, #0a3f47); }
+@media (prefers-reduced-motion: reduce) { html[data-header-compact] .storefront-header .container-fluid > .row, .storefront-menu-logo img, html[data-sticky-header] .header-section > .storefront-header { transition: none; } }
+html[data-a11y-paused] .storefront-menu-logo img, html[data-a11y-paused] .storefront-header .container-fluid > .row, html[data-a11y-paused][data-sticky-header] .header-section > .storefront-header { transition: none; }
+{% endstylesheet %}
 {% schema %}
 {
   "name": "t:storefront_editor.header",
+  "class": "header-section",
   "settings": [
     {
       "type": "image_picker",

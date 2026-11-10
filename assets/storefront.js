@@ -969,6 +969,46 @@
   }
   announcements(document);
 
+  // Sticky header (Theme Settings "header צף", sections/header.liquid). The section keeps the expanded header height
+  // reserved (--header-expanded-height), so switching to the compact state never shifts the page. Compact turns on
+  // after 120px and off again above 40px (hysteresis, no flicker); --header-compact-height feeds scroll-padding-top
+  // so anchors and the skip link land below the header.
+  (() => {
+    const html = document.documentElement;
+    if (!html.hasAttribute('data-sticky-header')) return;
+    let compact = false, frame = 0;
+    const header = () => document.querySelector('.header-section > .storefront-header');
+    const measureExpanded = () => {
+      const node = header();
+      if (node && !compact) html.style.setProperty('--header-expanded-height', node.offsetHeight + 'px');
+    };
+    const update = () => {
+      frame = 0;
+      const y = window.scrollY;
+      html.toggleAttribute('data-header-scrolled', y > 4);
+      // Never change layout under an open mobile menu.
+      if (document.querySelector('.storefront-header .navigation-holder.slideInn')) return;
+      const next = compact ? y > 40 : y > 120;
+      if (next === compact) return;
+      if (next) measureExpanded();
+      compact = next;
+      html.toggleAttribute('data-header-compact', compact);
+      if (compact) {
+        const node = header();
+        if (node) html.style.setProperty('--header-compact-height', node.offsetHeight + 'px');
+      }
+    };
+    measureExpanded();
+    update();
+    window.addEventListener('scroll', () => { if (!frame) frame = requestAnimationFrame(update); }, {passive: true});
+    window.addEventListener('resize', () => {
+      if (compact) { compact = false; html.removeAttribute('data-header-compact'); }
+      measureExpanded();
+      update();
+    });
+    document.addEventListener('shopify:section:load', event => { if (event.target.querySelector?.('.storefront-header')) { measureExpanded(); update(); } });
+  })();
+
   // Only a successful add (the server-rendered cart count changed) reloads; a failed add keeps its error visible.
   let cartSuggestionCount = null;
   const cartCount = () => document.querySelector('.storefront-header .cart-count')?.textContent.trim() ?? null;
