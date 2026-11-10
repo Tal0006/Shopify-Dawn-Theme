@@ -637,8 +637,6 @@
     "drawer_view": "View cart",
     "drawer_updated": "Cart updated",
     "drawer_stale": "Cart updated, but the display could not refresh. Use the view cart link.",
-    "drawer_shipping_remaining": "You are {{ amount }} away from free shipping",
-    "drawer_shipping_reached": "You have free shipping 🎉",
     "product_variant_error": "Could not load this option. Please try again.",
     "product_variant_updated": "Price, availability and quantity updated for the selected option.",
     "product_gallery": "Product images",
@@ -871,5 +869,10 @@
     "button": "Write us a Google review",
     "link_label": "Write a Google review for {{ shop }}",
     "new_tab": "opens in a new tab"
+  },
+  "free_shipping": {
+    "remaining": "Add {{ amount }} more for free shipping",
+    "reached": "Great! You get free shipping 🎉",
+    "progress_label": "Progress to free shipping"
   }
 }

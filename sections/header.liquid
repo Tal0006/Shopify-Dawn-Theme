@@ -21,7 +21,7 @@
     {% if shop.customer_accounts_enabled %}<a class="storefront-account" href="{{ routes.account_url }}" aria-label="{{ 'customer.account.title' | t }}"><i class="ti-user" aria-hidden="true"></i></a>{% endif %}
     <div class="mini-cart">
       <button type="button" class="cart-toggle-btn" data-count-label="{{ 'general.cart.view' | t: count: '__COUNT__' | escape }}" aria-controls="MiniCart-{{ section.id }}" aria-expanded="false" aria-haspopup="dialog" aria-label="{{ 'general.cart.view' | t: count: cart.item_count }}"><i><img src="{{ 'shopping-cart.png' | asset_url }}" width="24" height="24" alt=""></i><span class="cart-count">{{ cart.item_count }}</span></button>
-      {% render 'cart-drawer', drawer_id: section.id, shipping_threshold: section.settings.free_shipping_threshold %}
+      {% render 'cart-drawer', drawer_id: section.id %}
     </div>
   </div>
   </div>
@@ -40,13 +40,6 @@
       "id": "menu",
       "label": "t:storefront_editor.menu",
       "default": "main-menu"
-    },
-    {
-      "type": "number",
-      "id": "free_shipping_threshold",
-      "label": "t:storefront_editor.free_shipping_threshold",
-      "info": "t:storefront_editor.free_shipping_threshold_info",
-      "default": 0
     }
   ]
 }

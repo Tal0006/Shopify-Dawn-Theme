@@ -218,6 +218,42 @@
     scheduleCartToast(toast);
   }
   cartMobile.addEventListener('change', () => { const toast = document.querySelector('[data-cart-toast]'); if (toast) hideCartToast(toast); });
+  // Free shipping meter (snippets/free-shipping-meter.liquid). Shopify renders it, with the money format and the
+  // amount, inside the drawer section that every cart mutation already returns; nothing here computes amounts or
+  // issues requests. This only (1) eases the bar from its previous value, (2) mirrors the fresh state into a cart
+  // page meter outside the drawer, and (3) announces crossing the threshold once, through a persistent live region.
+  function shippingMeterUpdated(items, previous) {
+    const meter = items.querySelector('[data-shipping-meter]');
+    const animate = (node, from) => {
+      const bar = node.querySelector('.free-shipping__bar');
+      if (!bar || from === undefined) return;
+      const target = bar.style.getPropertyValue('--free-shipping-progress');
+      bar.style.setProperty('--free-shipping-progress', String(from));
+      void bar.offsetWidth;
+      bar.style.setProperty('--free-shipping-progress', target);
+    };
+    const crossedUp = !!meter && meter.dataset.reached === 'true' && !previous?.reached;
+    if (meter) {
+      animate(meter, previous ? previous.progress : 0);
+      if (crossedUp) meter.setAttribute('data-celebrate', '');
+    }
+    for (const page of document.querySelectorAll('[data-shipping-meter]')) {
+      if (items.contains(page)) continue;
+      if (!meter) { page.hidden = true; continue; }
+      const from = Number(page.dataset.progress);
+      const copy = meter.cloneNode(true);
+      copy.className = meter.className.replace('free-shipping--drawer', 'free-shipping--cart');
+      copy.removeAttribute('data-celebrate');
+      page.replaceWith(copy);
+      animate(copy, from);
+      if (crossedUp) copy.setAttribute('data-celebrate', '');
+    }
+    const announcer = drawer()?.querySelector('[data-shipping-announcer]');
+    if (!announcer) return;
+    const crossedDown = !!meter && previous?.reached && meter.dataset.reached !== 'true';
+    announcer.textContent = '';
+    if (crossedUp || crossedDown) setTimeout(() => { announcer.textContent = meter.querySelector('[data-shipping-text]').textContent.trim(); }, 100);
+  }
   function renderCardCartSection(html) {
     if (typeof html !== 'string' && !(html instanceof Document)) return false;
     const doc = html instanceof Document ? html : new DOMParser().parseFromString(html, 'text/html');
@@ -238,7 +274,10 @@
     const focused = items.contains(document.activeElement) ? document.activeElement : null;
     const lineKey = focused?.closest('[data-cart-line]')?.dataset.cartLine;
     const action = focused?.matches('[data-cart-quantity]') ? '[data-cart-quantity]' : focused?.matches('[data-cart-remove]') ? '[data-cart-remove]' : focused?.matches('[data-cart-delta]') ? '[data-cart-delta="' + focused.dataset.cartDelta + '"]' : null;
+    const previousMeter = items.querySelector('[data-shipping-meter]');
+    const previousShipping = previousMeter ? {progress: Number(previousMeter.dataset.progress), reached: previousMeter.dataset.reached === 'true'} : null;
     items.replaceChildren(...freshItems.childNodes);
+    shippingMeterUpdated(items, previousShipping);
     if (focused && drawer()?.open) {
       const line = [...items.querySelectorAll('[data-cart-line]')].find(item => item.dataset.cartLine === lineKey);
       const target = action && line?.querySelector(action);

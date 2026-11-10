@@ -1467,6 +1467,40 @@
     ]
   },
   {
+    "name": "t:free_shipping_editor.settings",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "t:free_shipping_editor.info"
+      },
+      {
+        "type": "checkbox",
+        "id": "free_shipping_enabled",
+        "label": "t:free_shipping_editor.enabled",
+        "default": true
+      },
+      {
+        "type": "number",
+        "id": "free_shipping_threshold",
+        "label": "t:free_shipping_editor.threshold",
+        "info": "t:free_shipping_editor.threshold_info",
+        "default": 150
+      },
+      {
+        "type": "text",
+        "id": "free_shipping_remaining_text",
+        "label": "t:free_shipping_editor.remaining_text",
+        "info": "t:free_shipping_editor.remaining_text_info"
+      },
+      {
+        "type": "text",
+        "id": "free_shipping_success_text",
+        "label": "t:free_shipping_editor.success_text",
+        "info": "t:free_shipping_editor.success_text_info"
+      }
+    ]
+  },
+  {
     "name": "t:storefront_editor.collections",
     "settings": [
       {

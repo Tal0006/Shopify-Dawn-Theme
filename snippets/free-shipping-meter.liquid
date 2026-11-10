@@ -1,0 +1,89 @@
+{% doc %}
+  Free shipping progress meter for the cart drawer and the cart page. Informational only: it never changes rates.
+  Uses cart.total_price, the cart total customers see (after line and cart discounts, before shipping), compared
+  with the Theme Settings threshold in the cart's minor units (integer arithmetic; 150 ILS = 15000). Free shipping
+  is shown as reached at exactly the threshold. Renders nothing when disabled, when the threshold is not positive,
+  for an empty cart, or when the cart is in a different currency than the shop (the threshold is in shop currency).
+  The amount is formatted with Shopify's money filter. Inside the drawer it is re-rendered with every cart update;
+  storefront.js only animates the bar from its previous value and announces threshold crossings.
+
+  @param {string} context - 'drawer' or 'cart'; used for the modifier class.
+  @example {% render 'free-shipping-meter', context: 'drawer' %}
+{% enddoc %}
+{%- liquid
+  assign shipping_threshold = settings.free_shipping_threshold | default: 0 | times: 100 | round
+  assign shipping_show = settings.free_shipping_enabled
+  if shipping_threshold <= 0 or cart.item_count == 0 or cart.currency.iso_code != shop.currency
+    assign shipping_show = false
+  endif
+-%}
+{%- if shipping_show -%}
+  {%- liquid
+    assign shipping_total = cart.total_price
+    if shipping_total >= shipping_threshold
+      assign shipping_reached = true
+      assign shipping_percent = 100
+      assign shipping_message = settings.free_shipping_success_text | strip
+      if shipping_message == blank
+        assign shipping_message = 'free_shipping.reached' | t
+      endif
+    else
+      assign shipping_reached = false
+      # Integer percentage, floored, so a cart below the threshold never shows a full bar.
+      assign shipping_percent = shipping_total | at_least: 0 | times: 100 | divided_by: shipping_threshold
+      assign shipping_amount = shipping_threshold | minus: shipping_total | money
+      assign shipping_message = settings.free_shipping_remaining_text | strip
+      if shipping_message == blank
+        assign shipping_message = 'free_shipping.remaining' | t: amount: '__AMOUNT__'
+      endif
+      assign shipping_amount_html = '<bdi class="free-shipping__amount">' | append: shipping_amount | append: '</bdi>'
+      assign shipping_text = shipping_message | replace: '{{ amount }}', shipping_amount | replace: '{{amount}}', shipping_amount | replace: '__AMOUNT__', shipping_amount
+      assign shipping_message = shipping_message | escape | replace: '{{ amount }}', shipping_amount_html | replace: '{{amount}}', shipping_amount_html | replace: '__AMOUNT__', shipping_amount_html
+    endif
+    if shipping_reached
+      assign shipping_text = shipping_message
+      assign shipping_message = shipping_message | escape
+    endif
+    assign shipping_context = context | default: 'drawer' | handleize
+  -%}
+  <div class="free-shipping free-shipping--{{ shipping_context }}{% if shipping_reached %} free-shipping--reached{% endif %}" data-shipping-meter data-progress="{{ shipping_percent }}" data-reached="{{ shipping_reached }}">
+    <p class="free-shipping__message">
+      <span class="free-shipping__icon" aria-hidden="true">
+        {%- if shipping_reached -%}
+          <svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="m5 12.5 4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {%- else -%}
+          <svg viewBox="0 0 24 24" width="18" height="18" focusable="false"><path d="M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3.2v2.8h-7z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="6.5" cy="17" r="1.8" fill="#fff" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="17" r="1.8" fill="#fff" stroke="currentColor" stroke-width="1.7"/></svg>
+        {%- endif -%}
+      </span>
+      <span class="free-shipping__text" data-shipping-text>{{ shipping_message }}</span>
+    </p>
+    <div class="free-shipping__track" role="progressbar" aria-label="{{ 'free_shipping.progress_label' | t | escape }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ shipping_percent }}" aria-valuetext="{{ shipping_text | strip_html | strip | escape }}">
+      <span class="free-shipping__bar" style="--free-shipping-progress: {{ shipping_percent }}"></span>
+    </div>
+  </div>
+{%- endif -%}
+
+{% stylesheet %}
+/* Compact glass card; the bar fills from the inline start (right in Hebrew, left in English). */
+.free-shipping { --free-shipping-fill: linear-gradient(90deg, var(--fk-teal-600, #087b88), var(--fk-cyan-500, #12a7bb)); display: grid; gap: 8px; min-width: 0; margin-block: 0 12px; padding: 10px 12px; border: 1px solid var(--fk-border, #d7e9ec); border-radius: var(--fk-radius-md, 12px); background: linear-gradient(160deg, rgb(255 255 255 / 92%), rgb(240 250 251 / 92%)); box-shadow: 0 1px 2px rgb(11 79 88 / 6%); color: var(--fk-teal-900, #0a3f47); transition: border-color var(--fk-dur, 240ms) ease, background-color var(--fk-dur, 240ms) ease; }
+.free-shipping__message { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
+.free-shipping__icon { flex: 0 0 28px; display: grid; place-items: center; inline-size: 28px; block-size: 28px; border-radius: 50%; background: var(--fk-cyan-100, #dff5f7); color: var(--fk-teal-700, #0b6571); }
+.free-shipping__text { min-width: 0; }
+.free-shipping__amount { font-weight: 800; white-space: nowrap; unicode-bidi: isolate; }
+.free-shipping__track { position: relative; overflow: hidden; block-size: 8px; border-radius: var(--fk-radius-pill, 999px); background: rgb(11 79 88 / 10%); box-shadow: inset 0 1px 2px rgb(11 79 88 / 12%); }
+.free-shipping__bar { position: absolute; inset: 0; border-radius: inherit; background: var(--free-shipping-fill); transform: scaleX(calc(var(--free-shipping-progress, 0) / 100)); transform-origin: left center; transition: transform calc(520ms * var(--fk-motion-scale, 1)) var(--fk-ease-out, ease); }
+.free-shipping__bar:dir(rtl) { transform-origin: right center; }
+[dir=rtl] .free-shipping__bar { transform-origin: right center; }
+.free-shipping--reached { --free-shipping-fill: linear-gradient(90deg, #0f8a5f, var(--fk-cyan-500, #12a7bb)); border-color: #b5e3cf; background: linear-gradient(160deg, #f4fcf8, #e9f8f2); color: #0c5a3f; }
+.free-shipping--reached .free-shipping__icon { background: #0f8a5f; color: #ffffff; }
+/* One-time completion cue (storefront.js sets data-celebrate when the threshold is crossed). */
+.free-shipping[data-celebrate] .free-shipping__icon { animation: free-shipping-pop calc(420ms * var(--fk-motion-scale, 1)) var(--fk-ease-out, ease) 1; }
+.free-shipping[data-celebrate] { animation: free-shipping-glow calc(900ms * var(--fk-motion-scale, 1)) ease-out 1; }
+@keyframes free-shipping-pop { 40% { transform: scale(1.18); } }
+@keyframes free-shipping-glow { 30% { box-shadow: 0 0 0 4px rgb(15 138 95 / 18%); } }
+.free-shipping--cart { max-inline-size: 520px; margin-block: 16px; }
+@media (prefers-reduced-motion: reduce) {
+ .free-shipping, .free-shipping *, .free-shipping[data-celebrate] { animation: none !important; transition: none !important; }
+}
+html[data-a11y-paused] .free-shipping, html[data-a11y-paused] .free-shipping * { animation: none !important; transition: none !important; }
+{% endstylesheet %}

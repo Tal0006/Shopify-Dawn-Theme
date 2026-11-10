@@ -1,13 +1,14 @@
 {% doc %}
   Server-rendered modal cart, refreshed through the header section.
   @param {string} drawer_id - Unique header section ID.
-  @param {number} shipping_threshold - Optional threshold in shop currency units.
   @example
-  {% render 'cart-drawer', drawer_id: section.id, shipping_threshold: section.settings.free_shipping_threshold %}
+  {% render 'cart-drawer', drawer_id: section.id %}
 {% enddoc %}
 <dialog id="MiniCart-{{ drawer_id }}" class="mini-cart-content cart-drawer" aria-modal="true" aria-labelledby="MiniCartTitle-{{ drawer_id }}" data-cart-error="{{ 'sections.cart.cart_error' | t | escape }}" data-cart-updated="{{ 'storefront.drawer_updated' | t | escape }}" data-cart-stale="{{ 'storefront.drawer_stale' | t | escape }}" data-cart-added="{{ 'storefront.cart_added' | t | escape }}">
   <button type="button" class="mini-cart-close" aria-label="{{ 'storefront.drawer_close' | t }}" autofocus><span aria-hidden="true">×</span></button>
   <p class="cart-drawer__status" role="status" aria-live="polite" aria-atomic="true" data-cart-status></p>
+  {%- comment -%}Persistent (outside the re-rendered items) so storefront.js can announce free-shipping threshold crossings once.{%- endcomment -%}
+  <p class="sr-only" aria-live="polite" aria-atomic="true" data-shipping-announcer></p>
   <div class="mini-cart-items">
     <header class="cart-drawer__header"><h2 id="MiniCartTitle-{{ drawer_id }}">{{ 'sections.cart.title' | t }} <span>({{ cart.item_count }})</span></h2></header>
     {% if cart.empty? %}
@@ -40,10 +41,7 @@
           {% endfor %}
         </div>
         <footer class="cart-drawer__summary">
-          {% assign threshold_cents = shipping_threshold | default: 0 | times: 100 %}
-          {% if threshold_cents > 0 and cart.currency.iso_code == shop.currency %}
-            <p class="cart-drawer__shipping">{% if cart.total_price >= threshold_cents %}{{ 'storefront.drawer_shipping_reached' | t }}{% else %}{% assign remaining = threshold_cents | minus: cart.total_price | money %}{{ 'storefront.drawer_shipping_remaining' | t: amount: remaining }}{% endif %}</p>
-          {% endif %}
+          {% render 'free-shipping-meter', context: 'drawer' %}
           <p class="cart-drawer__total"><span>{{ 'storefront.drawer_total' | t }}</span><bdi>{{ cart.total_price | money }}</bdi></p>
           <button type="submit" name="checkout" class="theme-btn">{{ 'sections.cart.checkout' | t }}</button>
           <a class="cart-drawer__view" href="{{ routes.cart_url }}">{{ 'storefront.drawer_view' | t }}</a>
@@ -88,7 +86,6 @@ html:has(.cart-drawer[open]) { overflow: hidden; }
 .cart-drawer__total { display: flex; justify-content: space-between; gap: 12px; font-weight: 700; margin-block: 0 14px; }
 .cart-drawer__summary .theme-btn { width: 100%; min-height: 54px; font-size: 17px; background: var(--fk-gradient-primary); color: #fff; border: 1px solid var(--fk-primary); box-shadow: var(--fk-shadow-cta); }
 .cart-drawer__view { display: flex; align-items: center; justify-content: center; min-height: 44px; color: var(--storefront-green); text-decoration: underline; }
-.cart-drawer__shipping { margin-block: 0 12px; padding: 8px; border-radius: 6px; background: #f0f5ee; color: var(--storefront-green); font-size: 13px; }
 .cart-drawer__empty { padding: 32px 20px; text-align: center; }
 .cart-drawer__empty .theme-btn { background: var(--storefront-green); color: #fff; }
 .cart-drawer__status { margin: 0; padding: 0 20px; font-size: 14px; }
@@ -120,7 +117,6 @@ html:has(.cart-drawer[open]) { overflow: hidden; }
 .cart-drawer__status:not(:empty) { animation: fk-fade var(--fk-dur) var(--fk-ease-out); }
 .cart-drawer__summary { border-color: var(--fk-border); background: rgb(255 255 255 / 94%); box-shadow: 0 -10px 28px rgb(11 79 88 / 8%); }
 .cart-drawer__total bdi { font-size: 20px; color: var(--fk-teal-900); }
-.cart-drawer__shipping { border: 1px solid #c6e9d6; background: var(--fk-success-bg); color: var(--fk-success); font-weight: 600; }
 .cart-drawer__view { color: var(--fk-accent); }
 .cart-drawer__empty { display: grid; justify-items: center; gap: 12px; padding-block: 48px; color: var(--fk-text-muted); }
 .cart-drawer__empty::before { content: ''; inline-size: 64px; block-size: 64px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, var(--fk-cyan-100)); box-shadow: inset 0 0 0 1px var(--fk-border), var(--fk-shadow-sm); }

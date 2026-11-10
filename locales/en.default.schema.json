@@ -3473,8 +3473,6 @@
     "title": "Title",
     "newsletter": "Newsletter",
     "category_info": "Choose an existing Shopify collection. Its name, image and URL are used automatically.",
-    "free_shipping_threshold": "Free shipping threshold",
-    "free_shipping_threshold_info": "In shop currency. 0 hides the message. Match your shipping rules; this setting does not change rates.",
     "product_usage": "Usage instructions",
     "product_additional": "Additional information",
     "recently_viewed": "Recently viewed",
@@ -3539,5 +3537,16 @@
     "text_info": "Blank uses the translated default text.",
     "button": "Button label",
     "button_info": "Blank uses the translated default label."
+  },
+  "free_shipping_editor": {
+    "settings": "Free shipping progress",
+    "info": "Progress meter in the cart and cart drawer. Informational only; it does not change shipping rates.",
+    "enabled": "Show free shipping progress",
+    "threshold": "Free shipping threshold",
+    "threshold_info": "In shop currency, compared with the cart total after discounts and before shipping. Make sure it matches your free shipping rate in Shopify. 0 hides the meter.",
+    "remaining_text": "Text before the threshold",
+    "remaining_text_info": "Use {{ amount }} for the remaining amount. Blank uses the translated default.",
+    "success_text": "Text after reaching the threshold",
+    "success_text_info": "Blank uses the translated default."
   }
 }
