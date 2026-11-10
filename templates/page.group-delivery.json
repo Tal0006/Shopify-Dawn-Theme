@@ -1,12 +1,40 @@
+/*
+ * ------------------------------------------------------------
+ * IMPORTANT: The contents of this file are auto-generated.
+ *
+ * This file may be updated by the Shopify admin theme editor
+ * or related systems. Please exercise caution as any changes
+ * made to this file may be overwritten.
+ * ------------------------------------------------------------
+ */
 {
   "sections": {
     "main": {
       "type": "group-delivery",
-      "settings": {}
+      "settings": {
+        "service_url": ""
+      }
     },
     "group_delivery_info": {
       "type": "group-delivery-info",
-      "settings": {}
+      "settings": {
+        "steps_heading": "",
+        "step_1_title": "",
+        "step_1_text": "",
+        "step_2_title": "",
+        "step_2_text": "",
+        "step_3_title": "",
+        "step_3_text": "",
+        "faq_heading": "",
+        "faq_1_question": "",
+        "faq_1_answer": "משלוח נפתח כשסך ההתחייבויות באזור מגיע ל־500 ₪. הסכום מחושב לפי מחירי המוצרים, לפני דמי משלוח והנחות.",
+        "faq_2_question": "",
+        "faq_2_answer": "אפשר לפתוח קבוצה בכל יישוב שמופיע ברשימה בדף זה. משלוחים רגילים מגיעים כיום ל: \n1. קריית גת והמושבים בסביבה\n2. אשקלון\n3. אשדוד\n4. שדרות\n5. אופקים\n6. נתיבות\n7. באר שבע",
+        "faq_3_question": "",
+        "faq_3_answer": "ההצטרפות חינם ואינה כרוכה בתשלום. היא מבטאת כוונה להזמין את הסל שתכננתם, ואפשר לבטל אותה בכל עת עד לאישור המשלוח בהודעה אלינו בוואטסאפ.",
+        "faq_4_question": "",
+        "faq_4_answer": "בשלב ההצטרפות לא נגבה תשלום. כשהקבוצה מגיעה ליעד והחנות מאשרת את המשלוח, נשלח אליכם הודעה עם קישור לתשלום מאובטח באתר ומועד המשלוח המתוכנן."
+      }
     }
   },
   "order": [

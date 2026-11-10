@@ -112,6 +112,14 @@
     "social_pinterest_link": "",
     "social_tumblr_link": "",
     "social_vimeo_link": "",
+    "business_legal_name": "פאנקי מוצרי ניקיון",
+    "business_id": "",
+    "business_address": "אחוזם 80, מושב אחוזם",
+    "business_phone": "054-396-6168",
+    "business_email": "fankeeoh@gmail.com",
+    "business_hours": "ראשון–חמישי: 24 שעות\nשישי: 06:00–14:00\nשבת: סגור",
+    "floating_whatsapp_enabled": true,
+    "floating_whatsapp_number": "972543966168",
     "predictive_search_enabled": true,
     "predictive_search_show_vendor": false,
     "predictive_search_show_price": false,
@@ -158,7 +166,8 @@
           "show_footer_links": false,
           "show_newsletter": false,
           "show_payment_icons": true,
-          "accessibility_statement_page": "הצהרת-נגישות"
+          "accessibility_statement_page": "הצהרת-נגישות",
+          "brand_description": ""
         }
       }
     },
@@ -219,9 +228,7 @@
           "shadow": "#121212"
         }
       }
-    },
-    "floating_whatsapp_enabled": true,
-    "floating_whatsapp_number": "972543966168"
+    }
   },
   "presets": {
     "Default": {
