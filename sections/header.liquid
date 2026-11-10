@@ -33,8 +33,7 @@
 html[data-sticky-header] .page-wrapper { overflow: clip; }
 html[data-sticky-header] .header-section { position: sticky; top: 0; z-index: 900; min-height: var(--header-expanded-height, 0px); pointer-events: none; }
 html[data-sticky-header] .header-section > .storefront-header { pointer-events: auto; background: rgb(255 255 255 / 97%); transition: box-shadow var(--fk-dur, 240ms) ease; }
-/* The legacy scroll script (script.js) switches the header to position: fixed with an entrance animation; the sticky
-   section replaces that behaviour, so neutralise it while sticky is on. */
+/* The classic fixed header (storefront.js, only when sticky is off) uses .header-fixed; never combine it with sticky. */
 html[data-sticky-header] .header-section .site-header.header-fixed { position: static; width: auto; box-shadow: none; animation: none !important; }
 html[data-header-scrolled] .header-section > .storefront-header { box-shadow: 0 6px 20px rgb(11 79 88 / 10%); }
 html[data-sticky-header] { scroll-padding-top: calc(var(--header-compact-height, 56px) + 12px); }

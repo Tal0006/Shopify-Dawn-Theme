@@ -67,7 +67,7 @@
       {{- 'base.css' | asset_url | stylesheet_tag -}}
     {%- endif %}
     <script>
-      window.themeStrings = {quantityIncrease: {{ 'products.product.quantity.increase' | t: product: product.title | json }}, quantityDecrease: {{ 'products.product.quantity.decrease' | t: product: product.title | json }}, required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}, previousSlide: {{ 'general.slider.previous_slide' | t | json }}, nextSlide: {{ 'general.slider.next_slide' | t | json }}};
+      window.themeStrings = {required: {{ 'storefront.required' | t | json }}, invalidEmail: {{ 'storefront.invalid_email' | t | json }}, quantityError: {{ 'storefront.quantity_error' | t | json }}, backToTop: {{ 'storefront.back_to_top' | t | json }}};
     </script>
     {% render 'cart-submit-guard' %}
     <script src="{{ 'storefront.js' | asset_url }}" defer></script>
@@ -101,7 +101,7 @@
       </div>
       <script>
         (() => {
-          // Critical visibility path: plain JavaScript, independent of jQuery and the deferred legacy scripts.
+          // Critical visibility path: plain inline JavaScript, independent of every deferred script.
           // style.css also fades the overlay out on its own after a few seconds if this never runs.
           const preloader = document.querySelector('.preloader');
           if (!preloader) return;
@@ -160,10 +160,5 @@
       {% render 'cart-toast' %}
     </div>
     {% render 'accessibility-menu' %}
-
-    <script src="{{ 'jquery.min.js' | asset_url }}" defer></script>
-    <script src="{{ 'bootstrap.bundle.min.js' | asset_url }}" defer></script>
-    <script src="{{ 'jquery-plugin-collection.js' | asset_url }}" defer></script>
-    <script src="{{ 'script.js' | asset_url }}" defer></script>
   </body>
 </html>

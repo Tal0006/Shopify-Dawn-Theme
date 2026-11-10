@@ -51,13 +51,6 @@
   function motion() {
     const paused = preferences.motion || media.matches;
     root.toggleAttribute('data-a11y-paused', paused);
-    if (window.jQuery) {
-      window.jQuery.fx.off = paused;
-      if (paused) {
-        window.jQuery('html, body').stop(true);
-        window.jQuery('.owl-carousel').trigger('stop.owl.autoplay');
-      }
-    }
     if (paused) document.querySelectorAll('video').forEach(video => {
       if (preferences.motion || video.autoplay) video.pause();
     });

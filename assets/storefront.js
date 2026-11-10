@@ -1009,6 +1009,75 @@
     document.addEventListener('shopify:section:load', event => { if (event.target.querySelector?.('.storefront-header')) { measureExpanded(); update(); } });
   })();
 
+  // Back-to-top button (formerly in the legacy script.js). Same markup and styles (style.css .back-to-top): appears
+  // after 1000px with a 600ms fade, scrolls smoothly to the top; with reduced motion or the accessibility pause it
+  // appears without fading and jumps to the top, moving focus to the skip link.
+  (() => {
+    if (document.querySelector('.back-to-top')) return;
+    const button = document.createElement('a');
+    button.href = '#';
+    button.className = 'back-to-top';
+    button.setAttribute('aria-label', window.themeStrings?.backToTop || '');
+    button.innerHTML = '<i class="ti-arrow-up" aria-hidden="true"></i>';
+    document.body.append(button);
+    const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused');
+    let shown = false, fade = null;
+    const toggle = () => {
+      const next = window.scrollY > 1000;
+      if (next === shown) return;
+      shown = next;
+      fade?.cancel();
+      fade = null;
+      if (next) {
+        button.style.display = 'block';
+        if (!still()) fade = button.animate([{opacity: 0}, {opacity: 1}], {duration: 600});
+      } else if (still()) button.style.display = 'none';
+      else {
+        fade = button.animate([{opacity: 1}, {opacity: 0}], {duration: 600});
+        fade.onfinish = () => { if (!shown) button.style.display = 'none'; };
+      }
+    };
+    window.addEventListener('scroll', toggle, {passive: true});
+    toggle();
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      if (still()) {
+        window.scrollTo({top: 0, behavior: 'instant'});
+        document.querySelector('.a11y-skip-link')?.focus({preventScroll: true});
+        return;
+      }
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    });
+  })();
+
+  // Classic fixed header (formerly script.js), only when the sticky header setting is off: past 300px the header
+  // becomes position: fixed with a short slide-in (style.css .site-header.header-fixed + the fadeInDown animation).
+  (() => {
+    if (document.documentElement.hasAttribute('data-sticky-header')) return;
+    let fixed = false;
+    const update = () => {
+      const next = window.scrollY > 300;
+      if (next === fixed) return;
+      fixed = next;
+      document.querySelectorAll('.site-header').forEach(header => {
+        header.classList.toggle('header-fixed', fixed);
+        header.classList.toggle('fadeInDown', fixed);
+        header.classList.toggle('animated', fixed);
+      });
+    };
+    window.addEventListener('scroll', update, {passive: true});
+    update();
+  })();
+
+  // Mobile menu: a tap outside the open menu closes it (taps inside it, including empty space, do nothing). The
+  // close button and Escape are handled above. Clicks the header handler already consumed never reach here.
+  document.addEventListener('click', event => {
+    const menu = document.querySelector('.storefront-header .navigation-holder.slideInn');
+    if (!menu || menu.contains(event.target) || event.target.closest?.('.storefront-header .open-btn')) return;
+    menu.classList.remove('slideInn');
+    menu.closest('.storefront-header')?.querySelector('.open-btn')?.classList.remove('x-close');
+  });
+
   // Only a successful add (the server-rendered cart count changed) reloads; a failed add keeps its error visible.
   let cartSuggestionCount = null;
   const cartCount = () => document.querySelector('.storefront-header .cart-count')?.textContent.trim() ?? null;
