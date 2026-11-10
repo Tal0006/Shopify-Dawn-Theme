@@ -773,7 +773,6 @@
       dialog.querySelector('[data-back-in-stock-product]').textContent = title;
       dialog.querySelector('[data-back-in-stock-field=title]').value = title;
       dialog.querySelector('[data-back-in-stock-field=url]').value = url;
-      dialog.querySelector('[data-back-in-stock-field=body]').value = (dialog.dataset.message || '').replace('__TITLE__', title).replace('__URL__', url);
       dialog.querySelectorAll('[data-back-in-stock-result]').forEach(node => node.remove());
       backInStockOpener = trigger;
       if (!dialog.open) dialog.showModal();

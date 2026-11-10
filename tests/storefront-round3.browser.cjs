@@ -18,8 +18,13 @@ test('Contract: settings, templates, fields and labels',()=>{
  assert.equal((read('layout/theme.liquid').match(/{% render 'back-in-stock' %}/g)||[]).length,1);
  const dialog=read('snippets/back-in-stock.liquid');
  assert.match(dialog,/{% form 'contact', id: 'BackInStockForm'/);
- for(const field of ['contact[name]','contact[email]','contact[phone]','contact[product]','contact[product_url]','contact[body]'])assert.ok(dialog.includes('name="'+field+'"'),field);
- assert.match(dialog,/name="contact\[email\]"[^>]*required/);assert.doesNotMatch(dialog.match(/<input id="BackInStockPhone"[^>]*>/)[0],/required/);
+ // Field keys are the labels in the email the store receives: Hebrew, except contact[email] (required by Shopify).
+ for(const field of ['contact[שם]','contact[email]','contact[טלפון]','contact[מוצר]','contact[קישור]','contact[body]'])assert.ok(dialog.includes('name="'+field+'"'),field);
+ for(const field of ['contact[name]','contact[phone]','contact[product]','contact[product_url]'])assert.ok(!dialog.includes('name="'+field+'"'),'English key '+field);
+ assert.match(dialog,/<input type="hidden" name="contact\[body\]" value="{{ 'back_in_stock\.message' \| t \| escape }}">/);
+ assert.equal(he.back_in_stock.message,'בקשת עדכון חזרה למלאי','body is only the request line; product and link are separate fields');
+ assert.doesNotMatch(read('assets/storefront.js'),/__TITLE__|__URL__/);
+ assert.match(dialog,/name="contact\[email\]"[^>]*required/);assert.match(dialog,/name="contact\[שם\]"[^>]*required/);assert.doesNotMatch(dialog.match(/<input id="BackInStockPhone"[^>]*>/)[0],/required/);
  for(const id of ['BackInStockName','BackInStockEmail','BackInStockPhone'])assert.match(dialog,new RegExp('<label for="'+id+'">'));
  assert.match(read('snippets/product-card.liquid'),/{% render 'back-in-stock-trigger', bis_product: card_product %}/);
  assert.match(read('sections/single-product.liquid'),/{% unless selected_variant\.available %}{% render 'back-in-stock-trigger', bis_product: product, bis_variant: selected_variant/);
@@ -44,7 +49,7 @@ test('Contract: settings, templates, fields and labels',()=>{
  const data=json('config/settings_data.json');assert.equal(data.current.sections.footer.settings.show_payment_icons,true);assert.equal(data.current.floating_whatsapp_number,'972543966168');
  // Contact page phone is optional.
  const contact=read('sections/contact-form.liquid');const phone=contact.match(/<input type="tel" id="ContactPhone-{{ section\.id }}"[^>]*>/)[0];
- assert.match(phone,/name="contact\[phone\]"/);assert.doesNotMatch(phone,/required/);assert.match(contact,/<label for="ContactPhone-{{ section\.id }}">/);
+ assert.match(phone,/name="contact\[טלפון\]"/);assert.doesNotMatch(phone,/required/);assert.match(contact,/<label for="ContactPhone-{{ section\.id }}">/);
  // Every schema t: key resolves in both schema locales; all new storefront keys exist in both locales.
  const schemaLocales=['locales/he.schema.json','locales/en.default.schema.json'].map(json);
  const files=['config/settings_schema.json','sections/featured-collection.liquid','sections/cart-recommendations.liquid','sections/shopping-assistant-promo.liquid','sections/group-delivery-info.liquid'];
@@ -165,10 +170,11 @@ ${dialog}${whatsapp}
    assert.equal(triggerInfo.text,'עדכנו אותי כשחוזר למלאי');assert.equal(triggerInfo.label,'עדכנו אותי כשחוזר למלאי: סנו Javel לימון');assert.ok(triggerInfo.height>=44);
    await ev('document.querySelector("[data-back-in-stock]").focus()');await key('Enter','Enter',13);
    await wait('document.querySelector("#BackInStockDialog").open');
-   const r=await ev('(()=>{const d=document.querySelector("#BackInStockDialog"),f=n=>d.querySelector("[data-back-in-stock-field="+n+"]").value;return {modal:d.matches(":modal"),focus:document.activeElement.id,product:d.querySelector("[data-back-in-stock-product]").textContent,title:f("title"),url:f("url"),body:f("body"),labels:[...d.querySelectorAll("input:not([type=hidden])")].map(i=>i.labels[0]?.textContent.trim()),required:[...d.querySelectorAll("input[required]")].map(i=>i.name),name:document.getElementById(d.getAttribute("aria-labelledby")).textContent}})()');
+   const r=await ev('(()=>{const d=document.querySelector("#BackInStockDialog"),f=n=>d.querySelector("[data-back-in-stock-field="+n+"]").value;return {modal:d.matches(":modal"),focus:document.activeElement.id,product:d.querySelector("[data-back-in-stock-product]").textContent,title:f("title"),url:f("url"),body:[...d.querySelectorAll("input[name^=contact]")].find(i=>i.name==="contact[body]").value,keys:[...d.querySelectorAll("input[name^=contact]")].map(i=>i.name),labels:[...d.querySelectorAll("input:not([type=hidden])")].map(i=>i.labels[0]?.textContent.trim()),required:[...d.querySelectorAll("input[required]")].map(i=>i.name),name:document.getElementById(d.getAttribute("aria-labelledby")).textContent}})()');
    assert.equal(r.modal,true);assert.equal(r.focus,'BackInStockName');assert.equal(r.product,'סנו Javel לימון');
-   assert.equal(r.url,'https://fanakee.com/products/sano');assert.equal(r.body,'בקשת עדכון חזרה למלאי\nמוצר: סנו Javel לימון\nקישור: https://fanakee.com/products/sano');
-   assert.deepEqual(r.labels,['שם','אימייל','טלפון (לא חובה)']);assert.deepEqual(r.required,['contact[name]','contact[email]']);assert.equal(r.name,'עדכון כשהמוצר חוזר למלאי');
+   assert.equal(r.title,'סנו Javel לימון');assert.equal(r.url,'https://fanakee.com/products/sano');assert.equal(r.body,'בקשת עדכון חזרה למלאי');
+   assert.deepEqual(r.keys,['contact[מוצר]','contact[קישור]','contact[body]','contact[שם]','contact[email]','contact[טלפון]']);
+   assert.deepEqual(r.labels,['שם','אימייל','טלפון (לא חובה)']);assert.deepEqual(r.required,['contact[שם]','contact[email]']);assert.equal(r.name,'עדכון כשהמוצר חוזר למלאי');
    await key('Escape','Escape',27);await wait('!document.querySelector("#BackInStockDialog").open');
    assert.equal(await ev('document.activeElement.matches("[data-back-in-stock]")'),true);
   });

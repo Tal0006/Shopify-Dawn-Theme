@@ -885,7 +885,7 @@
     "note": "We will let you know when the product is back in stock. Your details are used only for this update.",
     "submit": "Send request",
     "success": "Thank you! We will let you know when the product is back in stock.",
-    "message": "Back-in-stock request\nProduct: {{ title }}\nLink: {{ url }}"
+    "message": "Back-in-stock request"
   },
   "cart_recommendations": {
     "heading": "You may also like",

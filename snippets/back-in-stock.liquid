@@ -7,7 +7,7 @@
   @example
   {% render 'back-in-stock' %}
 {% enddoc %}
-<dialog id="BackInStockDialog" class="back-in-stock" aria-labelledby="BackInStockTitle" data-back-in-stock-dialog data-message="{{ 'back_in_stock.message' | t: title: '__TITLE__', url: '__URL__' | escape }}">
+<dialog id="BackInStockDialog" class="back-in-stock" aria-labelledby="BackInStockTitle" data-back-in-stock-dialog>
   <div class="back-in-stock__shell">
     <button type="button" class="back-in-stock__close" data-back-in-stock-close aria-label="{{ 'back_in_stock.close' | t | escape }}"><span aria-hidden="true">×</span></button>
     <h2 id="BackInStockTitle" class="back-in-stock__title">{{ 'back_in_stock.title' | t }}</h2>
@@ -19,12 +19,13 @@
       {%- if form.errors -%}
         <div class="storefront-form-errors" role="alert" id="BackInStockErrors" data-back-in-stock-result>{{ form.errors | default_errors }}</div>
       {%- endif -%}
-      <input type="hidden" name="contact[product]" value="" data-back-in-stock-field="title">
-      <input type="hidden" name="contact[product_url]" value="" data-back-in-stock-field="url">
-      <input type="hidden" name="contact[body]" value="" data-back-in-stock-field="body">
+      {%- comment -%}Field keys are the labels the store sees in the contact email. contact[email] keeps its key: Shopify requires it.{%- endcomment -%}
+      <input type="hidden" name="contact[מוצר]" value="" data-back-in-stock-field="title">
+      <input type="hidden" name="contact[קישור]" value="" data-back-in-stock-field="url">
+      <input type="hidden" name="contact[body]" value="{{ 'back_in_stock.message' | t | escape }}">
       <div class="back-in-stock__field">
         <label for="BackInStockName">{{ 'templates.contact.form.name' | t }}</label>
-        <input id="BackInStockName" type="text" name="contact[name]" autocomplete="name" required value="{{ customer.name | escape }}">
+        <input id="BackInStockName" type="text" name="contact[שם]" autocomplete="name" required value="{{ customer.name | escape }}">
       </div>
       <div class="back-in-stock__field">
         <label for="BackInStockEmail">{{ 'templates.contact.form.email' | t }}</label>
@@ -32,7 +33,7 @@
       </div>
       <div class="back-in-stock__field">
         <label for="BackInStockPhone">{{ 'templates.contact.form.phone' | t }} <span class="back-in-stock__optional">({{ 'storefront.optional' | t }})</span></label>
-        <input id="BackInStockPhone" type="tel" name="contact[phone]" autocomplete="tel" inputmode="tel" dir="ltr">
+        <input id="BackInStockPhone" type="tel" name="contact[טלפון]" autocomplete="tel" inputmode="tel" dir="ltr">
       </div>
       <p class="back-in-stock__note">{{ 'back_in_stock.note' | t }}</p>
       <button type="submit" class="theme-btn back-in-stock__submit">{{ 'back_in_stock.submit' | t }}</button>
