@@ -6,11 +6,11 @@
   @example
   {% render 'floating-whatsapp' %}
 {% enddoc %}
+{%- capture wa_digits -%}{% render 'whatsapp-number' %}{%- endcapture -%}
 {%- liquid
-  assign wa_digits = settings.floating_whatsapp_number | remove: '+' | remove: ' ' | remove: '-' | remove: '(' | remove: ')'
-  assign wa_rest = wa_digits | remove: '0' | remove: '1' | remove: '2' | remove: '3' | remove: '4' | remove: '5' | remove: '6' | remove: '7' | remove: '8' | remove: '9'
+  assign wa_digits = wa_digits | strip
   assign wa_show = false
-  if settings.floating_whatsapp_enabled and wa_digits != blank and wa_rest == blank and wa_digits.size >= 8 and wa_digits.size <= 15
+  if settings.floating_whatsapp_enabled and wa_digits != blank
     assign wa_show = true
   endif
 -%}

@@ -9,7 +9,7 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const json=file=>JSON.parse(read(file).replace(/^\s*\/\*[\s\S]*?\*\//,''));
 const he=json('locales/he.default.json'),en=json('locales/en.json');
 const schemaOf=file=>JSON.parse(read(file).match(/{% schema %}([\s\S]*?){% endschema %}/)[1]);
-const strip=source=>source.replace(/{% doc %}[\s\S]*?{% enddoc %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'').replace(/{% schema %}[\s\S]*?{% endschema %}/,'');
+const strip=source=>source.replace(/{% doc %}[\s\S]*?{% enddoc %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'').replace(/{% schema %}[\s\S]*?{% endschema %}/,'').replace(/{% render 'whatsapp-number' %}/g,()=>read('snippets/whatsapp-number.liquid').replace(/{% doc %}[\s\S]*?{% enddoc %}/,''));
 
 test('Contract: settings, templates, fields and labels',()=>{
  const featured=schemaOf('sections/featured-collection.liquid').settings.find(item=>item.id==='max_sold_out');
@@ -23,7 +23,7 @@ test('Contract: settings, templates, fields and labels',()=>{
  for(const field of ['contact[name]','contact[phone]','contact[product]','contact[product_url]'])assert.ok(!dialog.includes('name="'+field+'"'),'English key '+field);
  assert.match(dialog,/<input type="hidden" name="contact\[body\]" value="{{ 'back_in_stock\.message' \| t \| escape }}">/);
  assert.equal(he.back_in_stock.message,'בקשת עדכון חזרה למלאי','body is only the request line; product and link are separate fields');
- assert.doesNotMatch(read('assets/storefront.js'),/__TITLE__|__URL__/);
+ assert.doesNotMatch(read('assets/storefront.js'),/back-in-stock-field=body/,'the email body is fixed in Liquid, never rebuilt in JavaScript');
  assert.match(dialog,/name="contact\[email\]"[^>]*required/);assert.match(dialog,/name="contact\[שם\]"[^>]*required/);assert.doesNotMatch(dialog.match(/<input id="BackInStockPhone"[^>]*>/)[0],/required/);
  for(const id of ['BackInStockName','BackInStockEmail','BackInStockPhone'])assert.match(dialog,new RegExp('<label for="'+id+'">'));
  assert.match(read('snippets/product-card.liquid'),/{% render 'back-in-stock-trigger', bis_product: card_product %}/);
@@ -39,11 +39,12 @@ test('Contract: settings, templates, fields and labels',()=>{
  assert.match(read('snippets/cart-drawer.liquid'),/<label class="sr-only" for="DrawerNote-{{ drawer_id }}">{{ 'sections\.cart\.note' \| t }}<\/label>\s*<textarea id="DrawerNote-{{ drawer_id }}" name="note"/);
  // Templates.
  assert.deepEqual(json('templates/cart.json').order,['main','cart_recommendations']);
- const index=json('templates/index.json');assert.equal(index.order[index.order.indexOf('categories')+1],'shopping_assistant_promo');
+ const index=json('templates/index.json');const afterCategories=index.order.slice(index.order.indexOf('categories')+1,index.order.indexOf('categories')+3);
+ assert.deepEqual(afterCategories,['deals','shopping_assistant_promo'],'deals, then the assistant promo, after the categories');
  assert.deepEqual(json('templates/page.group-delivery.json').order,['main','group_delivery_info']);
  // Global settings.
  const groups=Object.fromEntries(json('config/settings_schema.json').map(g=>[g.name,g]));
- assert.deepEqual(groups['t:business_details_editor.settings'].settings.filter(i=>i.id).map(i=>i.id),['business_legal_name','business_id','business_address','business_phone','business_email','business_hours']);
+ assert.deepEqual(groups['t:business_details_editor.settings'].settings.filter(i=>i.id).map(i=>i.id),['business_legal_name','business_id','business_address','business_phone','business_email','business_hours','business_hours_schema']);
  assert.deepEqual(groups['t:floating_whatsapp_editor.settings'].settings.map(i=>i.id),['floating_whatsapp_enabled','floating_whatsapp_number']);
  assert.match(read('sections/footer.liquid'),/{% render 'business-details' %}/);
  const data=json('config/settings_data.json');assert.equal(data.current.sections.footer.settings.show_payment_icons,true);assert.equal(data.current.floating_whatsapp_number,'972543966168');

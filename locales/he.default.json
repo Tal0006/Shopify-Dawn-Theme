@@ -733,9 +733,15 @@
     "title_default": "עוזר הקניות של פאנקי"
   },
   "product_cards": {
-    "discount": "{{ percent }}% הנחה",
+    "discount": "-{{ percent }}%",
     "new": "חדש",
-    "bestseller": "הכי נמכר"
+    "bestseller": "הכי נמכר",
+    "in_cart": "בסל",
+    "in_cart_label": "כמות בסל עבור {{ product }}",
+    "cart_increase": "הוספת יחידה לסל: {{ product }}",
+    "cart_decrease": "הסרת יחידה מהסל: {{ product }}",
+    "cart_updated": "בסל: {{ count }}",
+    "cart_removed": "הוסר מהסל"
   },
   "trust_strip": {
     "label": "היתרונות של פאנקי"
@@ -894,7 +900,9 @@
     "note": "נעדכן אתכם כשהמוצר יחזור למלאי. הפרטים משמשים רק לעדכון הזה.",
     "submit": "שליחת בקשה",
     "success": "תודה! נעדכן אתכם כשהמוצר יחזור למלאי.",
-    "message": "בקשת עדכון חזרה למלאי"
+    "message": "בקשת עדכון חזרה למלאי",
+    "whatsapp": "עדכנו אותי בוואטסאפ",
+    "whatsapp_message": "שלום, אשמח לעדכון כשהמוצר \"{{ title }}\" יחזור למלאי.\n{{ url }}"
   },
   "cart_recommendations": {
     "heading": "אולי יתאים לך גם",
@@ -929,5 +937,18 @@
     "faq_2_question": "לאילו יישובים מגיע המשלוח הקבוצתי?",
     "faq_3_question": "האם ההצטרפות לקבוצה מחייבת?",
     "faq_4_question": "מתי ואיך משלמים?"
+  },
+  "announcement": {
+    "label": "הודעות החנות",
+    "previous": "ההודעה הקודמת",
+    "next": "ההודעה הבאה",
+    "pause": "עצירת החלפת ההודעות"
+  },
+  "deals": {
+    "heading": "מבצעים",
+    "editor_empty": "אין כרגע מוצרים במבצע במלאי, ולכן המקטע מוסתר באתר."
+  },
+  "breadcrumbs": {
+    "home": "דף הבית"
   }
 }

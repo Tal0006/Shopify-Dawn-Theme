@@ -33,7 +33,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
 
 
 
-  const tr=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8')).storefront;
+  const tr=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,'')).storefront;
   const esc=value=>String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const meta=(id,stock,finite=true)=>'<span class="inventory-limit" data-inventory-variant="'+id+'" data-inventory-finite="'+finite+'" data-inventory-stock="'+stock+'" data-inventory-cart="0" data-inventory-one="'+esc(tr.inventory_one)+'" data-inventory-many="'+esc(tr.inventory_many.replace('{{ count }}','__COUNT__'))+'" data-inventory-rule="'+esc(tr.inventory_rule_max.replace('{{ count }}','__COUNT__'))+'" data-inventory-full="'+esc(tr.inventory_full)+'" data-inventory-changed="'+esc(tr.inventory_changed)+'" role="status" aria-live="polite"></span>';
   const form=(id,stock,finite=true)=>'<form data-card-cart action="/he/cart/add"><input name="id" value="'+id+'" type="hidden"><div data-quantity-controls><button type="button" data-quantity-change="-1">-</button><input name="quantity" type="number" min="1" step="1" value="1"><button type="button" data-quantity-change="1">+</button></div>'+meta(id,stock,finite)+'<button name="add" class="theme-btn" data-pending-label="Adding">Add</button><p data-card-feedback data-success="Added" data-error="Failed" data-refresh-error="Stale" role="status"></p></form>';

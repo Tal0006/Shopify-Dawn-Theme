@@ -18,7 +18,8 @@
   {%- comment -%}Sold-out state is shown once, by the card's availability line and disabled button.{%- endcomment -%}
   {% if card_product.available == false %}
   {% elsif card_sale %}
-    <span class="catalog-card__badge catalog-card__badge--sale">{% if card_discount > 0 %}{{ 'product_cards.discount' | t: percent: card_discount }}{% else %}{{ 'products.product.on_sale' | t }}{% endif %}</span>
+    <span class="catalog-card__badge catalog-card__badge--sale">{{ 'products.product.on_sale' | t }}</span>
+    {%- if card_discount > 0 %}<span class="catalog-card__badge catalog-card__badge--discount"><bdi dir="ltr">{{ 'product_cards.discount' | t: percent: card_discount }}</bdi></span>{% endif %}
   {% elsif card_product.tags contains 'חדש' or card_product.tags contains 'new' %}
     <span class="catalog-card__badge">{{ 'product_cards.new' | t }}</span>
   {% elsif card_product.tags contains 'הכי נמכר' or card_product.tags contains 'bestseller' %}

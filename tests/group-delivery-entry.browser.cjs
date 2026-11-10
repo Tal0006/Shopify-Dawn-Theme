@@ -33,7 +33,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
 
 
 
-  const tr=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8'));
+  const tr=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,''));
   const escape=value=>String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const raw=fs.readFileSync(path.join(root,'sections/group-delivery-promo.liquid'),'utf8');
   const promo=raw.slice(raw.indexOf('<section'),raw.indexOf('</section>')+10)

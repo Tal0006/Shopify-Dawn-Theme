@@ -7,6 +7,7 @@
   @example
   {% render 'back-in-stock' %}
 {% enddoc %}
+{%- capture bis_whatsapp -%}{% render 'whatsapp-number' %}{%- endcapture -%}{%- assign bis_whatsapp = bis_whatsapp | strip -%}
 <dialog id="BackInStockDialog" class="back-in-stock" aria-labelledby="BackInStockTitle" data-back-in-stock-dialog>
   <div class="back-in-stock__shell">
     <button type="button" class="back-in-stock__close" data-back-in-stock-close aria-label="{{ 'back_in_stock.close' | t | escape }}"><span aria-hidden="true">×</span></button>
@@ -38,6 +39,13 @@
       <p class="back-in-stock__note">{{ 'back_in_stock.note' | t }}</p>
       <button type="submit" class="theme-btn back-in-stock__submit">{{ 'back_in_stock.submit' | t }}</button>
     {% endform %}
+    {%- if bis_whatsapp != blank -%}
+      {%- comment -%}storefront.js adds the prefilled message (product title and link) when the dialog opens.{%- endcomment -%}
+      <a class="back-in-stock__whatsapp" href="https://wa.me/{{ bis_whatsapp }}" target="_blank" rel="noopener noreferrer" data-back-in-stock-whatsapp data-base="https://wa.me/{{ bis_whatsapp }}" data-message="{{ 'back_in_stock.whatsapp_message' | t: title: '__TITLE__', url: '__URL__' | escape }}" aria-label="{{ 'back_in_stock.whatsapp' | t | escape }} ({{ 'google_review.new_tab' | t | escape }})">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2.2a9.7 9.7 0 0 0-8.3 14.7L2.3 21.8l5-1.3A9.7 9.7 0 1 0 12 2.2Zm0 17.7c-1.5 0-2.9-.4-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3a8 8 0 1 1 6.9 3.7Zm4.4-6c-.2-.1-1.4-.7-1.7-.8-.2-.1-.4-.1-.5.1l-.8 1c-.1.2-.3.2-.5.1a6.6 6.6 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.5-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 1.9s.8 2.2.9 2.3c.1.2 1.6 2.5 4 3.5 1.5.6 2.1.7 2.8.6.5-.1 1.4-.6 1.6-1.1.2-.6.2-1 .1-1.1l-.5-.2Z"/></svg>
+        <span>{{ 'back_in_stock.whatsapp' | t }}</span>
+      </a>
+    {%- endif -%}
   </div>
 </dialog>
 {% stylesheet %}
@@ -57,6 +65,9 @@
 .back-in-stock__optional { font-weight: 400; color: var(--fk-text-muted, #4b636b); }
 .back-in-stock__note { margin: 0; font-size: 13px; color: var(--fk-text-muted, #4b636b); }
 .back-in-stock__submit { width: 100%; min-height: 48px; }
+.back-in-stock__whatsapp { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 16px; border: 1px solid #1b8e4b; border-radius: var(--fk-radius-pill, 999px); background: #fff; color: #146c39; font-weight: 700; text-decoration: none; }
+.back-in-stock__whatsapp:hover { background: #effaf3; }
+.back-in-stock__whatsapp:focus-visible { outline: 3px solid var(--fk-teal-800, #0b4f58); outline-offset: 2px; }
 .back-in-stock__success { margin: 0; padding: 10px 12px; border-radius: var(--fk-radius-md, 12px); background: var(--fk-success-bg, #e9f8f2); color: var(--fk-success, #0c5a3f); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .back-in-stock[open] { animation: none; } }
 html[data-a11y-paused] .back-in-stock[open] { animation: none; }

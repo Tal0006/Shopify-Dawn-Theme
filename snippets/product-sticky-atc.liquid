@@ -1,0 +1,34 @@
+{% doc %}
+  Mobile sticky purchase bar for the product page: title, current price and an add button that submits the main
+  product form (same quantity, variant, validation and feedback). For a sold-out variant it offers the
+  back-in-stock request instead. Rendered inside the product purchase region, so variant changes re-render it.
+  storefront.js shows it below 768px once the main add button has scrolled above the viewport, and lifts the
+  floating buttons above it.
+  @param {product} sticky_product - Product.
+  @param {variant} sticky_variant - Selected variant.
+  @example {% render 'product-sticky-atc', sticky_product: product, sticky_variant: selected_variant %}
+{% enddoc %}
+<div class="product-sticky-atc" data-sticky-atc hidden>
+  <div class="product-sticky-atc__info">
+    <p class="product-sticky-atc__title">{{ sticky_product.title | escape }}</p>
+    <p class="product-sticky-atc__price"><bdi>{{ sticky_variant.price | money }}</bdi>{% if sticky_variant.compare_at_price > sticky_variant.price %} <s><bdi>{{ sticky_variant.compare_at_price | money }}</bdi></s>{% endif %}</p>
+  </div>
+  {%- if sticky_variant.available -%}
+    <button type="button" class="theme-btn product-sticky-atc__add" data-sticky-atc-add aria-label="{{ 'storefront.add_to_cart_label' | t: title: sticky_product.title | escape }}">{{ 'products.product.add_to_cart' | t }}</button>
+  {%- else -%}
+    {% render 'back-in-stock-trigger', bis_product: sticky_product, bis_variant: sticky_variant, bis_class: 'product-sticky-atc__add' %}
+  {%- endif -%}
+</div>
+{% stylesheet %}
+.product-sticky-atc { position: fixed; z-index: 999; inset-inline: 0; inset-block-end: 0; display: flex; align-items: center; gap: 12px; padding: 10px 16px max(10px, env(safe-area-inset-bottom)); border-block-start: 1px solid var(--fk-border, #d7e9ec); background: rgb(255 255 255 / 96%); box-shadow: 0 -8px 24px rgb(11 79 88 / 12%); }
+.product-sticky-atc[hidden] { display: none; }
+.product-sticky-atc__info { flex: 1 1 auto; min-width: 0; }
+.product-sticky-atc__title { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--fk-teal-900, #0a3f47); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.product-sticky-atc__price { margin: 0; font-size: 15px; font-weight: 800; color: var(--fk-teal-900, #0a3f47); }
+.product-sticky-atc__price s { font-size: 12px; font-weight: 400; color: var(--fk-text-muted, #4b636b); }
+.product-sticky-atc .product-sticky-atc__add { flex: 0 0 auto; width: auto; min-height: 48px; margin: 0; padding-inline: 18px; white-space: nowrap; }
+/* While the bar is shown, floating controls sit above it. */
+html[data-sticky-atc-visible] .a11y-launcher, html[data-sticky-atc-visible] .floating-whatsapp { inset-block-end: calc(var(--sticky-atc-height, 72px) + 12px) !important; }
+html[data-sticky-atc-visible] .cart-toast { --cart-toast-bottom: calc(var(--sticky-atc-height, 72px) + 12px); }
+@media (min-width: 768px) { .product-sticky-atc { display: none !important; } }
+{% endstylesheet %}

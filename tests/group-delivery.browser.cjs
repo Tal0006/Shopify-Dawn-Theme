@@ -32,7 +32,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
 
 
 
-  const tr=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8'));
+  const tr=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,''));
   const escape=value=>String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const raw=fs.readFileSync(path.join(root,'sections/group-delivery.liquid'),'utf8');
   const labels=Object.fromEntries(Object.entries(tr.group_delivery.status).map(([key,value])=>[key.toUpperCase(),value]));

@@ -6,7 +6,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const FACEBOOK='https://www.facebook.com/profile.php?id=61595992301035';
-const tr=JSON.parse(read('locales/he.default.json'));
+const tr=JSON.parse(read('locales/he.default.json').replace(/^\s*\/\*[\s\S]*?\*\//,''));
 const footer=read('sections/footer.liquid');
 const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 

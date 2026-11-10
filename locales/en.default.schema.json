@@ -3560,7 +3560,9 @@
     "phone": "Phone",
     "email": "Email",
     "hours": "Opening hours",
-    "hours_info": "One range per line."
+    "hours_info": "One range per line.",
+    "hours_schema": "Opening hours for Google (structured)",
+    "hours_schema_info": "One range per line, e.g. Su-Th 09:00-18:00 or Fr 09:00-13:00. Used by the homepage business structured data."
   },
   "floating_whatsapp_editor": {
     "settings": "Floating WhatsApp button",
@@ -3607,5 +3609,24 @@
     "faq_3_answer": "Answer 3",
     "faq_4_question": "Question 4 (payment)",
     "faq_4_answer": "Answer 4"
+  },
+  "announcement_editor": {
+    "settings": "Announcement bar",
+    "info": "Up to 3 messages above the header. More than one message rotates unless the visitor stops animations.",
+    "enabled": "Show announcement bar",
+    "interval": "Time per message",
+    "message_1": "Message 1",
+    "message_2": "Message 2",
+    "message_3": "Message 3",
+    "text": "Text",
+    "link": "Link (optional)"
+  },
+  "deals_editor": {
+    "name": "Deals",
+    "heading": "Heading",
+    "heading_info": "Blank uses the translated default.",
+    "subtitle": "Subheading",
+    "collection": "Collection to scan",
+    "collection_info": "Blank = all products. Only in-stock products with a compare-at price are shown."
   }
 }

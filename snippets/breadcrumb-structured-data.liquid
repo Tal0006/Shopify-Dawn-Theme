@@ -1,0 +1,31 @@
+{% doc %}
+  BreadcrumbList JSON-LD for product and collection pages (Home > collection > product). On a product page the
+  collection is the one in the URL when the product was opened from a collection, otherwise the product's first
+  collection. Rendered from the layout head; one per page.
+  @example {% render 'breadcrumb-structured-data' %}
+{% enddoc %}
+{%- liquid
+  assign bc_home = shop.url | append: routes.root_url
+  assign bc_collection = collection
+  if request.page_type == 'product' and bc_collection == blank
+    assign bc_collection = product.collections.first
+  endif
+  assign bc_position = 1
+-%}
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": {{ 'breadcrumbs.home' | t | json }}, "item": {{ bc_home | json }}}
+      {%- if bc_collection != blank -%}
+        {%- assign bc_position = bc_position | plus: 1 -%}
+        , {"@type": "ListItem", "position": {{ bc_position }}, "name": {{ bc_collection.title | json }}, "item": {{ shop.url | append: bc_collection.url | json }}}
+      {%- endif -%}
+      {%- if request.page_type == 'product' and product -%}
+        {%- assign bc_position = bc_position | plus: 1 -%}
+        , {"@type": "ListItem", "position": {{ bc_position }}, "name": {{ product.title | json }}, "item": {{ shop.url | append: product.url | json }}}
+      {%- endif %}
+    ]
+  }
+</script>

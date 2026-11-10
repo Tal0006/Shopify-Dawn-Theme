@@ -41,7 +41,9 @@ function jsonLd(html) { return [...html.matchAll(/<script type="application\/ld\
 test('Exactly one Product JSON-LD source, server-rendered from the layout head on product pages', () => {
   const sources = ['layout', 'sections', 'snippets', 'blocks', 'templates'].filter(dir => fs.existsSync(path.join(root, dir))).flatMap(files)
     .filter(file => /\.(liquid|json)$/.test(file) && /application\/ld\+json|schema\.org\/(Product|Offer)|"@type":\s*"(Product|Offer)/.test(read(file)));
-  assert.deepEqual(sources, ['snippets/product-structured-data.liquid']);
+  assert.deepEqual(sources, ['snippets/breadcrumb-structured-data.liquid', 'snippets/business-structured-data.liquid', 'snippets/product-structured-data.liquid']);
+  const productSources = sources.filter(file => /"@type": "(Product|ProductGroup|Offer)"|schema\.org\/(Product|Offer)/.test(read(file)));
+  assert.deepEqual(productSources, ['snippets/product-structured-data.liquid'], 'exactly one Product source');
   for (const file of ['layout/theme.liquid', 'layout/password.liquid', ...files('sections'), ...files('snippets')].filter(file => file.endsWith('.liquid'))) {
     const count = (read(file).replace(/{% doc %}[\s\S]*?{% enddoc %}/, '').match(/render 'product-structured-data'/g) || []).length;
     assert.equal(count, file === 'layout/theme.liquid' ? 1 : 0, file);

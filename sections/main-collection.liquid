@@ -22,7 +22,8 @@
   </div>
   {% paginate collection.products by section.settings.product_limit %}
     {% if collection.products_count > 0 %}
-      <div class="catalog-grid">{% for card_product in collection.products %}{% render 'product-card', card_product: card_product %}{% endfor %}</div>
+      {%- comment -%}In-stock products first within this page; collection sort order is kept inside each group.{%- endcomment -%}
+      <div class="catalog-grid">{% for card_product in collection.products %}{% if card_product.available %}{% render 'product-card', card_product: card_product %}{% endif %}{% endfor %}{% for card_product in collection.products %}{% unless card_product.available %}{% render 'product-card', card_product: card_product %}{% endunless %}{% endfor %}</div>
     {% else %}
       <div class="collection-page__empty" role="status">
         {% if collection_active_count > 0 %}<h2>{{ 'collection_page.no_matches' | t }}</h2><a class="theme-btn" href="{{ collection.url }}">{{ 'collection_page.clear' | t }}</a>

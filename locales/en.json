@@ -733,9 +733,15 @@
     "title_default": "Fankee Shopping Assistant"
   },
   "product_cards": {
-    "discount": "{{ percent }}% off",
+    "discount": "-{{ percent }}%",
     "new": "New",
-    "bestseller": "Best seller"
+    "bestseller": "Best seller",
+    "in_cart": "In cart",
+    "in_cart_label": "Quantity in cart for {{ product }}",
+    "cart_increase": "Add one to cart: {{ product }}",
+    "cart_decrease": "Remove one from cart: {{ product }}",
+    "cart_updated": "In cart: {{ count }}",
+    "cart_removed": "Removed from cart"
   },
   "trust_strip": {
     "label": "Why shop with Fankee"
@@ -894,7 +900,9 @@
     "note": "We will let you know when the product is back in stock. Your details are used only for this update.",
     "submit": "Send request",
     "success": "Thank you! We will let you know when the product is back in stock.",
-    "message": "Back-in-stock request"
+    "message": "Back-in-stock request",
+    "whatsapp": "Notify me on WhatsApp",
+    "whatsapp_message": "Hi, please let me know when \"{{ title }}\" is back in stock.\n{{ url }}"
   },
   "cart_recommendations": {
     "heading": "You may also like",
@@ -929,5 +937,18 @@
     "faq_2_question": "Which towns does group delivery reach?",
     "faq_3_question": "Is joining a group binding?",
     "faq_4_question": "When and how do I pay?"
+  },
+  "announcement": {
+    "label": "Store announcements",
+    "previous": "Previous announcement",
+    "next": "Next announcement",
+    "pause": "Pause rotating announcements"
+  },
+  "deals": {
+    "heading": "Deals",
+    "editor_empty": "No in-stock products are on sale right now, so this section is hidden on the storefront."
+  },
+  "breadcrumbs": {
+    "home": "Home"
   }
 }

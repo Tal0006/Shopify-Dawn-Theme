@@ -1303,6 +1303,73 @@
     ]
   },
   {
+    "name": "t:announcement_editor.settings",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "t:announcement_editor.info"
+      },
+      {
+        "type": "checkbox",
+        "id": "announcement_enabled",
+        "label": "t:announcement_editor.enabled",
+        "default": true
+      },
+      {
+        "type": "range",
+        "id": "announcement_interval",
+        "label": "t:announcement_editor.interval",
+        "min": 3,
+        "max": 10,
+        "step": 1,
+        "unit": "s",
+        "default": 5
+      },
+      {
+        "type": "header",
+        "content": "t:announcement_editor.message_1"
+      },
+      {
+        "type": "text",
+        "id": "announcement_1_text",
+        "label": "t:announcement_editor.text"
+      },
+      {
+        "type": "url",
+        "id": "announcement_1_link",
+        "label": "t:announcement_editor.link"
+      },
+      {
+        "type": "header",
+        "content": "t:announcement_editor.message_2"
+      },
+      {
+        "type": "text",
+        "id": "announcement_2_text",
+        "label": "t:announcement_editor.text"
+      },
+      {
+        "type": "url",
+        "id": "announcement_2_link",
+        "label": "t:announcement_editor.link"
+      },
+      {
+        "type": "header",
+        "content": "t:announcement_editor.message_3"
+      },
+      {
+        "type": "text",
+        "id": "announcement_3_text",
+        "label": "t:announcement_editor.text"
+      },
+      {
+        "type": "url",
+        "id": "announcement_3_link",
+        "label": "t:announcement_editor.link"
+      }
+    ]
+  },
+  {
     "name": "t:settings_schema.social-media.name",
     "settings": [
       {
@@ -1402,6 +1469,12 @@
         "id": "business_hours",
         "label": "t:business_details_editor.hours",
         "info": "t:business_details_editor.hours_info"
+      },
+      {
+        "type": "textarea",
+        "id": "business_hours_schema",
+        "label": "t:business_details_editor.hours_schema",
+        "info": "t:business_details_editor.hours_schema_info"
       }
     ]
   },

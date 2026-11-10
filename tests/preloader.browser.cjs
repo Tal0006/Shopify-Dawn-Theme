@@ -56,8 +56,7 @@ test('Preloader never leaves the storefront covered',{timeout:90000},async t=>{
   await t.test('Failing legacy scripts and never-ending media cannot keep the page covered',async()=>{
    await open('/broken');
    assert.equal(await ev('document.readyState==="complete"'),false,'fixture media should still be loading');
-   assert.ok(await ev(covered),'overlay should show while the DOM settles');
-   assert.ok(await until('!'+covered,3500),'overlay waited for window.load or legacy scripts');
+   assert.ok(await until('!'+covered,800),'overlay must lift at DOM ready, without waiting for media or legacy scripts');
    assert.equal(await ev('document.readyState==="complete"'),false);
   });
   await t.test('CSS failsafe reveals the page even when the inline controller never runs',async()=>{

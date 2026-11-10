@@ -8,7 +8,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const snippet=read('snippets/free-shipping-meter.liquid');
-const he=JSON.parse(read('locales/he.default.json')),en=JSON.parse(read('locales/en.json'));
+const he=JSON.parse(read('locales/he.default.json').replace(/^\s*\/\*[\s\S]*?\*\//,'')),en=JSON.parse(read('locales/en.json').replace(/^\s*\/\*[\s\S]*?\*\//,''));
 
 test('Contract: Theme Settings, placement, cart value and no hard-coded threshold',()=>{
  const group=JSON.parse(read('config/settings_schema.json')).find(item=>item.name==='t:free_shipping_editor.settings');

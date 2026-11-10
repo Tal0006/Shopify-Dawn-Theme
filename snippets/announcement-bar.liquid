@@ -1,0 +1,63 @@
+{% doc %}
+  Announcement bar above the header: up to 3 messages from Theme Settings, each with an optional link. With more
+  than one message, storefront.js rotates them (pausable; paused on hover/focus) and shows previous/next and
+  pause controls. It never rotates with reduced motion or the accessibility "stop animations" option. Without
+  JavaScript the first message is shown and the controls stay hidden.
+  @example {% render 'announcement-bar' %}
+{% enddoc %}
+{%- liquid
+  assign ann_count = 0
+  for i in (1..3)
+    assign ann_key = 'announcement_' | append: i | append: '_text'
+    assign ann_text = settings[ann_key] | strip
+    if ann_text != blank
+      assign ann_count = ann_count | plus: 1
+    endif
+  endfor
+-%}
+{%- if settings.announcement_enabled and ann_count > 0 -%}
+<div class="announcement-bar" role="region" aria-label="{{ 'announcement.label' | t | escape }}" data-announcement data-interval="{{ settings.announcement_interval | default: 5 }}">
+  <div class="announcement-bar__inner container">
+    {%- if ann_count > 1 -%}
+      <button type="button" class="announcement-bar__control" data-announcement-prev hidden aria-label="{{ 'announcement.previous' | t | escape }}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    {%- endif -%}
+    <div class="announcement-bar__messages" data-announcement-live aria-live="off" aria-atomic="true">
+      {%- assign ann_shown = 0 -%}
+      {%- for i in (1..3) -%}
+        {%- liquid
+          assign ann_key = 'announcement_' | append: i | append: '_text'
+          assign link_key = 'announcement_' | append: i | append: '_link'
+          assign ann_text = settings[ann_key] | strip
+          assign ann_link = settings[link_key]
+        -%}
+        {%- if ann_text != blank -%}
+          <p class="announcement-bar__message" data-announcement-item {% if ann_shown > 0 %}hidden{% endif %}>
+            {%- if ann_link != blank -%}<a href="{{ ann_link }}">{{ ann_text | escape }}</a>{%- else -%}{{ ann_text | escape }}{%- endif -%}
+          </p>
+          {%- assign ann_shown = ann_shown | plus: 1 -%}
+        {%- endif -%}
+      {%- endfor -%}
+    </div>
+    {%- if ann_count > 1 -%}
+      <button type="button" class="announcement-bar__control" data-announcement-next hidden aria-label="{{ 'announcement.next' | t | escape }}"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m10 3-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+      <button type="button" class="announcement-bar__control announcement-bar__toggle" data-announcement-toggle hidden aria-pressed="false" aria-label="{{ 'announcement.pause' | t | escape }}"><svg class="announcement-bar__pause" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 3v10M11 3v10" stroke="currentColor" stroke-width="2"/></svg><svg class="announcement-bar__play" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 3v10l8-5z" fill="currentColor"/></svg></button>
+    {%- endif -%}
+  </div>
+</div>
+{%- endif -%}
+{% stylesheet %}
+.announcement-bar { position: relative; z-index: 3; background: linear-gradient(90deg, var(--fk-teal-900, #0a3f47), var(--fk-teal-700, #0b6571)); color: #fff; font-size: 14px; line-height: 1.5; }
+.announcement-bar__inner { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; }
+.announcement-bar__messages { position: relative; flex: 1 1 auto; min-width: 0; display: grid; text-align: center; }
+.announcement-bar__message { grid-area: 1 / 1; margin: 0; padding-block: 8px; overflow-wrap: anywhere; animation: fk-fade var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease); }
+.announcement-bar__message a { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.announcement-bar__message a:focus-visible, .announcement-bar__control:focus-visible { outline: 2px solid #fff !important; outline-offset: 2px !important; }
+.announcement-bar__control { flex: 0 0 44px; display: grid; place-items: center; width: 44px; height: 40px; padding: 0; border: 0; background: transparent; color: #fff; }
+.announcement-bar__control:hover { background: rgb(255 255 255 / 12%); }
+.announcement-bar__control svg { pointer-events: none; }
+:dir(ltr) .announcement-bar__control[data-announcement-prev] svg, :dir(ltr) .announcement-bar__control[data-announcement-next] svg { transform: scaleX(-1); }
+.announcement-bar__toggle .announcement-bar__play, .announcement-bar__toggle[aria-pressed=true] .announcement-bar__pause { display: none; }
+.announcement-bar__toggle[aria-pressed=true] .announcement-bar__play { display: block; }
+@media (prefers-reduced-motion: reduce) { .announcement-bar__message { animation: none; } }
+html[data-a11y-paused] .announcement-bar__message { animation: none; }
+{% endstylesheet %}

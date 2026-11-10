@@ -1,0 +1,38 @@
+{% doc %}
+  Store (LocalBusiness) JSON-LD for the homepage, built only from the business-details Theme Settings. Rendered
+  only when an address or phone is filled. openingHours comes from the separate machine-readable setting (one
+  schema.org range per line, e.g. "Su-Th 09:00-18:00"); the free-text Hebrew hours are for people, not search engines.
+  @example {% render 'business-structured-data' %}
+{% enddoc %}
+{%- liquid
+  assign biz_name = settings.business_legal_name | strip | default: shop.name
+  assign biz_address = settings.business_address | strip | strip_newlines
+  assign biz_address_lines = settings.business_address | strip | newline_to_br | split: '<br />'
+  assign biz_phone = settings.business_phone | strip
+  assign biz_email = settings.business_email | strip
+  assign biz_id = settings.business_id | strip
+  assign biz_hours = settings.business_hours_schema | strip | newline_to_br | split: '<br />'
+-%}
+{%- if biz_address != blank or biz_phone != blank -%}
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Store",
+    "@id": {{ shop.url | append: '/#store' | json }},
+    "name": {{ biz_name | json }},
+    "url": {{ shop.url | json }}
+    {%- if settings.logo != blank %}, "image": {{ settings.logo | image_url: width: 600 | prepend: 'https:' | json }}{% endif -%}
+    {%- if biz_phone != blank %}, "telephone": {{ biz_phone | json }}{% endif -%}
+    {%- if biz_email != blank %}, "email": {{ biz_email | json }}{% endif -%}
+    {%- if biz_id != blank %}, "taxID": {{ biz_id | json }}{% endif -%}
+    {%- if biz_address != blank -%}
+      , "address": {"@type": "PostalAddress", "streetAddress": {{ biz_address_lines | join: ', ' | strip_newlines | strip | json }}, "addressCountry": "IL"}
+    {%- endif -%}
+    {%- assign biz_hours_count = 0 -%}
+    {%- for line in biz_hours -%}{%- assign biz_line = line | strip_newlines | strip -%}{%- if biz_line != blank -%}{%- assign biz_hours_count = biz_hours_count | plus: 1 -%}{%- endif -%}{%- endfor -%}
+    {%- if biz_hours_count > 0 -%}
+      , "openingHours": [{%- assign biz_first = true -%}{%- for line in biz_hours -%}{%- assign biz_line = line | strip_newlines | strip -%}{%- if biz_line != blank -%}{%- unless biz_first %}, {% endunless -%}{{ biz_line | json }}{%- assign biz_first = false -%}{%- endif -%}{%- endfor -%}]
+    {%- endif %}
+  }
+</script>
+{%- endif -%}

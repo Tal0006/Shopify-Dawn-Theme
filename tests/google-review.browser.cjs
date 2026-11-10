@@ -7,7 +7,7 @@ const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const REVIEW_URL='https://g.page/r/CTA0XiuYPkeoECE/review';
 const snippet=read('snippets/google-review-cta.liquid');
-const tr=JSON.parse(read('locales/he.default.json'));
+const tr=JSON.parse(read('locales/he.default.json').replace(/^\s*\/\*[\s\S]*?\*\//,''));
 const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 test('Theme settings, footer placement and no review gating',()=>{
@@ -38,7 +38,7 @@ test('Theme settings, footer placement and no review gating',()=>{
 let Liquid;try{({Liquid}=require('liquidjs'));}catch{Liquid=null;}
 test('Liquid renders nothing when disabled or without an https URL',{skip:Liquid?false:'liquidjs not resolvable (set NODE_PATH to an install to run)'},async()=>{
  const engine=new Liquid();
- const en=JSON.parse(read('locales/en.json'));
+ const en=JSON.parse(read('locales/en.json').replace(/^\s*\/\*[\s\S]*?\*\//,''));
  const lookup=(locale,key)=>key.split('.').reduce((a,k)=>a?.[k],locale);
  engine.registerFilter('t',(key,...args)=>{let value=lookup(tr,key);for(const [k,v] of args.filter(Array.isArray))value=value.replace(new RegExp('{{\\s*'+k+'\\s*}}','g'),v);return value;});
  engine.registerFilter('handleize',value=>String(value).toLowerCase().replace(/[^a-z0-9]+/g,'-'));

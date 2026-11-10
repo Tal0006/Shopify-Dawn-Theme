@@ -774,6 +774,11 @@
       dialog.querySelector('[data-back-in-stock-field=title]').value = title;
       dialog.querySelector('[data-back-in-stock-field=url]').value = url;
       dialog.querySelectorAll('[data-back-in-stock-result]').forEach(node => node.remove());
+      const whatsapp = dialog.querySelector('[data-back-in-stock-whatsapp]');
+      if (whatsapp) {
+        const message = (whatsapp.dataset.message || '').replace('__TITLE__', title).replace('__URL__', url);
+        whatsapp.href = whatsapp.dataset.base + '?text=' + encodeURIComponent(message);
+      }
       backInStockOpener = trigger;
       if (!dialog.open) dialog.showModal();
       dialog.querySelector('input:not([type=hidden])')?.focus();
@@ -818,6 +823,152 @@
 
   // Cart page suggestions add through the shared card flow; reload once afterwards so the cart table and totals
   // (server-rendered, not AJAX) show the new line.
+  // Product card cart state (snippets/product-card.liquid). The quantity comes from inventoryCart, which every add
+  // and cart change refreshes from Shopify's cart.js; the card switches between "choose and add" and "in cart".
+  // Last focused control: a disabled or hidden control drops focus to <body>, so the card restores it to the
+  // visible counterpart (add button <-> in-cart plus/minus) when the shopper was using that card.
+  let cardLastFocus = null;
+  document.addEventListener('focusin', event => { cardLastFocus = event.target; });
+  function syncCardCartState() {
+    for (const panel of document.querySelectorAll('[data-card-in-cart]')) {
+      const form = panel.closest('form');
+      const buy = form?.querySelector('[data-card-buy]');
+      const count = panel.querySelector('[data-card-in-cart-count]');
+      if (!buy || !count) continue;
+      const id = panel.dataset.variantId;
+      const quantity = inventoryCart.has(id) ? inventoryCart.get(id) : Number(count.textContent) || 0;
+      if (count.textContent !== String(quantity)) count.textContent = String(quantity);
+      const node = form.querySelector('[data-inventory-variant]');
+      const plus = panel.querySelector('[data-card-line-change="1"]');
+      if (plus) plus.disabled = !!node && inventoryRemaining(node) < 1;
+      const inCart = quantity > 0;
+      if (buy.hidden === inCart && panel.hidden === !inCart) continue;
+      const active = document.activeElement;
+      const leaving = inCart ? buy : panel;
+      const hadFocus = leaving.contains(active) || ((active === document.body || !active) && !!cardLastFocus && leaving.contains(cardLastFocus));
+      buy.hidden = inCart;
+      panel.hidden = !inCart;
+      if (hadFocus) {
+        const target = inCart ? panel.querySelector('[data-card-line-change="1"]:not(:disabled)') || panel.querySelector('[data-card-line-change="-1"]') : buy.querySelector('[name=add]');
+        target?.focus({preventScroll: true});
+      }
+    }
+  }
+  document.addEventListener('storefront:inventory:updated', syncCardCartState);
+  document.addEventListener('click', event => {
+    const button = event.target.closest('[data-card-line-change]');
+    if (!button) return;
+    event.preventDefault();
+    const panel = button.closest('[data-card-in-cart]');
+    const form = panel?.closest('form');
+    if (!panel || !form || panel.hasAttribute('aria-busy') || button.disabled) return;
+    const id = panel.dataset.variantId;
+    const current = inventoryCart.has(id) ? inventoryCart.get(id) : Number(panel.querySelector('[data-card-in-cart-count]').textContent) || 0;
+    const quantity = Math.max(0, current + Number(button.dataset.cardLineChange));
+    const feedback = form.querySelector('[data-card-feedback]');
+    // Buttons stay enabled (focus is kept); repeated clicks are ignored while the change is in flight.
+    panel.setAttribute('aria-busy', 'true');
+    const operation = cardCartQueue.then(async () => {
+      const sectionId = document.querySelector('.storefront-header')?.dataset.cartSection;
+      let changed = false;
+      try {
+        const response = await fetch(cartRoot() + 'cart/change.js', {method: 'POST', headers: {'Content-Type': 'application/json', Accept: 'application/json'}, credentials: 'same-origin',
+          body: JSON.stringify({id, quantity, ...(sectionId ? {sections: [sectionId], sections_url: window.location.pathname + window.location.search} : {})})});
+        if (!response.ok) throw Error('Cart change rejected');
+        changed = true;
+        const result = await response.json();
+        await refreshCardCart(result.sections, sectionId);
+        const now = inventoryCart.has(id) ? inventoryCart.get(id) : quantity;
+        if (feedback) feedback.textContent = now > 0 ? (panel.dataset.updated || '').replace('__COUNT__', String(now)) : panel.dataset.removed || '';
+      } catch {
+        if (changed) await refreshCardCart(null, sectionId);
+        if (feedback) feedback.textContent = feedback.dataset.error || '';
+      } finally {
+        panel.removeAttribute('aria-busy');
+        syncCardCartState();
+        document.dispatchEvent(new CustomEvent('storefront:cart:updated'));
+      }
+    });
+    cardCartQueue = operation.catch(() => {});
+  });
+  syncCardCartState();
+
+  // Mobile sticky add-to-cart (snippets/product-sticky-atc.liquid): shown once the main add button has scrolled
+  // above the viewport; it submits the main form, so quantity, variant and feedback stay in one place.
+  const stickyMobile = window.matchMedia('(max-width: 767px)');
+  let stickyObserver = null;
+  function stickyBar() {
+    stickyObserver?.disconnect();
+    stickyObserver = null;
+    const bar = document.querySelector('[data-sticky-atc]');
+    const target = bar?.closest('[data-product-purchase]')?.querySelector('.product-page__add, .product-page__notify');
+    const setVisible = visible => {
+      if (!bar) { document.documentElement.removeAttribute('data-sticky-atc-visible'); return; }
+      if (!visible && bar.contains(document.activeElement)) return;
+      bar.hidden = !visible;
+      if (visible) {
+        document.documentElement.setAttribute('data-sticky-atc-visible', '');
+        document.documentElement.style.setProperty('--sticky-atc-height', bar.offsetHeight + 'px');
+      } else document.documentElement.removeAttribute('data-sticky-atc-visible');
+    };
+    if (!bar || !target || !('IntersectionObserver' in window)) { setVisible(false); return; }
+    stickyObserver = new IntersectionObserver(([entry]) => setVisible(stickyMobile.matches && !entry.isIntersecting && entry.boundingClientRect.top < 0));
+    stickyObserver.observe(target);
+  }
+  document.addEventListener('click', event => {
+    const add = event.target.closest('[data-sticky-atc-add]');
+    if (!add) return;
+    const form = add.closest('[data-product-purchase]')?.querySelector('form[data-card-cart]');
+    const main = form?.querySelector('[name=add]');
+    if (form && main && !main.disabled) form.requestSubmit(main);
+  });
+  stickyBar();
+  stickyMobile.addEventListener('change', stickyBar);
+  document.addEventListener('storefront:variant:updated', () => queueMicrotask(stickyBar));
+  document.addEventListener('shopify:section:load', stickyBar);
+
+  // Announcement bar (snippets/announcement-bar.liquid): rotates only while motion is allowed, nothing is hovered
+  // or focused, and the shopper has not paused it. Manual previous/next announce the message once.
+  function announcements(root) {
+    for (const bar of root.querySelectorAll('[data-announcement]')) {
+      if (bar.dataset.ready) continue;
+      const items = [...bar.querySelectorAll('[data-announcement-item]')];
+      if (items.length < 2) continue;
+      bar.dataset.ready = 'true';
+      const live = bar.querySelector('[data-announcement-live]');
+      const toggle = bar.querySelector('[data-announcement-toggle]');
+      const prev = bar.querySelector('[data-announcement-prev]');
+      const next = bar.querySelector('[data-announcement-next]');
+      [prev, next, toggle].forEach(control => { if (control) control.hidden = false; });
+      let index = 0, timer = null, userPaused = false, hovering = false, focused = false;
+      const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused');
+      const show = (target, announce) => {
+        index = (target + items.length) % items.length;
+        live.setAttribute('aria-live', announce ? 'polite' : 'off');
+        items.forEach((item, n) => { item.hidden = n !== index; });
+      };
+      const schedule = () => {
+        clearInterval(timer);
+        timer = null;
+        const blocked = still();
+        toggle.setAttribute('aria-pressed', String(userPaused || blocked));
+        toggle.disabled = blocked;
+        if (!userPaused && !blocked && !hovering && !focused) timer = setInterval(() => show(index + 1, false), Math.max(3, Number(bar.dataset.interval) || 5) * 1000);
+      };
+      prev?.addEventListener('click', () => { show(index - 1, true); schedule(); });
+      next?.addEventListener('click', () => { show(index + 1, true); schedule(); });
+      toggle?.addEventListener('click', () => { userPaused = !userPaused; schedule(); });
+      bar.addEventListener('pointerenter', () => { hovering = true; schedule(); });
+      bar.addEventListener('pointerleave', () => { hovering = false; schedule(); });
+      bar.addEventListener('focusin', () => { focused = true; schedule(); });
+      bar.addEventListener('focusout', event => { if (!bar.contains(event.relatedTarget)) { focused = false; schedule(); } });
+      window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', schedule);
+      new MutationObserver(schedule).observe(document.documentElement, {attributes: true, attributeFilter: ['data-a11y-paused']});
+      schedule();
+    }
+  }
+  announcements(document);
+
   // Only a successful add (the server-rendered cart count changed) reloads; a failed add keeps its error visible.
   let cartSuggestionCount = null;
   const cartCount = () => document.querySelector('.storefront-header .cart-count')?.textContent.trim() ?? null;

@@ -1,0 +1,53 @@
+{% comment %}
+  Section contract.
+  Homepage deals: in-stock products whose compare-at price is above the price, using the shared product cards (old
+  price struck through, "מבצע" and "−X%" badges). Uses the same rule as the card badge (uniform price and compare-at
+  price), so every listed card shows its discount. The whole section is hidden when nothing qualifies.
+  @example
+  <!-- Homepage: add "Deals"; optionally choose the collection to scan (default: all products) -->
+{% endcomment %}
+{%- liquid
+  assign deals_source = section.settings.collection | default: collections.all
+  assign deals_limit = section.settings.product_limit
+  assign deals_count = 0
+  assign deals_heading = section.settings.heading | strip
+  if deals_heading == blank
+    assign deals_heading = 'deals.heading' | t
+  endif
+-%}
+{%- capture deals_cards -%}
+  {%- for card_product in deals_source.products -%}
+    {%- if card_product.available and deals_count < deals_limit and card_product.price_varies == false and card_product.compare_at_price_varies == false and card_product.compare_at_price > card_product.price -%}
+      {%- assign deals_count = deals_count | plus: 1 -%}
+      {% render 'product-card', card_product: card_product, refined_card: true %}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endcapture -%}
+{%- if deals_count > 0 -%}
+<section class="catalog-section catalog-home container deals" aria-labelledby="DealsHeading-{{ section.id }}" {{ section.shopify_attributes }}>
+  <header class="catalog-section-header">
+    <div>
+      <h2 id="DealsHeading-{{ section.id }}">{{ deals_heading | escape }}</h2>
+      {%- if section.settings.subtitle != blank %}<p>{{ section.settings.subtitle | escape }}</p>{% endif -%}
+    </div>
+  </header>
+  <div class="catalog-grid">{{ deals_cards }}</div>
+</section>
+{%- elsif request.design_mode -%}
+<p class="catalog-editor-note container">{{ 'deals.editor_empty' | t }}</p>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "t:deals_editor.name",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "t:deals_editor.heading", "info": "t:deals_editor.heading_info" },
+    { "type": "text", "id": "subtitle", "label": "t:deals_editor.subtitle" },
+    { "type": "collection", "id": "collection", "label": "t:deals_editor.collection", "info": "t:deals_editor.collection_info" },
+    { "type": "range", "id": "product_limit", "label": "t:storefront_editor.product_limit", "min": 2, "max": 12, "step": 1, "default": 8 }
+  ],
+  "presets": [
+    { "name": "t:deals_editor.name" }
+  ]
+}
+{% endschema %}

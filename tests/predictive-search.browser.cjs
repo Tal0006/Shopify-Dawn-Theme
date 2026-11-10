@@ -4,7 +4,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const root=path.join(__dirname,'..');
 test('Header predictive search browser coverage',{timeout:90000},async t=>{
  const source=fs.readFileSync(path.join(root,'snippets/predictive-search.liquid'),'utf8');
- const translations=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8'));
+ const translations=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,''));
  const escaped=value=>String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  const css=fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/predictive-search-styles.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
  const markup=source.replace(/{% doc %}[\s\S]*?{% enddoc %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'')

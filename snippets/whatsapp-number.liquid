@@ -1,0 +1,12 @@
+{% doc %}
+  Outputs the store's WhatsApp number from Theme Settings as digits only (8-15 digits, international format),
+  or nothing when it is missing or invalid. Capture it: {% capture wa %}{% render 'whatsapp-number' %}{% endcapture %}
+  @example {% capture whatsapp_digits %}{% render 'whatsapp-number' %}{% endcapture %}
+{% enddoc %}
+{%- liquid
+  assign wa_digits = settings.floating_whatsapp_number | remove: '+' | remove: ' ' | remove: '-' | remove: '(' | remove: ')'
+  assign wa_rest = wa_digits | remove: '0' | remove: '1' | remove: '2' | remove: '3' | remove: '4' | remove: '5' | remove: '6' | remove: '7' | remove: '8' | remove: '9'
+  if wa_digits != blank and wa_rest == blank and wa_digits.size >= 8 and wa_digits.size <= 15
+    echo wa_digits
+  endif
+-%}

@@ -153,6 +153,12 @@
     "shopping_assistant_promo": {
       "type": "shopping-assistant-promo",
       "settings": {}
+    },
+    "deals": {
+      "type": "deals",
+      "settings": {
+        "product_limit": 8
+      }
     }
   },
   "order": [
@@ -160,6 +166,7 @@
     "trust_benefits",
     "group_delivery_promo",
     "categories",
+    "deals",
     "shopping_assistant_promo",
     "laundry",
     "cleaning",

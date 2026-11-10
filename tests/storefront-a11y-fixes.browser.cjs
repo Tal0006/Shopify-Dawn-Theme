@@ -4,7 +4,7 @@ const {spawn}=require('node:child_process');const {test}=require('node:test');co
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const root=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
-const he=JSON.parse(read('locales/he.default.json'));
+const he=JSON.parse(read('locales/he.default.json').replace(/^\s*\/\*[\s\S]*?\*\//,''));
 
 test('Product cards: sold-out text once, named add button, image link out of tab order',()=>{
  const card=read('snippets/product-card.liquid'),badges=read('snippets/product-card-badges.liquid');

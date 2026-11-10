@@ -29,9 +29,29 @@
         {% assign card_form_id = 'CardProductForm-' | append: section.id | append: '-' | append: card_product.id %}
         {% form 'product', card_product, id: card_form_id, class: 'catalog-card__form', data-card-cart: '' %}
           <input type="hidden" name="id" value="{{ card_variant.id }}">
-          <input type="hidden" name="quantity" value="1">
 {% render 'inventory-limit', inventory_variant: card_variant %}
-          <button type="submit" class="theme-btn" name="add" aria-label="{{ 'storefront.add_to_cart_label' | t: title: card_product.title | escape }}" aria-describedby="{{ card_form_id }}-Feedback" data-pending-label="{{ 'storefront.cart_adding' | t | escape }}">{{ 'products.product.add_to_cart' | t }}</button>
+          {%- comment -%}
+            Two states, switched by storefront.js from Shopify's cart quantities: choose a quantity and add, or (once
+            the product is in the cart) change the cart quantity directly; minus at 1 removes it.
+          {%- endcomment -%}
+          {%- assign card_cart_lines = cart.items | where: 'variant_id', card_variant.id -%}
+          {%- assign card_in_cart = card_cart_lines | map: 'quantity' | sum -%}
+          <div class="catalog-card__buy" data-card-buy{% if card_in_cart > 0 %} hidden{% endif %}>
+            <div class="catalog-card__stepper" data-quantity-controls role="group" aria-label="{{ 'products.product.quantity.input_label' | t: product: card_product.title | escape }}">
+              <button type="button" data-quantity-change="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: card_product.title | escape }}">−</button>
+              <input type="number" name="quantity" value="1" min="1" step="1" inputmode="numeric" aria-label="{{ 'products.product.quantity.input_label' | t: product: card_product.title | escape }}"{% if card_variant.quantity_rule.max != blank %} max="{{ card_variant.quantity_rule.max }}" data-inventory-original-max="{{ card_variant.quantity_rule.max }}"{% endif %}>
+              <button type="button" data-quantity-change="1" aria-label="{{ 'products.product.quantity.increase' | t: product: card_product.title | escape }}">+</button>
+            </div>
+            <button type="submit" class="theme-btn" name="add" aria-label="{{ 'storefront.add_to_cart_label' | t: title: card_product.title | escape }}" aria-describedby="{{ card_form_id }}-Feedback" data-pending-label="{{ 'storefront.cart_adding' | t | escape }}">{{ 'products.product.add_to_cart' | t }}</button>
+          </div>
+          <div class="catalog-card__in-cart" data-card-in-cart data-variant-id="{{ card_variant.id }}" data-updated="{{ 'product_cards.cart_updated' | t: count: '__COUNT__' | escape }}" data-removed="{{ 'product_cards.cart_removed' | t | escape }}"{% if card_in_cart == 0 %} hidden{% endif %}>
+            <span class="catalog-card__in-cart-label" aria-hidden="true">{{ 'product_cards.in_cart' | t }}</span>
+            <div class="catalog-card__stepper" role="group" aria-label="{{ 'product_cards.in_cart_label' | t: product: card_product.title | escape }}">
+              <button type="button" data-card-line-change="-1" aria-label="{{ 'product_cards.cart_decrease' | t: product: card_product.title | escape }}">−</button>
+              <span class="catalog-card__in-cart-count" data-card-in-cart-count>{{ card_in_cart }}</span>
+              <button type="button" data-card-line-change="1" aria-label="{{ 'product_cards.cart_increase' | t: product: card_product.title | escape }}">+</button>
+            </div>
+          </div>
           <p id="{{ card_form_id }}-Feedback" class="catalog-card-feedback" role="status" aria-live="polite" aria-atomic="true" data-card-feedback data-success="{{ 'storefront.cart_added' | t | escape }}" data-error="{{ 'storefront.cart_add_error' | t | escape }}" data-refresh-error="{{ 'storefront.cart_refresh_error' | t | escape }}"></p>
         {% endform %}
       {% else %}
@@ -40,3 +60,20 @@
     </div>
   </article>
 {% endif %}
+{% stylesheet %}
+/* Card quantity stepper (add) and in-cart quantity (change the cart line); side by side when the card is wide. */
+.catalog-card__form { container-type: inline-size; }
+.catalog-card__buy { display: grid; gap: 8px; }
+@container (min-width: 250px) { .catalog-card__buy { grid-template-columns: minmax(112px, auto) minmax(0, 1fr); align-items: stretch; } }
+.catalog-card .catalog-card__stepper { display: flex; align-items: stretch; justify-content: space-between; min-width: 0; border: 1px solid var(--fk-border-strong, #9fcfd7); border-radius: var(--fk-radius-md, 12px); background: #fff; overflow: hidden; }
+.catalog-card .catalog-card__stepper button { flex: 0 0 38px; min-width: 38px; min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--fk-accent, #086b7b); font-size: 18px; font-weight: 700; line-height: 1; }
+.catalog-card .catalog-card__stepper button:not(:disabled):hover { background: var(--fk-cyan-50, #f0fafb); }
+.catalog-card .catalog-card__stepper button:disabled { opacity: .4; cursor: not-allowed; }
+.catalog-card .catalog-card__stepper input, .catalog-card .catalog-card__in-cart-count { flex: 1 1 auto; width: 100%; min-width: 28px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--fk-teal-900, #0a3f47); font-weight: 700; font-size: 16px; text-align: center; appearance: textfield; -moz-appearance: textfield; display: flex; align-items: center; justify-content: center; }
+.catalog-card .catalog-card__stepper input::-webkit-inner-spin-button, .catalog-card .catalog-card__stepper input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.catalog-card__in-cart { display: grid; gap: 4px; }
+.catalog-card__in-cart[hidden], .catalog-card__buy[hidden] { display: none; }
+.catalog-card__in-cart-label { font-size: 13px; font-weight: 600; color: var(--fk-success, #0c5a3f); }
+.catalog-card__in-cart .catalog-card__stepper { border-color: var(--fk-success, #0c5a3f); background: var(--fk-success-bg, #e9f8f2); }
+.catalog-card__in-cart[aria-busy=true] .catalog-card__stepper { opacity: .65; }
+{% endstylesheet %}

@@ -4,7 +4,7 @@ const {spawn}=require('node:child_process'),{test}=require('node:test'),assert=r
 const root=path.join(__dirname,'..'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 test('Shopping Assistant browser flows',{timeout:90000},async t=>{
  const source=fs.readFileSync(path.join(root,'snippets/shopping-assistant.liquid'),'utf8');
- const strings=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8')).shopping_assistant;
+ const strings=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,'')).shopping_assistant;
  const trustCSS=fs.readFileSync(path.join(root,'sections/trust-benefits.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
  const collectionCSS=['sections/main-collection.liquid','snippets/storefront-filters.liquid','sections/footer.liquid'].map(file=>fs.readFileSync(path.join(root,file),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]).join('\n');
  const css=collectionCSS+trustCSS+source.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
@@ -164,7 +164,7 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
   });
   await t.test('Trust strip is compact, readable and clear of floating controls at all requested sizes',async()=>{
    const trustSource=fs.readFileSync(path.join(root,'sections/trust-benefits.liquid'),'utf8');
-   const index=JSON.parse(fs.readFileSync(path.join(root,'templates/index.json'),'utf8'));
+   const index=JSON.parse(fs.readFileSync(path.join(root,'templates/index.json'),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,''));
    assert.equal(index.order[index.order.indexOf('hero')+1],'trust_benefits');
    const config=index.sections.trust_benefits;
    const itemTemplate=trustSource.match(/<li class="trust-strip__item"[\s\S]*?<\/li>/)[0];
