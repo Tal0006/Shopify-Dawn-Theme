@@ -5,7 +5,9 @@ const root=path.join(__dirname,'..');
 // The storefront must never stay covered: verifies the real layout markup, controller and style.css rules.
 test('Preloader never leaves the storefront covered',{timeout:90000},async t=>{
  const layout=fs.readFileSync(path.join(root,'layout/theme.liquid'),'utf8');
- const noscript=layout.match(/<noscript><style>\.preloader[\s\S]*?<\/noscript>/)[0];
+ const noscript=layout.match(/<noscript>\s*<style>\s*\.preloader\s*{[\s\S]*?<\/noscript>/)?.[0];
+ assert.ok(noscript,'no-JS preloader fallback missing from layout');
+ assert.match(noscript,/\.preloader\s*{\s*display:\s*none\s*!important;?\s*}/,'no-JS fallback must hide the preloader');
  const block=layout.slice(layout.indexOf('<!-- start preloader -->'),layout.indexOf('<!-- end preloader -->')).replace(/{{ 'preloader.png' \| asset_url }}/,'/preloader.png');
  assert.ok(block.includes('data-preloader-done'),'inline preloader controller missing from layout');
  const withoutController=block.replace(/<script>[\s\S]*?<\/script>/,'');

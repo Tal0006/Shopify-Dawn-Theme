@@ -27,7 +27,10 @@
 {%- endif -%}
 
 {%- if request.page_type == 'product' -%}
-  <meta property="og:price:amount" content="{{ product.price | money_without_currency | strip_html }}">
+  {%- comment -%}Plain decimal from minor units: the shop money format can add thousands separators.{%- endcomment -%}
+  {%- assign og_price_major = product.price | divided_by: 100 -%}
+  {%- assign og_price_minor = product.price | modulo: 100 | prepend: '0' | slice: -2, 2 -%}
+  <meta property="og:price:amount" content="{{ og_price_major }}.{{ og_price_minor }}">
   <meta property="og:price:currency" content="{{ cart.currency.iso_code }}">
 {%- endif -%}
 

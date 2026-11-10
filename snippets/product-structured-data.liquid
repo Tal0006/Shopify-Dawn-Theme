@@ -1,0 +1,97 @@
+{% doc %}
+  Product structured data (schema.org JSON-LD) for search engines and Google Merchant Center. Rendered once per
+  product page from the layout head, so it is server-rendered and independent of section composition and JavaScript.
+  A product with only the default variant is a Product with one Offer; a product with real variants is a
+  ProductGroup whose hasVariant entries each carry their own Offer. Every Offer has a numeric price (current
+  variant price in the cart currency), priceCurrency, availability (from variant.available) and URL. Exact
+  inventory counts are never emitted.
+
+  @param {product} sd_product - Product being described.
+  @example {% render 'product-structured-data', sd_product: product %}
+{% enddoc %}
+{%- liquid
+  assign sd_base_url = canonical_url | split: '?' | first
+  assign sd_currency = cart.currency.iso_code
+  assign sd_single = sd_product.has_only_default_variant
+  assign sd_description = sd_product.description | strip_html | strip_newlines | strip | truncate: 5000
+  assign sd_brand = sd_product.vendor | strip
+-%}
+{%- capture sd_variants -%}
+  {%- for sd_variant in sd_product.variants -%}
+    {%- liquid
+      # Price comes from Shopify's integer minor units, written as a plain decimal (no money formatting/locale).
+      assign sd_major = sd_variant.price | divided_by: 100
+      assign sd_minor = sd_variant.price | modulo: 100 | prepend: '0' | slice: -2, 2
+      if sd_variant.available
+        assign sd_availability = 'https://schema.org/InStock'
+      else
+        assign sd_availability = 'https://schema.org/OutOfStock'
+      endif
+      if sd_single
+        assign sd_offer_url = sd_base_url
+      else
+        assign sd_offer_url = sd_base_url | append: '?variant=' | append: sd_variant.id
+      endif
+      assign sd_image = sd_variant.featured_image | default: sd_product.featured_image
+      assign sd_sku = sd_variant.sku | strip
+      # GTIN only when the barcode is a well-formed GTIN-8/12/13/14 (digits only); anything else is omitted.
+      assign sd_gtin = sd_variant.barcode | strip
+      assign sd_gtin_rest = sd_gtin | remove: '0' | remove: '1' | remove: '2' | remove: '3' | remove: '4' | remove: '5' | remove: '6' | remove: '7' | remove: '8' | remove: '9'
+      assign sd_gtin_valid = false
+      if sd_gtin != blank and sd_gtin_rest == blank
+        if sd_gtin.size == 8 or sd_gtin.size == 12 or sd_gtin.size == 13 or sd_gtin.size == 14
+          assign sd_gtin_valid = true
+        endif
+      endif
+    -%}
+    {%- unless forloop.first %},{% endunless -%}
+    { {%- if sd_single %}"@context": "https://schema.org",{% endif %}
+      "@type": "Product",
+      {%- if sd_single %}
+        "@id": {{ sd_base_url | append: '#product' | json }},
+        "name": {{ sd_product.title | json }},
+        "url": {{ sd_base_url | json }},
+        {%- if sd_description != blank %}"description": {{ sd_description | json }},{% endif -%}
+        {%- if sd_brand != blank %}"brand": {"@type": "Brand", "name": {{ sd_brand | json }}},{% endif -%}
+      {%- else %}
+        "@id": {{ sd_offer_url | append: '#variant' | json }},
+        "name": {{ sd_product.title | append: ' - ' | append: sd_variant.title | json }},
+        "url": {{ sd_offer_url | json }},
+      {%- endif -%}
+      {%- if sd_single and sd_product.images.size > 1 %}
+        "image": [{% for sd_media in sd_product.images limit: 10 %}{{ sd_media | image_url: width: 1200 | prepend: 'https:' | json }}{% unless forloop.last %},{% endunless %}{% endfor %}],
+      {%- elsif sd_image %}
+        "image": {{ sd_image | image_url: width: 1200 | prepend: 'https:' | json }},
+      {%- endif -%}
+      {%- if sd_sku != blank %}"sku": {{ sd_sku | json }},{% endif -%}
+      {%- if sd_gtin_valid %}"gtin": {{ sd_gtin | json }},{% endif %}
+      "offers": {
+        "@type": "Offer",
+        "price": {{ sd_major }}.{{ sd_minor }},
+        "priceCurrency": {{ sd_currency | json }},
+        "availability": {{ sd_availability | json }},
+        "itemCondition": "https://schema.org/NewCondition",
+        "url": {{ sd_offer_url | json }},
+        "seller": {"@type": "Organization", "name": {{ shop.name | json }}}
+      }
+    }
+  {%- endfor -%}
+{%- endcapture -%}
+<script type="application/ld+json" data-product-structured-data>
+  {%- if sd_single %}
+    {{ sd_variants }}
+  {%- else %}
+    {
+      "@context": "https://schema.org",
+      "@type": "ProductGroup",
+      "@id": {{ sd_base_url | append: '#product' | json }},
+      "name": {{ sd_product.title | json }},
+      "url": {{ sd_base_url | json }},
+      "productGroupID": {{ sd_product.id | append: '' | json }},
+      {%- if sd_description != blank %}"description": {{ sd_description | json }},{% endif -%}
+      {%- if sd_brand != blank %}"brand": {"@type": "Brand", "name": {{ sd_brand | json }}},{% endif -%}
+      {%- if sd_product.featured_image %}"image": {{ sd_product.featured_image | image_url: width: 1200 | prepend: 'https:' | json }},{% endif %}
+      "hasVariant": [{{ sd_variants }}]
+    }
+  {%- endif %}
+</script>

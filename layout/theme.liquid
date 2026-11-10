@@ -32,6 +32,9 @@
     {% endif %}
 
     {% render 'meta-tags' %}
+    {%- if request.page_type == 'product' and product -%}
+      {% render 'product-structured-data', sd_product: product %}
+    {%- endif -%}
 
     <link href="{{ 'bootstrap.min.css' | asset_url }}" rel="stylesheet">
     <link href="{{ 'animate.css' | asset_url }}" rel="stylesheet">
