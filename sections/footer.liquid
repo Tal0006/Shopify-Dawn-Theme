@@ -42,6 +42,7 @@
     {% endform %}
   </div>{% endif %}
     </div>
+    {% render 'google-review-cta', context: 'footer' %}
     <ul class="storefront-footer__trust" role="list">{% assign footer_facts = 'secure,pickup,shipping' | split: ',' %}{% for fact in footer_facts %}{% assign fact_key = 'product_trust.' | append: fact %}<li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6"/></svg>{{ fact_key | t }}</li>{% endfor %}</ul>
     <div class="storefront-footer__bottom">
     {% if section.settings.show_payment_icons and shop.enabled_payment_types != blank %}<ul class="paymets" aria-label="{{ 'sections.footer.payment' | t }}">{% for type in shop.enabled_payment_types %}<li>{{ type | payment_type_svg_tag }}</li>{% endfor %}</ul>{% endif %}

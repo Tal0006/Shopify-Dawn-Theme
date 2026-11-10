@@ -862,5 +862,13 @@
     "approval": "Delivery requires store approval. No payment is taken when joining.",
     "cta": "Explore Group Delivery",
     "setup": "Choose the Group Delivery page in Theme settings, or publish the existing page with the group-delivery handle."
+  },
+  "google_review": {
+    "eyebrow": "Google reviews",
+    "heading": "Enjoyed shopping with us?",
+    "text": "We would love to hear what you think, and your review helps other shoppers discover Fankee",
+    "button": "Write us a Google review",
+    "link_label": "Write a Google review for {{ shop }}",
+    "new_tab": "opens in a new tab"
   }
 }

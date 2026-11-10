@@ -3526,5 +3526,18 @@
     "navigation": "Show navigation shortcut",
     "navigation_info": "Shown only when the page is absent from the main menu. Disable to manage the link exclusively in Shopify Navigation.",
     "footer": "Show footer information link"
+  },
+  "google_review_editor": {
+    "settings": "Google reviews",
+    "policy": "Every customer gets the same direct review link. Do not ask about satisfaction before the link and do not offer rewards for reviews.",
+    "enabled": "Show Google review invitation",
+    "url": "Google review link",
+    "url_info": "The \"write a review\" link from your Google Business Profile (starts with https://). Leave blank to hide the invitation.",
+    "heading": "Heading",
+    "heading_info": "Blank uses the translated default heading.",
+    "text": "Supporting text",
+    "text_info": "Blank uses the translated default text.",
+    "button": "Button label",
+    "button_info": "Blank uses the translated default label."
   }
 }

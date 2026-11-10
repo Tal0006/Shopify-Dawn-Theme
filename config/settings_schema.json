@@ -1529,5 +1529,45 @@
         "default": true
       }
     ]
+  },
+  {
+    "name": "t:google_review_editor.settings",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "t:google_review_editor.policy"
+      },
+      {
+        "type": "checkbox",
+        "id": "google_review_enabled",
+        "label": "t:google_review_editor.enabled",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "google_review_url",
+        "label": "t:google_review_editor.url",
+        "info": "t:google_review_editor.url_info",
+        "default": "https://g.page/r/CTA0XiuYPkeoECE/review"
+      },
+      {
+        "type": "text",
+        "id": "google_review_heading",
+        "label": "t:google_review_editor.heading",
+        "info": "t:google_review_editor.heading_info"
+      },
+      {
+        "type": "textarea",
+        "id": "google_review_text",
+        "label": "t:google_review_editor.text",
+        "info": "t:google_review_editor.text_info"
+      },
+      {
+        "type": "text",
+        "id": "google_review_button",
+        "label": "t:google_review_editor.button",
+        "info": "t:google_review_editor.button_info"
+      }
+    ]
   }
 ]

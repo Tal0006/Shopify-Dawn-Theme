@@ -1,0 +1,105 @@
+{% doc %}
+  Google review call to action. Every visitor gets the same direct link to the store's Google review flow: no
+  rating questions, filtering or incentives before it (no review gating). Renders nothing when the theme setting
+  is off or the review URL is not an https:// URL. Copy comes from theme settings, falling back to translations.
+  Entrance motion is driven by storefront.js (data-review-reveal) and the --fk-dur* tokens, which collapse to 0 for
+  reduced motion and the accessibility pause.
+
+  @param {string} context - Where the card is placed (for example 'footer'); used for the modifier class and IDs.
+  @example {% render 'google-review-cta', context: 'footer' %}
+{% enddoc %}
+{%- liquid
+  assign review_url = settings.google_review_url | strip
+  assign review_scheme = review_url | slice: 0, 8 | downcase
+  assign review_show = true
+  if settings.google_review_enabled == false or review_scheme != 'https://'
+    assign review_show = false
+  endif
+  assign review_context = context | default: 'footer' | handleize
+  assign review_heading = settings.google_review_heading | strip
+  if review_heading == blank
+    assign review_heading = 'google_review.heading' | t
+  endif
+  assign review_text = settings.google_review_text | strip
+  if review_text == blank
+    assign review_text = 'google_review.text' | t
+  endif
+  assign review_label = settings.google_review_button | strip
+  if review_label == blank
+    assign review_label = 'google_review.button' | t
+  endif
+  assign review_heading_id = 'GoogleReview-' | append: review_context
+  assign review_aria = 'google_review.link_label' | t: shop: shop.name
+  assign review_new_tab = 'google_review.new_tab' | t
+-%}
+{%- if review_show -%}
+<div class="google-review-cta google-review-cta--{{ review_context }}" data-review-cta aria-labelledby="{{ review_heading_id }}" role="group">
+  <span class="google-review-cta__icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><path d="M4 4.5h16a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-7.4L8 21v-3.5H4A1.5 1.5 0 0 1 2.5 16V6A1.5 1.5 0 0 1 4 4.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m12 7.4 1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.3 1.2.5-2.5-1.8-1.7 2.5-.3Z" fill="currentColor"/></svg>
+  </span>
+  <div class="google-review-cta__body">
+    <p class="google-review-cta__eyebrow">
+      <span class="google-review-cta__stars" aria-hidden="true">
+        {%- for i in (1..5) -%}
+          <svg class="google-review-cta__star" style="--review-star: {{ forloop.index0 }}" viewBox="0 0 20 20" width="16" height="16" focusable="false"><path d="m10 1.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.6 7.7l5.8-.8Z" fill="currentColor"/></svg>
+        {%- endfor -%}
+      </span>
+      <span>{{ 'google_review.eyebrow' | t }}</span>
+    </p>
+    <h2 class="google-review-cta__heading" id="{{ review_heading_id }}">{{ review_heading | escape }}</h2>
+    {%- if review_text != blank %}<p class="google-review-cta__text">{{ review_text | escape }}</p>{% endif %}
+  </div>
+  <a class="google-review-cta__link" href="{{ review_url | escape }}" target="_blank" rel="noopener noreferrer" aria-label="{{ review_label | escape }} – {{ review_aria | escape }} ({{ review_new_tab | escape }})">
+    <span>{{ review_label | escape }}</span>
+    <svg class="google-review-cta__arrow" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M19 12H5m6-6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+</div>
+{%- endif -%}
+
+{% stylesheet %}
+/* Slim glass strip on the deep-teal footer. Text keeps full contrast; translucency lives only in the surface. */
+.google-review-cta { container-type: inline-size; position: relative; isolation: isolate; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 16px; min-width: 0; margin-block-start: 16px; padding: 12px 16px; border: 1px solid rgb(191 233 238 / 26%); border-radius: var(--fk-radius-lg, 16px); background: radial-gradient(ellipse at 100% 0%, rgb(18 167 187 / 20%), transparent 60%), linear-gradient(160deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 3%)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%); color: #e9f5f6; text-align: start; }
+.google-review-cta__icon { display: grid; place-items: center; inline-size: 44px; block-size: 44px; border: 1px solid rgb(191 233 238 / 34%); border-radius: var(--fk-radius-md, 12px); background: rgb(18 167 187 / 18%); color: #bfe9ee; }
+.google-review-cta__body { min-width: 0; }
+.google-review-cta__eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 2px; font-size: 13px; font-weight: 600; line-height: 1.5; color: #d8ecef; }
+.google-review-cta__stars { display: inline-flex; gap: 2px; color: #ffcf5c; direction: ltr; }
+.google-review-cta__star { display: block; flex: 0 0 16px; }
+.google-review-cta__heading { margin: 0; font-size: 17px; line-height: 1.4; font-weight: 700; color: #fff; overflow-wrap: anywhere; }
+.google-review-cta__text { margin: 2px 0 0; font-size: 13px; line-height: 1.6; color: #d8ecef; overflow-wrap: anywhere; }
+.google-review-cta .google-review-cta__link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-block-size: 44px; padding: 8px 18px; border: 1px solid #bfe9ee; border-radius: var(--fk-radius-pill, 999px); background: #f0fafb; color: #0a3f47; font-size: 15px; font-weight: 700; line-height: 1.3; text-align: center; text-decoration: none; white-space: nowrap; box-shadow: 0 4px 14px rgb(4 30 35 / 28%); transition: transform var(--fk-dur-fast, 160ms) var(--fk-ease, ease), box-shadow var(--fk-dur, 240ms) var(--fk-ease, ease), background-color var(--fk-dur-fast, 160ms) ease; }
+.google-review-cta__arrow { flex: 0 0 18px; transition: translate var(--fk-dur, 240ms) var(--fk-ease-out, ease); }
+:dir(ltr) .google-review-cta__arrow { transform: scaleX(-1); }
+/* The global teal focus outline (accessibility.css) is low-contrast on the dark footer: white outline over a dark gap
+   ring instead. High-contrast mode keeps its own yellow outline. */
+html:not([data-a11y-contrast]) .google-review-cta .google-review-cta__link:focus-visible { outline: 3px solid #ffffff !important; outline-offset: 4px !important; box-shadow: 0 0 0 4px #072e35; }
+.google-review-cta__link:active { transform: translateY(1px); }
+@media (hover: hover) and (pointer: fine) {
+ .google-review-cta .google-review-cta__link:hover { background: #ffffff; color: #0a3f47; transform: translateY(-2px); box-shadow: 0 8px 20px rgb(4 30 35 / 34%), 0 0 0 3px rgb(18 167 187 / 30%); }
+}
+.google-review-cta__link:is(:hover, :focus-visible) .google-review-cta__arrow { translate: -3px 0; }
+:dir(ltr) .google-review-cta__link:is(:hover, :focus-visible) .google-review-cta__arrow { translate: 3px 0; }
+@container (max-width: 559px) {
+ .google-review-cta .google-review-cta__link { grid-column: 1 / -1; inline-size: 100%; white-space: normal; }
+}
+@media (max-width: 599px) {
+ .google-review-cta { margin-block-start: 14px; padding: 12px; gap: 10px 12px; }
+ .google-review-cta__heading { font-size: 16px; }
+}
+
+/* One-time entrance (storefront.js): the card is hidden only while JavaScript has marked it pending below the fold. */
+.google-review-cta[data-review-reveal] { transition: opacity var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease), transform var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease); }
+.google-review-cta[data-review-reveal=pending] { opacity: 0; transform: translateY(10px); }
+.google-review-cta[data-review-reveal=entered] .google-review-cta__star { animation: google-review-star var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease) both; animation-delay: calc(var(--review-star) * 70ms * var(--fk-motion-scale, 1) + 120ms * var(--fk-motion-scale, 1)); }
+.google-review-cta:focus-within { opacity: 1; transform: none; }
+@keyframes google-review-star { from { opacity: 0; transform: scale(.6); } }
+@media (prefers-reduced-motion: reduce) {
+ .google-review-cta, .google-review-cta *, .google-review-cta[data-review-reveal] { animation: none !important; transition: none !important; }
+ .google-review-cta[data-review-reveal] { opacity: 1; transform: none; }
+ .google-review-cta__link:is(:hover, :active) { transform: none; }
+ .google-review-cta__link:is(:hover, :focus-visible) .google-review-cta__arrow { translate: none; }
+}
+html[data-a11y-paused] .google-review-cta, html[data-a11y-paused] .google-review-cta * { animation: none !important; transition: none !important; }
+html[data-a11y-paused] .google-review-cta[data-review-reveal] { opacity: 1; transform: none; }
+html[data-a11y-paused] .google-review-cta__link:is(:hover, :active) { transform: none; }
+html[data-a11y-paused] .google-review-cta__link:is(:hover, :focus-visible) .google-review-cta__arrow { translate: none; }
+{% endstylesheet %}

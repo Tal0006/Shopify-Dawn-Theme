@@ -667,4 +667,30 @@
   document.addEventListener('shopify:section:load', (event) => menuState(event.target));
   recommendations(document);
   document.addEventListener('shopify:section:load', (event) => recommendations(event.target));
+
+  // Google review card: one-time entrance when it first scrolls into view. Content already on screen, reduced
+  // motion, the accessibility pause and the Theme Editor show it immediately; CSS keeps it visible without JS.
+  const reviewObservers = new WeakMap();
+  function reviewReveal(scope) {
+    for (const card of scope.querySelectorAll('[data-review-cta]')) {
+      if (card.dataset.reviewReveal) continue;
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused') || window.Shopify?.designMode;
+      const rect = card.getBoundingClientRect();
+      if (still || !('IntersectionObserver' in window) || (rect.top < window.innerHeight && rect.bottom > 0)) { card.dataset.reviewReveal = 'visible'; continue; }
+      card.dataset.reviewReveal = 'pending';
+      const observer = new IntersectionObserver(entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        card.dataset.reviewReveal = 'entered';
+        observer.disconnect();
+        reviewObservers.delete(card);
+      }, {threshold: 0.2});
+      observer.observe(card);
+      reviewObservers.set(card, observer);
+    }
+  }
+  reviewReveal(document);
+  document.addEventListener('shopify:section:load', event => reviewReveal(event.target));
+  document.addEventListener('shopify:section:unload', event => {
+    for (const card of event.target.querySelectorAll('[data-review-cta]')) { reviewObservers.get(card)?.disconnect(); reviewObservers.delete(card); }
+  });
 })();
