@@ -16,7 +16,7 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
   .replace(/{{ settings.shopping_assistant_title[^}]*}}/g,strings.title_default)
   .replace(/{{ 'shopping_assistant\.([^']+)' \| t(?: \| escape)? }}/g,(_,key)=>strings[key]);
  const page='<html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>'+
- ['bootstrap.min.css','style.css','storefront.css','accessibility.css'].map(f=>fs.readFileSync(path.join(root,'assets',f),'utf8')).join('\n')+css+
+ ['bootstrap-subset.css','style.css','storefront.css','accessibility.css'].map(f=>fs.readFileSync(path.join(root,'assets',f),'utf8')).join('\n')+css+
  '</style></head><body><main style="min-height:1800px">Fixture</main><button class="a11y-launcher">Accessibility</button>'+markup+
  '<script src="/assistant.js"></script></body></html>';
  const server=http.createServer((req,res)=>{

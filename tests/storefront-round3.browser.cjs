@@ -121,7 +121,7 @@ test('Liquid: homepage grids, cart suggestions, business details, WhatsApp, Grou
 test('Browser: back-in-stock dialog, floating buttons, assistant promo and drawer note',{skip:SKIP,timeout:180000},async t=>{
  const liquid=engine();
  const block=file=>read(file).match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
- const css=['bootstrap.min.css','style.css','storefront.css','accessibility.css'].map(file=>read('assets/'+file)).join('')+['snippets/storefront-design.liquid','snippets/cart-drawer.liquid','snippets/back-in-stock.liquid','snippets/back-in-stock-trigger.liquid','snippets/floating-whatsapp.liquid','sections/shopping-assistant-promo.liquid'].map(block).join('');
+ const css=['bootstrap-subset.css','style.css','storefront.css','accessibility.css'].map(file=>read('assets/'+file)).join('')+['snippets/storefront-design.liquid','snippets/cart-drawer.liquid','snippets/back-in-stock.liquid','snippets/back-in-stock-trigger.liquid','snippets/floating-whatsapp.liquid','sections/shopping-assistant-promo.liquid'].map(block).join('');
  // Shopify-only tags replaced by their static output for the browser fixture.
  const dialogSource=strip(read('snippets/back-in-stock.liquid')).replace(/{% form 'contact', id: 'BackInStockForm', class: '([^']+)' %}/,'<form method="post" action="/contact#BackInStockForm" id="BackInStockForm" class="$1">').replace('{% endform %}','</form>');
  const dialog=await liquid.parseAndRender(dialogSource,{form:{},customer:null});

@@ -71,7 +71,7 @@
     }
     positionLauncher() {
       this.style.removeProperty('--sa-launch-bottom');
-      const obstacles = [...document.querySelectorAll('.a11y-launcher, [data-store-whatsapp], [class*="whatsapp"], [data-cart-toast], .product-sticky-atc, [data-sticky-atc]')];
+      const obstacles = [...document.querySelectorAll('.a11y-launcher, [data-store-whatsapp], [class*="whatsapp"], [data-cart-toast], .product-sticky-atc, [data-sticky-atc], .back-to-top')];
       // Only fixed/sticky controls can overlap the floating launcher.
       for (let pass = 0; pass < 4; pass++) {
         let moved = false;

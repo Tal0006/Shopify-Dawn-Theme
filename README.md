@@ -28,8 +28,7 @@ Built on Shopify's [Dawn](https://github.com/Shopify/dawn) (Online Store 2.0) fo
 
 - 🧩 **Custom drag-and-drop sections** — Hero, Feature highlights, Shop Now, Social Media, About Us, Coming Soon, Contact form, and a bespoke Single Product layout
 - ⚡ **Online Store 2.0 ready** — JSON templates, section groups, and app blocks fully supported
-- 🎞️ **Smooth scroll animations** — powered by WOW.js + `animate.css` for elegant reveal effects
-- 🎠 **Product & content carousels** — Owl Carousel integration for sliders and galleries
+- 🎞️ **Smooth scroll animations** — lightweight vanilla JS reveals that respect reduced motion
 - 📱 **Fully responsive** — mobile-first layout that looks great on every screen
 - 🌍 **Multi-language ready** — 30+ locale files included out of the box
 - 🛒 **Complete storefront** — product, collection, cart, blog, search, 404, password, and full customer account templates
@@ -87,11 +86,9 @@ Developers can extend the theme by editing the `.liquid` files in `sections/`, `
 | Platform | Shopify (Online Store 2.0) |
 | Templating | Liquid |
 | Base theme | Shopify Dawn v15 |
-| Styling | CSS3, Bootstrap 5 |
-| Scripting | Vanilla JS, jQuery |
-| Animation | WOW.js, animate.css |
-| Carousels | Owl Carousel |
-| Icons | Themify Icons |
+| Styling | CSS3, a generated subset of Bootstrap 5 CSS (`tests/helpers/bootstrap-subset.cjs`) |
+| Scripting | Vanilla JS (no jQuery or Bootstrap JS) |
+| Icons | Inline SVG (`snippets/theme-icon.liquid`) |
 
 ## 📂 Project Structure
 

@@ -27,6 +27,9 @@
 html:has(dialog[open]) .floating-whatsapp, html:has(.a11y-panel:not([hidden])) .floating-whatsapp { visibility: hidden; }
 /* Keep the last footer row clear of the button at the end of the page. */
 html:has(.floating-whatsapp) .storefront-footer__bottom { padding-inline-start: 72px; }
+/* Back-to-top (style.css, 45px; 35px up to 991px) sits centred above this 52px button with a 10px gap. */
+html:has(.floating-whatsapp) .back-to-top { inset-inline-start: 19.5px; inset-block-end: calc(max(16px, env(safe-area-inset-bottom)) + 62px); }
+@media (max-width: 991px) { html:has(.floating-whatsapp) .back-to-top { inset-inline-start: 24.5px; } }
 @media (prefers-reduced-motion: reduce) { .floating-whatsapp { transition: none; } .floating-whatsapp:hover { transform: none; } }
 html[data-a11y-paused] .floating-whatsapp { transition: none; }
 html[data-a11y-paused] .floating-whatsapp:hover { transform: none; }

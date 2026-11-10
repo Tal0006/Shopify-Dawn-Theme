@@ -173,8 +173,10 @@ img {
   display: none;
   position: fixed;
   z-index: 999;
-  right: 15px;
-  bottom: 15px;
+  /* Same corner as the floating WhatsApp button (inline-start), opposite the accessibility and assistant
+     launchers; snippets/floating-whatsapp.liquid and product-sticky-atc.liquid stack it above those. */
+  inset-inline-start: 15px;
+  inset-block-end: 15px;
   transition: all 0.3s;
 }
 @media (max-width: 991px) {
@@ -596,23 +598,6 @@ img {
   .site-header #navbar li {
     position: relative;
   }
-  .site-header #navbar > ul > li > .sub-menu > .menu-item-has-children > a {
-    position: relative;
-  }
-  .site-header #navbar > ul > li > .sub-menu > .menu-item-has-children > a:before {
-    font-family: 'themify';
-    content: '\e649';
-    font-size: 11px;
-    font-size: 0.73333rem;
-    position: absolute;
-    right: 15px;
-    top: 58%;
-    -webkit-transform: translateY(-50%);
-    -moz-transform: translateY(-50%);
-    -o-transform: translateY(-50%);
-    -ms-transform: translateY(-50%);
-    transform: translateY(-50%);
-  }
   .site-header #navbar > ul > li:hover > .sub-menu {
     top: 100%;
     visibility: visible;
@@ -668,10 +653,6 @@ img {
   .site-header #navbar ul a:hover,
   .site-header #navbar ul li.current a {
     color: #ff8900;
-  }
-  .site-header #navbar .close-navbar .ti-close {
-    position: relative;
-    top: 1px;
   }
   .site-header .navbar-toggler .first-angle,
   .site-header .navbar-toggler .last-angle {
@@ -792,24 +773,6 @@ img {
   .site-header #navbar li.middle-logo a:before {
     display: none;
   }
-  .site-header #navbar ul > li.menu-item-has-children {
-    position: relative;
-  }
-  .site-header #navbar ul > li.menu-item-has-children:before {
-    position: absolute;
-    right: 5px;
-    top: 50%;
-    transform: translateY(-50%);
-    content: '\e64b';
-    font-family: 'themify';
-    color: #fff;
-    font-size: 12px;
-  }
-}
-@media (min-width: 992px) and (max-width: 1300px) {
-  .site-header #navbar ul > li.menu-item-has-children:before {
-    display: none;
-  }
 }
 @media (min-width: 992px) {
   .site-header #navbar > ul .sub-menu {
@@ -846,17 +809,6 @@ img {
     left: 110%;
     top: 0;
   }
-  .site-header #navbar > ul > li > .sub-menu > .menu-item-has-children > a {
-    position: relative;
-  }
-  .site-header #navbar > ul > li > .sub-menu > .menu-item-has-children > a:before {
-    font-family: 'themify';
-    content: '\e649';
-    font-size: 11px;
-    position: absolute;
-    right: 15px;
-    top: 50%;
-  }
   .site-header #navbar > ul > li:hover > .sub-menu {
     top: 100%;
     visibility: visible;
@@ -888,36 +840,9 @@ img {
   .site-header #navbar > ul > li > .sub-menu .sub-menu a {
     padding: 8px 15px 8px 65px;
   }
-  .site-header #navbar > ul .menu-item-has-children > a {
-    position: relative;
-    color: #ddd;
-  }
-  .site-header #navbar > ul .menu-item-has-children > a:hover,
-  .site-header #navbar > ul .menu-item-has-children > a.active {
-    color: #fff;
-  }
-  .site-header #navbar > ul .menu-item-has-children > a:before {
-    font-family: 'themify';
-    content: '\e649';
-    font-size: 11px;
-    position: absolute;
-    right: 30px;
-    top: 50%;
-    transition: all 0.3s;
-  }
-  .site-header #navbar > ul .menu-item-has-children > a.rotate:before {
-    transform: rotate(90deg);
-    top: 29%;
-  }
-  .site-header #navbar > ul .menu-item-has-children > a.rotate {
-    color: #fff;
-  }
 }
 @media (min-width: 992px) {
   .site-header .navbar-header .open-btn {
-    display: none;
-  }
-  .site-header #navbar .close-navbar {
     display: none;
   }
 }
@@ -999,22 +924,6 @@ img {
     height: 100%;
     overflow: auto;
     padding-bottom: 60px;
-  }
-  .site-header #navbar .close-navbar {
-    background-color: #fff;
-    width: 40px;
-    height: 40px;
-    color: #2f2f31;
-    border: 0;
-    outline: none;
-    position: absolute;
-    left: -41px;
-    top: 90px;
-    z-index: 20;
-  }
-  .site-header #navbar .close-navbar .ti-close {
-    position: relative;
-    top: 1px;
   }
   .site-header .menu-close {
     display: block;

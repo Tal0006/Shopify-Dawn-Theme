@@ -43,9 +43,8 @@
       {% render 'business-structured-data' %}
     {%- endif -%}
 
-    <link href="{{ 'bootstrap.min.css' | asset_url }}" rel="stylesheet">
-    <link href="{{ 'animate.css' | asset_url }}" rel="stylesheet">
-    <link href="{{ 'themify-icons.css' | asset_url }}" rel="stylesheet">
+    {%- comment -%} Only the Bootstrap rules this theme uses; regenerate with tests/helpers/bootstrap-subset.cjs. {%- endcomment -%}
+    <link href="{{ 'bootstrap-subset.css' | asset_url }}" rel="stylesheet">
     <link href="{{ 'style.css' | asset_url }}" rel="stylesheet">
     <noscript>
       <style>

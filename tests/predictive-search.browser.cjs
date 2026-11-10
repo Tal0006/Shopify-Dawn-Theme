@@ -7,13 +7,18 @@ test('Header predictive search browser coverage',{timeout:90000},async t=>{
  const translations=JSON.parse(fs.readFileSync(path.join(root,'locales/he.default.json'),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,''));
  const escaped=value=>String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  const css=fs.readFileSync(path.join(root,'snippets/storefront-design.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1]+fs.readFileSync(path.join(root,'snippets/predictive-search-styles.liquid'),'utf8').match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
+ // The submit icon comes from snippets/theme-icon.liquid: expand it the same way (markup and its stylesheet).
+ const iconSource=fs.readFileSync(path.join(root,'snippets/theme-icon.liquid'),'utf8');
+ const iconCss=iconSource.match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
+ const icon=name=>`<i class="theme-icon" aria-hidden="true"><svg viewBox="0 0 512 512" width="1em" height="1em" fill="currentColor" focusable="false"><path d="${iconSource.match(new RegExp(`when '${name}'\\s+assign icon_path = '([^']+)'`))[1]}"/></svg></i>`;
  const markup=source.replace(/{% doc %}[\s\S]*?{% enddoc %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'')
   .replace(/{% render 'predictive-search-styles' %}/g,'')
+  .replace(/{% render 'theme-icon', icon: '([\w-]+)' %}/g,(_m,name)=>icon(name))
   .replace(/{{ routes.search_url }}/g,'/he/search').replace(/{{ routes.predictive_search_url }}/g,'/he/search/suggest')
   .replace(/{{ search_id }}/g,'HeaderSearch-fixture').replace(/{{ search.terms \| escape }}/g,'')
   .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escaped(key.split('.').reduce((o,k)=>o[k],translations).replace('{{ count }}','__COUNT__')));
  const html='<html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><script id="shopify-features" type="application/json">{"predictiveSearch":false}</script><style>'+
- fs.readFileSync(path.join(root,'assets/storefront.css'),'utf8')+css+'</style></head><body><header class="storefront-header"><div class="container-fluid"><div class="row"><a class="navbar-brand" href="#">פאנקי</a><div class="mobail-menu"><button>תפריט</button></div><nav id="navbar" class="navigation-holder"></nav><div class="storefront-header-tools">'+markup+
+ fs.readFileSync(path.join(root,'assets/storefront.css'),'utf8')+css+iconCss+'</style></head><body><header class="storefront-header"><div class="container-fluid"><div class="row"><a class="navbar-brand" href="#">פאנקי</a><div class="mobail-menu"><button>תפריט</button></div><nav id="navbar" class="navigation-holder"></nav><div class="storefront-header-tools">'+markup+
  '<div class="mini-cart"><button class="cart-toggle-btn" id="outside">סל</button></div></div></div></div></header><main><h1>מוצרים לבית</h1></main></body></html>';
  const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/html;charset=utf-8');res.end(html);});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));

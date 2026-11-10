@@ -68,7 +68,7 @@ test('Browser: back-to-top, classic fixed header, mobile menu taps',{skip:Liquid
    assert.equal(await ev('document.querySelectorAll(".back-to-top").length'),1);
    await ev('scrollTo(0,1400)');await wait('getComputedStyle(document.querySelector(".back-to-top")).display==="block"');
    const shown=await ev('(()=>{const b=document.querySelector(".back-to-top"),c=getComputedStyle(b),r=b.getBoundingClientRect();return {display:c.display,label:b.getAttribute("aria-label"),fading:b.getAnimations().length>0,icon:b.querySelector("i").className,hidden:b.querySelector("i").getAttribute("aria-hidden"),right:Math.round(document.documentElement.clientWidth-r.right),bottom:Math.round(innerHeight-r.bottom),size:Math.round(r.width)}})()');
-   assert.deepEqual(shown,{display:'block',label:'חזרה לראש העמוד',fading:true,icon:'ti-arrow-up',hidden:'true',right:15,bottom:15,size:45},'same position and size as style.css');
+   assert.deepEqual(shown,{display:'block',label:'חזרה לראש העמוד',fading:true,icon:'theme-icon',hidden:'true',right:15,bottom:15,size:45},'same position and size as style.css');
    await ev('document.querySelector(".back-to-top").click()');
    await wait('scrollY===0');
    await wait('getComputedStyle(document.querySelector(".back-to-top")).display==="none"');

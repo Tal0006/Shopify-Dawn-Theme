@@ -29,6 +29,9 @@
 .product-sticky-atc .product-sticky-atc__add { flex: 0 0 auto; width: auto; min-height: 48px; margin: 0; padding-inline: 18px; white-space: nowrap; }
 /* While the bar is shown, floating controls sit above it. */
 html[data-sticky-atc-visible] .a11y-launcher, html[data-sticky-atc-visible] .floating-whatsapp { inset-block-end: calc(var(--sticky-atc-height, 72px) + 12px) !important; }
+/* Back-to-top clears the bar, and also the raised WhatsApp button (52px + 10px gap) when that is shown. */
+html[data-sticky-atc-visible] .back-to-top { inset-block-end: calc(var(--sticky-atc-height, 72px) + 12px); }
+html[data-sticky-atc-visible]:has(.floating-whatsapp) .back-to-top { inset-block-end: calc(var(--sticky-atc-height, 72px) + 74px); }
 html[data-sticky-atc-visible] .cart-toast { --cart-toast-bottom: calc(var(--sticky-atc-height, 72px) + 12px); }
 @media (min-width: 768px) { .product-sticky-atc { display: none !important; } }
 {% endstylesheet %}

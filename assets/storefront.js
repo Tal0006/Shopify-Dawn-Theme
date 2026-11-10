@@ -1018,7 +1018,8 @@
     button.href = '#';
     button.className = 'back-to-top';
     button.setAttribute('aria-label', window.themeStrings?.backToTop || '');
-    button.innerHTML = '<i class="ti-arrow-up" aria-hidden="true"></i>';
+    // Same markup as {% render 'theme-icon', icon: 'arrow-up' %} (snippets/theme-icon.liquid owns its CSS).
+    button.innerHTML = '<i class="theme-icon" aria-hidden="true"><svg viewBox="0 0 512 512" width="1em" height="1em" fill="currentColor" focusable="false"><path d="M456 267L271 82L271 482L241 482L241 82L56 267L35 245L256 24L477 245L456 267L456 267Z"/></svg></i>';
     document.body.append(button);
     const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused');
     let shown = false, fade = null;

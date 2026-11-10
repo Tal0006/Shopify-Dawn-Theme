@@ -36,8 +36,6 @@ html[data-a11y-contrast] .page-wrapper button:disabled { background: #ccc !impor
 html[data-a11y-contrast] .theme-btn::before { display: none; }
 html[data-a11y-contrast] .page-wrapper :focus-visible { outline-color: #ffff00 !important; box-shadow: 0 0 0 6px #000 !important; }
 html[data-a11y-paused] *, html[data-a11y-paused] *::before, html[data-a11y-paused] *::after { animation-play-state: paused !important; transition-duration: 0s !important; scroll-behavior: auto !important; }
-html[data-a11y-paused] .wow { visibility: visible !important; }
-html[data-a11y-paused] .owl-carousel .animated { animation: none !important; }
 .page-content a, .catalog-description a, .details-note a, .shop-single-section details a { text-decoration: underline; text-underline-offset: 3px; }
 .storefront-header .submenu-toggle { display: none; }
 .product-thumbnil-active button { display: block; width: 100%; padding: 0; border: 0; background: #fff; border-radius: 8px; cursor: pointer; }

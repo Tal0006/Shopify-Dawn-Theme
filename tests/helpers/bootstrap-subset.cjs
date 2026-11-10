@@ -1,0 +1,91 @@
+// Builds assets/bootstrap-subset.css from the full Bootstrap 5.0.1 stylesheet (tests/fixtures) by keeping only
+// the rules this theme can match. A rule's selector is kept when every class it requires (outside :not()) appears
+// as a word anywhere in the theme's markup sources (Liquid, templates, settings, locales, theme JS), so classes set
+// by JavaScript or saved in settings count too. Selectors without classes (reboot, :root variables, elements,
+// attributes) are always kept, and rule order is unchanged, so the cascade stays the same.
+//
+// Regenerate after adding a Bootstrap class to markup:  node tests/helpers/bootstrap-subset.cjs --write
+// tests/bootstrap-subset.test.cjs fails while the committed file is out of date.
+const fs = require('node:fs'), path = require('node:path');
+const {parse, splitSelectors} = require('./css-parse.cjs');
+const root = path.join(__dirname, '..', '..');
+const SOURCE = path.join(root, 'tests', 'fixtures', 'bootstrap-5.0.1.min.css');
+const OUTPUT = path.join(root, 'assets', 'bootstrap-subset.css');
+// Classes that come from shop content rather than theme files (product descriptions, pages, app markup).
+// Checked against the live storefront when the subset was built; add here if merchant content needs more.
+const CONTENT_CLASSES = [];
+
+function markupFiles() {
+  const files = [];
+  const walk = (dir, test) => {
+    const full = path.join(root, dir);
+    if (!fs.existsSync(full)) return;
+    for (const entry of fs.readdirSync(full, {withFileTypes: true})) {
+      const rel = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(rel, test);
+      else if (test(entry.name)) files.push(rel);
+    }
+  };
+  for (const dir of ['layout', 'sections', 'snippets', 'blocks', 'templates', 'config', 'locales']) walk(dir, name => /\.(liquid|json)$/.test(name));
+  walk('assets', name => /\.js$/.test(name));
+  return files.sort();
+}
+
+function usedTokens() {
+  const tokens = new Set(CONTENT_CLASSES);
+  for (const file of markupFiles()) for (const [word] of fs.readFileSync(path.join(root, file), 'utf8').matchAll(/-?[A-Za-z_][\w-]*/g)) tokens.add(word);
+  return tokens;
+}
+
+// Classes a selector requires: ignore :not(...) and attribute values, which never require a class to exist.
+function requiredClasses(selector) {
+  let s = selector.replace(/\[[^\]]*\]/g, '[]');
+  for (let i; (i = s.indexOf(':not(')) >= 0;) {
+    let depth = 0, j = i + 4;
+    for (; j < s.length; j++) { if (s[j] === '(') depth++; else if (s[j] === ')' && --depth === 0) break; }
+    s = s.slice(0, i) + s.slice(j + 1);
+  }
+  return [...s.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map(m => m[1]);
+}
+
+function subset(css, tokens) {
+  const keepSelector = sel => requiredClasses(sel).every(name => tokens.has(name));
+  const usedKeyframes = new Set();
+  const emit = nodes => {
+    let out = '';
+    for (const node of nodes) {
+      if (node.type === 'rule') {
+        const selectors = splitSelectors(node.selector);
+        const kept = selectors.filter(keepSelector);
+        if (!kept.length) continue;
+        // A list with a vendor-prefixed pseudo is dropped whole by browsers that do not know it; keep it intact.
+        const list = selectors.some(sel => /::?-(webkit|moz|ms)-/.test(sel)) ? selectors : kept;
+        for (const [, name] of node.body.matchAll(/animation(?:-name)?:\s*([\w-]+)/g)) usedKeyframes.add(name);
+        out += list.join(',') + '{' + node.body + '}';
+      } else if (node.children) {
+        const inner = emit(node.children);
+        if (inner) out += '@' + node.name + ' ' + node.prelude + '{' + inner + '}';
+      } else if (node.name === 'keyframes') {
+        out += '\0' + node.prelude + '\0@keyframes ' + node.prelude + '{' + node.body + '}\0';
+      } else if (node.name !== 'charset') {
+        out += css.slice(node.start, node.end);
+      }
+    }
+    return out;
+  };
+  const body = emit(parse(css)).replace(/\0([\w-]+)\0([^\0]*)\0/g, (m, name, rule) => usedKeyframes.has(name) ? rule : '');
+  const license = css.match(/\/\*![\s\S]*?\*\//)[0];
+  return '@charset "UTF-8";' + license.replace(' */', ' *\n * Subset for this theme: tests/helpers/bootstrap-subset.cjs\n */') + body + '\n';
+}
+
+function build() {
+  return subset(fs.readFileSync(SOURCE, 'utf8'), usedTokens());
+}
+
+if (require.main === module) {
+  const css = build();
+  if (process.argv.includes('--write')) fs.writeFileSync(OUTPUT, css);
+  console.log(`${process.argv.includes('--write') ? 'wrote' : 'would write'} ${path.relative(root, OUTPUT)}: ${css.length} bytes`);
+}
+
+module.exports = {build, subset, usedTokens, requiredClasses, OUTPUT, SOURCE};
