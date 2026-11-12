@@ -28,24 +28,24 @@
     if (!scope) return;
     const active = root.getAttribute('data-a11y-text');
     root.removeAttribute('data-a11y-text');
+    // Collect, then read every size, then write: one style calculation instead of one per element.
+    const pending = new Set();
     const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
       const element = node.parentElement;
       if (!node.textContent.trim() || !element || element.closest('script, style, svg, .sr-only, [hidden]')) continue;
-      if (!sizedElements.has(element)) {
-        element.style.setProperty('--a11y-base-font', getComputedStyle(element).fontSize);
-        element.setAttribute('data-a11y-scalable', '');
-        sizedElements.add(element);
-      }
+      if (!sizedElements.has(element)) pending.add(element);
     }
     scope.querySelectorAll('input:not([type=hidden]), select, textarea').forEach(element => {
-      if (!sizedElements.has(element)) {
-        element.style.setProperty('--a11y-base-font', getComputedStyle(element).fontSize);
-        element.setAttribute('data-a11y-scalable', '');
-        sizedElements.add(element);
-      }
+      if (!sizedElements.has(element)) pending.add(element);
     });
+    const sizes = [...pending].map(element => [element, getComputedStyle(element).fontSize]);
+    for (const [element, fontSize] of sizes) {
+      element.style.setProperty('--a11y-base-font', fontSize);
+      element.setAttribute('data-a11y-scalable', '');
+      sizedElements.add(element);
+    }
     if (active !== null) root.setAttribute('data-a11y-text', active);
   }
   function motion() {

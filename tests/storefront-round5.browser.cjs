@@ -14,9 +14,8 @@ test('Contract: wiring, settings, structured data and performance attributes',()
  assert.match(layout,/{% render 'announcement-bar' %}\s*{% section 'header' %}/,'announcement bar above the header');
  assert.match(layout,/request\.page_type == 'product' or request\.page_type == 'collection' -%}\s*{% render 'breadcrumb-structured-data' %}/);
  assert.match(layout,/request\.page_type == 'index' -%}\s*{% render 'business-structured-data' %}/);
- // Preloader never waits for window.load or media; all external scripts deferred.
- const preloader=layout.slice(layout.indexOf('<!-- start preloader -->'),layout.indexOf('<!-- end preloader -->'));
- assert.doesNotMatch(preloader,/addEventListener\('load'/);assert.match(preloader,/DOMContentLoaded', finish/);
+ // No preloader: real content paints first (tests/first-paint.browser.cjs); all external scripts deferred.
+ assert.doesNotMatch(layout,/preloader/i);
  for(const tag of layout.match(/<script src=[^>]*>/g)||[])assert.match(tag,/\bdefer\b/,tag);
  // Hero image preloaded with high priority; content images lazy below the fold with srcset; raw images sized.
  assert.match(read('sections/hero-section.liquid'),/'storefront-hero-image'[^}]*loading: 'eager', fetchpriority: 'high', preload: true/);
@@ -108,7 +107,7 @@ test('Liquid: structured data, deals, announcement bar and sale badges',{skip:SK
 test('Browser: card in-cart controls, sticky bar, announcement bar, back-in-stock WhatsApp',{skip:SKIP,timeout:240000},async t=>{
  const liquid=engine({settings:{floating_whatsapp_enabled:true,floating_whatsapp_number:'972543966168'},shop:{name:'פאנקי',url:'https://fanakee.com'},routes:{root_url:'/'},pages:{}});
  const block=file=>read(file).match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
- const css=['bootstrap-subset.css','style.css','storefront.css','accessibility.css'].map(file=>read('assets/'+file)).join('')+['snippets/storefront-design.liquid','snippets/product-card.liquid','snippets/product-card-badges.liquid','snippets/announcement-bar.liquid','snippets/product-sticky-atc.liquid','snippets/floating-whatsapp.liquid','snippets/back-in-stock.liquid','snippets/back-in-stock-trigger.liquid','snippets/inventory-limit.liquid'].map(block).join('');
+ const css=['theme.css','storefront.css','accessibility.css','accessibility-panel.css'].map(file=>read('assets/'+file)).join('')+['snippets/storefront-design.liquid','snippets/product-card.liquid','snippets/product-card-badges.liquid','snippets/announcement-bar.liquid','snippets/product-sticky-atc.liquid','snippets/floating-whatsapp.liquid','snippets/back-in-stock.liquid','snippets/back-in-stock-trigger.liquid','snippets/inventory-limit.liquid'].map(block).join('');
  const variant={id:501,quantity_rule:{min:1,increment:1,max:null},inventory_management:null,inventory_policy:'deny',inventory_quantity:0};
  const product={id:5,title:'סנו Javel לימון',url:'/products/sano',available:true,variants:[variant],selected_or_first_available_variant:variant,requires_selling_plan:false,featured_image:null,price:1590,compare_at_price:null,price_varies:false,compare_at_price_varies:false,tags:[],vendor:'פאנקי'};
  const card=await liquid.renderFile('product-card',{card_product:product,section:{id:'grid'},request:{page_type:'index'},cart:{items:[]}});

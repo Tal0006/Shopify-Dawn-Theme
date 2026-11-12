@@ -49,7 +49,9 @@
 .announcement-bar { position: relative; z-index: 3; background: linear-gradient(90deg, var(--fk-teal-900, #0a3f47), var(--fk-teal-700, #0b6571)); color: #fff; font-size: 14px; line-height: 1.5; }
 .announcement-bar__inner { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; }
 .announcement-bar__messages { position: relative; flex: 1 1 auto; min-width: 0; display: grid; text-align: center; }
-.announcement-bar__message { grid-area: 1 / 1; margin: 0; padding-block: 8px; overflow-wrap: anywhere; animation: fk-fade var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease); }
+.announcement-bar__message { grid-area: 1 / 1; margin: 0; padding-block: 8px; overflow-wrap: anywhere; }
+/* The first message paints at once; the fade only runs when storefront.js rotates to another message. */
+[data-announcement][data-rotated] .announcement-bar__message { animation: fk-fade var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease); }
 .announcement-bar__message a { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 .announcement-bar__message a:focus-visible, .announcement-bar__control:focus-visible { outline: 2px solid #fff !important; outline-offset: 2px !important; }
 .announcement-bar__control { flex: 0 0 44px; display: grid; place-items: center; width: 44px; height: 40px; padding: 0; border: 0; background: transparent; color: #fff; }
@@ -58,6 +60,6 @@
 :dir(ltr) .announcement-bar__control[data-announcement-prev] svg, :dir(ltr) .announcement-bar__control[data-announcement-next] svg { transform: scaleX(-1); }
 .announcement-bar__toggle .announcement-bar__play, .announcement-bar__toggle[aria-pressed=true] .announcement-bar__pause { display: none; }
 .announcement-bar__toggle[aria-pressed=true] .announcement-bar__play { display: block; }
-@media (prefers-reduced-motion: reduce) { .announcement-bar__message { animation: none; } }
-html[data-a11y-paused] .announcement-bar__message { animation: none; }
+@media (prefers-reduced-motion: reduce) { [data-announcement][data-rotated] .announcement-bar__message { animation: none; } }
+html[data-a11y-paused] [data-announcement][data-rotated] .announcement-bar__message { animation: none; }
 {% endstylesheet %}

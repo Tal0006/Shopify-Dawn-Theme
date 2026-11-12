@@ -28,7 +28,7 @@ test('Facebook uses the existing settings, renders once and only when configured
 
 test('Footer social icons in the browser: size, focus, RTL alignment and floating controls',{timeout:120000},async t=>{
  const block=file=>read(file).match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
- const css=['bootstrap-subset.css','style.css','storefront.css','accessibility.css'].map(file=>read('assets/'+file)).join('')+block('snippets/storefront-design.liquid')+block('sections/footer.liquid');
+ const css=['theme.css','storefront.css','accessibility.css','accessibility-panel.css'].map(file=>read('assets/'+file)).join('')+block('snippets/storefront-design.liquid')+block('sections/footer.liquid');
  // The real <li> markup for WhatsApp, Facebook and Instagram with their settings filled in.
  const items=['section.settings.whatsapp','facebook_url','instagram_url'].map(name=>{
   const line=footer.split(/\r?\n/).find(l=>l.includes('{% if '+name+' != blank %}<li>'));assert.ok(line,name);

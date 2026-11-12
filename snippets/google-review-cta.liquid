@@ -87,7 +87,8 @@ html:not([data-a11y-contrast]) .google-review-cta .google-review-cta__link:focus
 }
 
 /* One-time entrance (storefront.js): the card is hidden only while JavaScript has marked it pending below the fold. */
-.google-review-cta[data-review-reveal] { transition: opacity var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease), transform var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease); }
+/* Transition only on entry: switching to pending off-screen at load is instant. */
+.google-review-cta[data-review-reveal=entered] { transition: opacity var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease), transform var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease); }
 .google-review-cta[data-review-reveal=pending] { opacity: 0; transform: translateY(10px); }
 .google-review-cta[data-review-reveal=entered] .google-review-cta__star { animation: google-review-star var(--fk-dur-slow, 420ms) var(--fk-ease-out, ease) both; animation-delay: calc(var(--review-star) * 70ms * var(--fk-motion-scale, 1) + 120ms * var(--fk-motion-scale, 1)); }
 .google-review-cta:focus-within { opacity: 1; transform: none; }

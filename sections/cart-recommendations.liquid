@@ -20,7 +20,7 @@
     {%- for card_product in rec_collection.products -%}
       {%- if card_product.available and rec_count < rec_limit -%}
         {%- assign rec_count = rec_count | plus: 1 -%}
-        {% render 'product-card', card_product: card_product, refined_card: true %}
+        {% render 'product-card', card_product: card_product, refined_card: true, card_sizes: '(min-width: 992px) 260px, (min-width: 600px) 42vw, 78vw' %}
       {%- endif -%}
     {%- endfor -%}
   {%- endcapture -%}
@@ -40,7 +40,7 @@
         {%- if card_product.available and rec_count < rec_limit -%}
           {%- unless rec_in_cart contains rec_key -%}
             {%- assign rec_count = rec_count | plus: 1 -%}
-            {% render 'product-card', card_product: card_product, refined_card: true %}
+            {% render 'product-card', card_product: card_product, refined_card: true, card_sizes: '(min-width: 992px) 260px, (min-width: 600px) 42vw, 78vw' %}
           {%- endunless -%}
         {%- endif -%}
       {%- endfor -%}

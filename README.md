@@ -86,7 +86,7 @@ Developers can extend the theme by editing the `.liquid` files in `sections/`, `
 | Platform | Shopify (Online Store 2.0) |
 | Templating | Liquid |
 | Base theme | Shopify Dawn v15 |
-| Styling | CSS3, a generated subset of Bootstrap 5 CSS (`tests/helpers/bootstrap-subset.cjs`) |
+| Styling | CSS3; `assets/theme.css` holds a generated subset of Bootstrap 5 CSS (`tests/helpers/bootstrap-subset.cjs`) |
 | Scripting | Vanilla JS (no jQuery or Bootstrap JS) |
 | Icons | Inline SVG (`snippets/theme-icon.liquid`) |
 

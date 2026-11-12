@@ -17,10 +17,6 @@
       <link rel="icon" type="image/png" href="{{ settings.favicon | image_url: width: 32, height: 32 }}">
     {%- endif -%}
 
-    {%- unless settings.type_header_font.system? and settings.type_body_font.system? -%}
-      <link rel="preconnect" href="https://fonts.shopifycdn.com" crossorigin>
-    {%- endunless -%}
-
     <title>
       {{ page_title }}
       {%- if current_tags %} &ndash; {{ 'storefront.tagged' | t: tags: current_tags }}{% endif -%}
@@ -43,17 +39,11 @@
       {% render 'business-structured-data' %}
     {%- endif -%}
 
-    {%- comment -%} Only the Bootstrap rules this theme uses; regenerate with tests/helpers/bootstrap-subset.cjs. {%- endcomment -%}
-    <link href="{{ 'bootstrap-subset.css' | asset_url }}" rel="stylesheet">
-    <link href="{{ 'style.css' | asset_url }}" rel="stylesheet">
-    <noscript>
-      <style>
-        .preloader {
-          display: none !important;
-        }
-      </style>
-    </noscript>
-
+    {%- comment -%}
+      Render-blocking CSS, in cascade order: theme.css (Bootstrap subset + legacy styles), storefront.css (shared with
+      the password and gift card pages) and, below, the small blocking part of the accessibility layer.
+    {%- endcomment -%}
+    {{ 'theme.css' | asset_url | stylesheet_tag }}
     {{ 'storefront.css' | asset_url | stylesheet_tag }}
     {% render 'storefront-design' %}
     {% if request.page_type == 'index' or request.page_type == 'collection' or request.page_type == 'product' %}
@@ -71,6 +61,13 @@
     {% render 'cart-submit-guard' %}
     <script src="{{ 'storefront.js' | asset_url }}" defer></script>
     {{ 'accessibility.css' | asset_url | stylesheet_tag }}
+    {%- comment -%}
+      Accessibility panel and preference modes: loaded without blocking first paint (media switches from print to all
+      once it arrives). Its cascade position is this element's position (right after accessibility.css), so the rule
+      order is unchanged.
+    {%- endcomment -%}
+    <link rel="stylesheet" href="{{ 'accessibility-panel.css' | asset_url }}" media="print" onload="this.onload=null;this.media='all'">
+    <noscript>{{ 'accessibility-panel.css' | asset_url | stylesheet_tag }}</noscript>
     <script src="{{ 'accessibility.js' | asset_url }}" defer></script>
     {{ content_for_header }}
 
@@ -86,57 +83,6 @@
   <body class="">
     <a class="a11y-skip-link" href="#MainContent">{{ 'accessibility.skip_to_text' | t }}</a>
     <div class="page-wrapper">
-      <!-- start preloader -->
-      <div class="preloader">
-        <div class="vertical-centered-box">
-          <div class="content">
-            <div class="loader-circle"></div>
-            <div class="loader-line-mask">
-              <div class="loader-line"></div>
-            </div>
-            <img src="{{ 'preloader.png' | asset_url }}" width="170" height="147" alt="" aria-hidden="true" fetchpriority="low">
-          </div>
-        </div>
-      </div>
-      <script>
-        (() => {
-          // Critical visibility path: plain inline JavaScript, independent of every deferred script.
-          // style.css also fades the overlay out on its own after a few seconds if this never runs.
-          const preloader = document.querySelector('.preloader');
-          if (!preloader) return;
-          let release;
-          window.fankeePreloader = {
-            done: new Promise((resolve) => {
-              release = resolve;
-            }),
-          };
-          let paused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-          try {
-            paused = paused || JSON.parse(localStorage.getItem('punky-accessibility-v1'))?.motion === true;
-          } catch {}
-          let finished = false;
-          const finish = () => {
-            if (finished) return;
-            finished = true;
-            preloader.setAttribute('data-preloader-done', '');
-            setTimeout(
-              () => {
-                preloader.hidden = true;
-                release();
-              },
-              paused ? 0 : 500
-            );
-          };
-          if (paused) {
-            finish();
-            return;
-          }
-          // Never waits for images, fonts or legacy scripts: the overlay lifts as soon as the HTML is parsed.
-          if (document.readyState !== 'loading') finish();
-          else document.addEventListener('DOMContentLoaded', finish, { once: true });
-        })();
-      </script>
-      <!-- end preloader -->
       <!-- Start header -->
 
       {% render 'announcement-bar' %}

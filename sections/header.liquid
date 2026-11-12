@@ -3,7 +3,7 @@
 <div class="site-header header-style-1"><nav class="navigation navbar navbar-expand-lg navbar-light"><div class="container-fluid"><div class="row">
   <a class="navbar-brand storefront-menu-logo" href="{{ routes.root_url }}">
     {% assign header_logo = section.settings.logo | default: settings.logo %}{% assign header_logo_alt = header_logo.alt | default: shop.name %}
-    {% if header_logo != blank %}{{ header_logo | image_url: width: 400 | image_tag: widths: '100, 200, 400', alt: header_logo_alt }}{% else %}<span class="storefront-logo-text">{{ shop.name | escape }}</span>{% endif %}
+    {% if header_logo != blank %}{{ header_logo | image_url: width: 400 | image_tag: widths: '100, 200, 300, 400', sizes: '(max-width: 709px) 128px, (max-width: 991px) 156px, 164px', alt: header_logo_alt }}{% else %}<span class="storefront-logo-text">{{ shop.name | escape }}</span>{% endif %}
   </a>
   <div class="mobail-menu d-lg-none"><button type="button" class="navbar-toggler open-btn" aria-label="{{ 'sections.header.menu' | t }}"><span class="icon-bar first-angle"></span><span class="icon-bar middle-angle"></span><span class="icon-bar last-angle"></span></button></div>
     {% assign header_search_id = 'HeaderSearch-' | append: section.id %}

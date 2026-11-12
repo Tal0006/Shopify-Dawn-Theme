@@ -10,7 +10,7 @@
     {% for history_handle in unique_handles limit: 10 %}
       {% assign history_product = all_products[history_handle] %}
       {% if history_product != blank %}
-        <div data-history-handle="{{ history_product.handle | escape }}">{% render 'product-card', card_product: history_product, refined_card: true %}</div>
+        <div data-history-handle="{{ history_product.handle | escape }}">{% render 'product-card', card_product: history_product, refined_card: true, card_sizes: '(min-width: 992px) 260px, (min-width: 600px) 42vw, 78vw' %}</div>
       {% endif %}
     {% endfor %}
   {% endif %}

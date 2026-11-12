@@ -69,7 +69,7 @@ function cardHTML(){
 
 test('Footer review card: layout, floating controls, accessibility and motion',{timeout:120000},async t=>{
  const block=file=>read(file).match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
- const css=['bootstrap-subset.css','style.css','storefront.css','accessibility.css'].map(file=>read('assets/'+file)).join('')+block('snippets/storefront-design.liquid')+block('sections/footer.liquid')+block('snippets/group-delivery-entry.liquid')+block('snippets/google-review-cta.liquid');
+ const css=['theme.css','storefront.css','accessibility.css','accessibility-panel.css'].map(file=>read('assets/'+file)).join('')+block('snippets/storefront-design.liquid')+block('sections/footer.liquid')+block('snippets/group-delivery-entry.liquid')+block('snippets/google-review-cta.liquid');
  const links=['מדיניות פרטיות','מדיניות החזרים','תנאי שימוש','מדיניות משלוחים'].map(text=>`<li><a href="/policies/x">${text}</a></li>`).join('');
  const footer=`<footer class="footer-area storefront-footer" dir="rtl"><div class="container storefront-footer-inner"><div class="storefront-footer__top"><div class="storefront-footer__brand"><p class="storefront-footer__description">מוצרי ניקיון וטיפוח לבית, במחירים הוגנים.</p><a class="group-delivery-entry" href="/pages/group-delivery">משלוח קבוצתי</a></div><nav class="storefront-footer-policies" aria-label="מדיניות"><h3>מדיניות</h3><ul>${links}</ul></nav><div class="storefront-footer__social-group"><h3>עקבו אחרינו</h3><ul class="storefront-footer-social" role="list"><li><a href="https://wa.me/1" aria-label="WhatsApp">W</a></li><li><a href="https://instagram.com/x" aria-label="Instagram">I</a></li></ul></div></div>${cardHTML()}<ul class="storefront-footer__trust" role="list"><li>תשלום מאובטח</li><li>איסוף עצמי</li><li>משלוחים</li></ul><div class="storefront-footer__bottom"><a class="storefront-footer-statement" href="/pages/a11y">הצהרת נגישות</a><p class="storefront-footer-copyright">© 2026 פאנקי</p></div></div></footer>`;
  const controls=`<style>@media(max-width:991px){fankee-shopping-assistant .shopping-assistant__launcher{display:none}}</style><button class="a11y-launcher" type="button">נגישות</button><fankee-shopping-assistant><button class="shopping-assistant__launcher" type="button" style="position:fixed;inset-inline-end:16px;bottom:84px;width:184px;height:44px">עוזר קניות</button></fankee-shopping-assistant>`;
@@ -97,6 +97,8 @@ test('Footer review card: layout, floating controls, accessibility and motion',{
   await load();
 
   await t.test('Card starts hidden below the fold, enters once with a star stagger, then stays still',async()=>{
+   // The state comes from the IntersectionObserver's first report (a frame after storefront.js runs).
+   await wait('document.querySelector("[data-review-cta]").dataset.reviewReveal!==undefined');
    assert.equal(await ev('document.querySelector("[data-review-cta]").dataset.reviewReveal'),'pending');
    await ev('document.querySelector("[data-review-cta]").scrollIntoView({block:"center"})');
    await wait('document.querySelector("[data-review-cta]").dataset.reviewReveal==="entered"');
@@ -146,6 +148,7 @@ test('Footer review card: layout, floating controls, accessibility and motion',{
    assert.deepEqual(r,{opacity:'1',star:'none',transition:'0s'});
    await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
    await load(390);
+   await wait('document.querySelector("[data-review-cta]").dataset.reviewReveal!==undefined');
    assert.equal(await ev('document.querySelector("[data-review-cta]").dataset.reviewReveal'),'pending');
    await ev('document.documentElement.setAttribute("data-a11y-paused","")');
    assert.equal(await ev('getComputedStyle(document.querySelector(".google-review-cta")).opacity'),'1','pause reveals a pending card');

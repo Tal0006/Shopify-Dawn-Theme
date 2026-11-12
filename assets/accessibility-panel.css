@@ -1,0 +1,29 @@
+/* Accessibility panel and preference modes (text size, links, contrast, grayscale). Loaded without blocking first
+   paint, at the same cascade position as before (right after accessibility.css); accessibility.js applies the modes. */
+.a11y-panel { position: fixed; inset: auto; inset-block-end: max(80px, calc(env(safe-area-inset-bottom) + 80px)); inset-inline-end: 16px; z-index: 1000002; width: min(340px, calc(100vw - 32px)); max-height: calc(100dvh - 112px); overflow-y: auto; margin: 0; padding: 16px; border: 1px solid #dce4df; border-radius: 12px; background: #fff; color: #182b25; box-shadow: 0 4px 24px #0003; text-align: start; }
+.a11y-panel:not([open]) { display: none; }
+.a11y-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-block-end: 12px; }
+.a11y-panel h2 { color: inherit; font: 700 18px/1.4 Arial, sans-serif; margin: 0; }
+.a11y-panel button { min-height: 44px; border: 1px solid #b9c6be; border-radius: 6px; padding: 10px 12px; background: #fff; color: #182b25; font: 400 16px/1.4 Arial, sans-serif; cursor: pointer; }
+.a11y-panel > button { display: block; width: 100%; margin-block: 8px; text-align: start; }
+.a11y-panel button:hover { background: #eef4ef; }
+.a11y-panel button[aria-pressed=true] { background: var(--fk-teal-800, #0b4f58); border-color: var(--fk-teal-800, #0b4f58); color: #fff; }
+.a11y-panel button[aria-pressed=true]::after { content: ' ✓'; }
+.a11y-panel button:disabled { cursor: default; color: #657068; background: #f3f5f3; }
+.a11y-panel-heading button { min-width: 44px; font-size: 24px; padding: 4px; }
+.a11y-text-controls { display: flex; gap: 8px; }
+.a11y-text-controls button { flex: 1; }
+.a11y-panel p { color: inherit; font-size: 14px; line-height: 1.5; margin-block: 8px; }
+.a11y-status:empty { display: none; }
+.a11y-grayscale-overlay { position: fixed; inset: 0; z-index: 1000000; pointer-events: none; backdrop-filter: grayscale(1); -webkit-backdrop-filter: grayscale(1); }
+.a11y-grayscale-overlay[hidden] { display: none; }
+html[data-a11y-text] .page-wrapper [data-a11y-scalable] { font-size: calc(var(--a11y-base-font) * var(--a11y-text-scale)) !important; }
+html[data-a11y-text] .catalog-card :is(h2,h3) { height: auto; min-height: 3em; -webkit-line-clamp: unset; }
+html[data-a11y-text] .storefront-header .row { grid-template-columns: minmax(0,1fr) auto auto; }
+html[data-a11y-links] .page-wrapper a { text-decoration: underline !important; text-decoration-thickness: 2px !important; text-underline-offset: 3px; }
+html[data-a11y-links] .page-wrapper a:has(img), html[data-a11y-links] .storefront-footer-social a { outline: 2px solid currentColor; outline-offset: -2px; }
+html[data-a11y-contrast] .page-wrapper, html[data-a11y-contrast] .page-wrapper :where(header,footer,main,section,nav,div,article,p,h1,h2,h3,h4,h5,h6,span,label,li,summary,details,td,th,small,strong,bdi,s) { background-color: #000 !important; background-image: none !important; color: #fff !important; border-color: #fff !important; }
+html[data-a11y-contrast] .page-wrapper :where(a) { color: #ffff00 !important; }
+html[data-a11y-contrast] .page-wrapper button:disabled { background: #ccc !important; color: #333 !important; }
+html[data-a11y-contrast] .theme-btn::before { display: none; }
+html[data-a11y-contrast] .page-wrapper :focus-visible { outline-color: #ffff00 !important; box-shadow: 0 0 0 6px #000 !important; }

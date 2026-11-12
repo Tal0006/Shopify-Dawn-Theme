@@ -8,7 +8,7 @@
         <a class="catalog-category" href="{{ category.url }}" {{ block.shopify_attributes }}>
           {% assign category_image = category.image | default: category.products.first.featured_image %}
           <span class="catalog-category__media{% if category.image == blank %} catalog-category__media--product{% endif %}" aria-hidden="true">
-            {% if category_image != blank %}{{ category_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '180, 300, 450, 600', sizes: '(min-width: 1200px) 268px, (min-width: 992px) 23vw, 46vw', alt: '' }}{% endif %}
+            {% if category_image != blank %}{{ category_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '180, 300, 360, 450, 600', sizes: '(min-width: 1200px) 268px, (min-width: 992px) 23vw, calc(50vw - 20px)', alt: '' }}{% endif %}
           </span>
           <span>{{ category.title | escape }}</span>
         </a>

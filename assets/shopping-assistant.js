@@ -49,15 +49,17 @@
         const rect = this.dialog.getBoundingClientRect();
         if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) this.dialog.close();
       }, {signal: this.lifecycle.signal});
-      const reposition = () => {
+      const reposition = (remeasure = false) => {
+        this.remeasure ||= remeasure === true;
         cancelAnimationFrame(this.positionFrame);
         this.positionFrame = requestAnimationFrame(() => this.positionLauncher());
       };
-      window.addEventListener('resize', reposition, {signal: this.lifecycle.signal});
-      window.addEventListener('scroll', reposition, {passive: true, signal: this.lifecycle.signal});
-      this.resizeObserver = new ResizeObserver(reposition);
+      window.addEventListener('resize', () => reposition(true), {signal: this.lifecycle.signal});
+      window.addEventListener('scroll', () => reposition(), {passive: true, signal: this.lifecycle.signal});
+      // The observer's first report (after the first layout) does the initial positioning, so loading the page never
+      // forces a layout here.
+      this.resizeObserver = new ResizeObserver(() => reposition());
       this.resizeObserver.observe(document.body);
-      this.positionLauncher();
     }
     disconnectedCallback() {
       if (this.dialog?.open) this.dialog.close();
@@ -70,22 +72,41 @@
       this.lifecycle = null;
     }
     positionLauncher() {
-      this.style.removeProperty('--sa-launch-bottom');
-      const obstacles = [...document.querySelectorAll('.a11y-launcher, [data-store-whatsapp], [class*="whatsapp"], [data-cart-toast], .product-sticky-atc, [data-sticky-atc], .back-to-top')];
-      // Only fixed/sticky controls can overlap the floating launcher.
+      // The natural offset (no override) is measured once, and again after a resize. Every other run reads all
+      // rectangles first and writes at most once, so repositioning while scrolling never forces a layout.
+      if (this.remeasure || this.naturalBottom === undefined) {
+        this.style.removeProperty('--sa-launch-bottom');
+        this.appliedBottom = null;
+        const natural = this.launcher.getBoundingClientRect();
+        // Hidden (no box): measure again next time.
+        if (!natural.height) { this.naturalBottom = undefined; return; }
+        this.naturalBottom = innerHeight - natural.bottom;
+        this.remeasure = false;
+      }
+      const launcher = this.launcher.getBoundingClientRect();
+      if (!launcher.height) return;
+      const obstacles = [...document.querySelectorAll('.a11y-launcher, [data-store-whatsapp], [class*="whatsapp"], [data-cart-toast], .product-sticky-atc, [data-sticky-atc], .back-to-top')]
+        // Only fixed/sticky controls can overlap the floating launcher.
+        .filter(element => !element.hidden && ['fixed', 'sticky'].includes(getComputedStyle(element).position))
+        .map(element => element.getBoundingClientRect())
+        .filter(rect => rect.width && rect.height && rect.bottom > 0 && rect.top < innerHeight);
+      let bottom = this.naturalBottom;
       for (let pass = 0; pass < 4; pass++) {
         let moved = false;
-        for (const element of obstacles) {
-          if (element.hidden || !['fixed', 'sticky'].includes(getComputedStyle(element).position)) continue;
-          const rect = element.getBoundingClientRect(), button = this.launcher.getBoundingClientRect();
-          if (rect.width && rect.height && rect.bottom > 0 && rect.top < innerHeight &&
-            rect.left < button.right + 8 && rect.right > button.left - 8 && rect.top < button.bottom + 8 && rect.bottom > button.top - 8) {
-            this.style.setProperty('--sa-launch-bottom', Math.max(84, innerHeight - rect.top + 12) + 'px');
+        for (const rect of obstacles) {
+          const top = innerHeight - bottom - launcher.height, end = innerHeight - bottom;
+          if (rect.left < launcher.right + 8 && rect.right > launcher.left - 8 && rect.top < end + 8 && rect.bottom > top - 8) {
+            bottom = Math.max(84, innerHeight - rect.top + 12);
             moved = true;
           }
         }
         if (!moved) break;
       }
+      const applied = bottom === this.naturalBottom ? null : bottom;
+      if (applied === this.appliedBottom) return;
+      this.appliedBottom = applied;
+      if (applied === null) this.style.removeProperty('--sa-launch-bottom');
+      else this.style.setProperty('--sa-launch-bottom', applied + 'px');
     }
     text(key) { return this.strings[key] || ''; }
     element(tag, text, className) {

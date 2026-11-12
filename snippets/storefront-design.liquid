@@ -61,13 +61,11 @@ body { background: var(--fk-bg); }
 :is(.theme-btn, .theme-btn-2, .theme-btn-4):not(:disabled):active, fankee-shopping-assistant .shopping-assistant__primary:not(:disabled):active { transform: translateY(1px); box-shadow: none; }
 fankee-shopping-assistant .shopping-assistant__launcher { border-color: var(--fk-cyan-200); border-radius: var(--fk-radius-pill); background: linear-gradient(125deg, var(--fk-teal-800), var(--fk-teal-600)); box-shadow: 0 6px 20px rgb(11 79 88 / 22%), 0 0 0 3px rgb(223 245 247 / 70%); font-weight: 600; transition: box-shadow var(--storefront-transition-fast), transform var(--fk-dur-fast) ease; }
 fankee-shopping-assistant .shopping-assistant__launcher svg { transition: transform var(--fk-dur) var(--fk-ease-out); }
-:is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal] { transition: opacity var(--storefront-transition-normal), transform var(--storefront-transition-normal); }
+/* Transitions only on reveal: marking off-screen content pending at load is instant (nothing animates during load). */
+:is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal=visible], :is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal]:focus-within { transition: opacity var(--storefront-transition-normal), transform var(--storefront-transition-normal); }
 :is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal=pending] { opacity: 0; transform: translateY(12px); }
 :is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal=visible] { opacity: 1; transform: none; }
 :is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal]:focus-within { opacity: 1; transform: none; }
-[data-storefront-home] :is(.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn) { animation: storefront-entrance 330ms var(--storefront-ease) both; }
-[data-storefront-home] .hero-btn { animation-delay: 60ms; }
-@keyframes storefront-entrance { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes storefront-light-drift { to { transform: translate(2%, 1%); opacity: .65; } }
 @media (hover: hover) and (pointer: fine) {
  [data-storefront-home] .catalog-category:hover img { transform: scale(1.025); }
@@ -89,7 +87,6 @@ fankee-shopping-assistant .shopping-assistant__launcher svg { transition: transf
  .catalog-card { box-shadow: 0 2px 8px #21495608; }
 }
 @media (prefers-reduced-motion: reduce) {
- [data-storefront-home] :is(.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn) { animation: none; }
  [data-storefront-home] .hero-area::before { animation: none; }
  :is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal], :is([data-storefront-home], [data-storefront-collection], [data-storefront-discovery]) [data-storefront-reveal=pending] { opacity: 1; transform: none; transition: none; }
  .catalog-card, .catalog-card__image img, [data-storefront-home] .catalog-category,
@@ -99,7 +96,6 @@ fankee-shopping-assistant .shopping-assistant__launcher svg { transition: transf
 }
 html[data-a11y-paused] [data-storefront-reveal] { opacity: 1 !important; transform: none !important; transition: none !important; }
 html[data-a11y-paused] #MainContent::before, html[data-a11y-paused] #MainContent::after, html[data-a11y-paused] [data-storefront-home] .hero-area::before, html[data-a11y-paused] [data-storefront-home] .hero-area::after { animation: none; }
-html[data-a11y-paused] [data-storefront-home] :is(.storefront-hero-heading, .storefront-hero-subtitle, .hero-btn) { animation: none; }
 @media (prefers-reduced-motion: reduce) {
  #MainContent[data-storefront-home]::before, #MainContent[data-storefront-home]::after, [data-storefront-home] .hero-area::before, [data-storefront-home] .hero-area::after { animation: none; transform: none; }
  [data-storefront-home] .catalog-category:hover img, [data-storefront-home] .hero-btn .theme-btn:is(:hover, :active) { transform: none; }
@@ -205,7 +201,7 @@ html[data-a11y-paused] [data-card-cart] button.theme-btn[name=add]:is(:hover,:ac
 /* ===== Fankee UI system (tokens: assets/storefront.css) =====
    Durations use --fk-dur*, which collapse to 0 for reduced motion and the accessibility pause. */
 
-/* Buttons: one teal primary. Legacy style.css paints .theme-btn orange; components that own a treatment
+/* Buttons: one teal primary. Legacy theme.css paints .theme-btn orange; components that own a treatment
    (Add to Cart, Group Delivery, promo, hero, card secondary) keep it through higher specificity. */
 .theme-btn, .theme-btn-2, .theme-btn-4 { background: linear-gradient(120deg, var(--fk-teal-700), var(--fk-teal-600) 50%, var(--fk-teal-700)); background-size: 220% 100%; background-position: 100% 0; color: #fff; border: 1px solid var(--fk-primary); box-shadow: var(--fk-shadow-cta); transition: transform var(--fk-dur-fast) var(--fk-ease), box-shadow var(--fk-dur) var(--fk-ease), background-position var(--fk-dur-slow) var(--fk-ease-out), background-color var(--fk-dur) var(--fk-ease); }
 .theme-btn:not(:disabled):is(:hover, :focus-visible), .theme-btn-2:not(:disabled):is(:hover, :focus-visible) { color: #fff; }

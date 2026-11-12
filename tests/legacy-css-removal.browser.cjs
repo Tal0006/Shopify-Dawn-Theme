@@ -20,12 +20,14 @@ test('Contract: legacy CSS libraries and icon font deleted and unreferenced',()=
   for(const name of removed)assert.ok(!text.includes(name),`${file} still references ${name}`);
   assert.doesNotMatch(text,/font-family:\s*['"]?themify|class="ti-|['"]ti-[a-z-]+['"]/,`${file} still uses the themify icon font`);
  }
- assert.match(read('layout/theme.liquid'),/'bootstrap-subset\.css' \| asset_url/);
+ // The subset now lives in theme.css (merged with the legacy styles; see tests/first-paint.browser.cjs).
+ assert.match(read('layout/theme.liquid'),/'theme\.css' \| asset_url/);
 });
 
 test('Contract: the Bootstrap subset is generated from the current markup and keeps the grid, navbar and utilities in use',()=>{
- const committed=read('assets/bootstrap-subset.css');
- assert.equal(committed,bootstrap.build(),'assets/bootstrap-subset.css is out of date: run node tests/helpers/bootstrap-subset.cjs --write');
+ const committed=bootstrap.committedRegion();
+ assert.ok(committed,'bootstrap-subset markers missing in assets/theme.css');
+ assert.equal(committed,bootstrap.build(),'the Bootstrap region of assets/theme.css is out of date: run node tests/helpers/bootstrap-subset.cjs --write');
  assert.match(committed,/Licensed under MIT/,'license header kept');
  for(const selector of ['.row{','.container-fluid','.col-lg-4{','.col-md-6{','.navbar-expand-lg .navbar-collapse{','.collapse:not(.show){','.d-lg-none{','.list-unstyled{','.visually-hidden','.align-items-center{','.mb-lg-0{','.pt-0{'])
   assert.ok(committed.includes(selector),'subset keeps '+selector);

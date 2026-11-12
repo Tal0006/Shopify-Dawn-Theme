@@ -2,6 +2,8 @@
   Renders a product card with its existing purchase actions.
   @param {product} card_product - Product to display.
   @param {boolean} [refined_card] - Show the homepage vendor detail.
+  @param {string} [card_sizes] - Image sizes for a different layout. Defaults to the catalog grid (2 columns up to
+    991px, 4 columns up to 1399px, 5 from 1400px, inside the 1200px content width).
   @example
   {% render 'product-card', card_product: product, refined_card: true %}
 {% enddoc %}
@@ -11,10 +13,11 @@
   {% assign card_quantity_min = card_variant.quantity_rule.min | default: 1 %}
   {% assign card_quantity_increment = card_variant.quantity_rule.increment | default: 1 %}
   {% assign card_image_alt = card_product.featured_image.alt | default: card_product.title %}
+  {% assign card_image_sizes = card_sizes | default: '(min-width: 1400px) 200px, (min-width: 992px) 260px, calc(50vw - 30px)' %}
   <article class="catalog-card{% if card_product.available == false %} catalog-card--sold-out{% endif %}">
     <a href="{{ card_product.url }}" class="catalog-card__image" tabindex="-1" aria-hidden="true">
       {% if card_product.featured_image != blank %}
-        {{ card_product.featured_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '200, 300, 450, 600', sizes: '(min-width: 1000px) 25vw, 50vw', alt: card_image_alt }}
+        {{ card_product.featured_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '200, 300, 360, 450, 600', sizes: card_image_sizes, alt: card_image_alt }}
       {% else %}<span class="catalog-no-image">{{ 'storefront.no_image' | t }}</span>{% endif %}
       {% render 'product-card-badges', card_product: card_product %}
     </a>

@@ -80,7 +80,7 @@ test('Menu groups with a "#" URL: heading text on desktop, one labelled disclosu
  assert.match(nav,/<button class="nav-group-toggle submenu-toggle nav-group-toggle--labelled" type="button" data-group-trigger aria-expanded="false" aria-controls="NavSubmenu-header-1-Group-1"><span>כביסה<\/span>/);
  assert.match(nav,/<a href="\/collections\/cleaning" >ניקיון כללי<\/a>/,'real URLs stay links');
  assert.match(nav,/<span class="nav-mega-group-label">מבצעים<\/span>/,'"#" without children is plain text');
- const css=['bootstrap-subset.css','style.css','storefront.css'].map(file=>read('assets/'+file)).join('');
+ const css=['theme.css','storefront.css'].map(file=>read('assets/'+file)).join('');
  const html=`<!doctype html><html dir="rtl" lang="he"><head><meta name="viewport" content="width=device-width"><style>${css}</style></head><body><header class="storefront-header" data-cart-section="header"><div class="header-area"><button class="open-btn" type="button">תפריט</button><nav class="navigation-holder"><button class="menu-close" type="button">סגירה</button><div id="navbar"><ul class="nav navbar-nav">${nav}</ul></div></nav><div class="mini-cart"><button class="cart-toggle-btn" type="button" data-count-label="Cart __COUNT__"><span class="cart-count">0</span></button><dialog class="mini-cart-content cart-drawer"><button class="mini-cart-close" type="button">x</button><div class="mini-cart-items"></div></dialog></div></div></header><main><h1>חנות</h1></main></body></html>`;
  const server=http.createServer((_req,res)=>{res.setHeader('Content-Type','text/html;charset=utf-8');res.end(html);});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));

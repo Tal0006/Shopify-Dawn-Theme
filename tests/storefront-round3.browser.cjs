@@ -67,7 +67,7 @@ function engine(){
  liquid.registerFilter('newline_to_br',v=>String(v).replace(/\n/g,'<br>\n'));
  return liquid;
 }
-const card=source=>source.replace(/{% render 'product-card', card_product: card_product, refined_card: true %}/g,'[{{ card_product.title }}]').replace(/{% render 'product-discovery-styles' %}/,'');
+const card=source=>source.replace(/{% render 'product-card', card_product: card_product, refined_card: true[^%]*%}/g,'[{{ card_product.title }}]').replace(/{% render 'product-discovery-styles' %}/,'');
 
 test('Liquid: homepage grids, cart suggestions, business details, WhatsApp, Group Delivery guide',{skip:SKIP},async t=>{
  const liquid=engine();
@@ -121,7 +121,7 @@ test('Liquid: homepage grids, cart suggestions, business details, WhatsApp, Grou
 test('Browser: back-in-stock dialog, floating buttons, assistant promo and drawer note',{skip:SKIP,timeout:180000},async t=>{
  const liquid=engine();
  const block=file=>read(file).match(/{% stylesheet %}([\s\S]*?){% endstylesheet %}/)[1];
- const css=['bootstrap-subset.css','style.css','storefront.css','accessibility.css'].map(file=>read('assets/'+file)).join('')+['snippets/storefront-design.liquid','snippets/cart-drawer.liquid','snippets/back-in-stock.liquid','snippets/back-in-stock-trigger.liquid','snippets/floating-whatsapp.liquid','sections/shopping-assistant-promo.liquid'].map(block).join('');
+ const css=['theme.css','storefront.css','accessibility.css','accessibility-panel.css'].map(file=>read('assets/'+file)).join('')+['snippets/storefront-design.liquid','snippets/cart-drawer.liquid','snippets/back-in-stock.liquid','snippets/back-in-stock-trigger.liquid','snippets/floating-whatsapp.liquid','sections/shopping-assistant-promo.liquid'].map(block).join('');
  // Shopify-only tags replaced by their static output for the browser fixture.
  const dialogSource=strip(read('snippets/back-in-stock.liquid')).replace(/{% form 'contact', id: 'BackInStockForm', class: '([^']+)' %}/,'<form method="post" action="/contact#BackInStockForm" id="BackInStockForm" class="$1">').replace('{% endform %}','</form>');
  const dialog=await liquid.parseAndRender(dialogSource,{form:{},customer:null});

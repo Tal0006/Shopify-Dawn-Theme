@@ -9,29 +9,37 @@
   observer?.disconnect();
   home.querySelectorAll('[data-storefront-reveal]').forEach(node => { node.dataset.storefrontReveal = 'visible'; });
  };
+ // Positions come from the observer's first report (computed after layout), so setup never forces a reflow:
+ // content on screen at that report is never hidden; content outside the viewport becomes pending (instant, no
+ // transition, and off screen) and reveals when it scrolls in.
+ const observed = new WeakSet();
  const setup = (scope = home) => {
   if (reduced.matches || document.documentElement.hasAttribute('data-a11y-paused') || window.Shopify?.designMode) { showAll(); return; }
   observer ||= new IntersectionObserver(entries => {
    // Items of one grid that arrive together reveal in a short stagger (max 200ms); the delay is then
    // cleared so it never slows hover transitions.
    const batch = new Map();
-   for (const entry of entries) if (entry.isIntersecting) {
-    const index = batch.get(entry.target.parentElement) || 0;
-    batch.set(entry.target.parentElement, index + 1);
-    if (index) {
-     entry.target.style.setProperty('--fk-reveal-delay', Math.min(index, 4) * 50 + 'ms');
-     setTimeout(() => entry.target.style.removeProperty('--fk-reveal-delay'), 700);
+   for (const entry of entries) {
+    const node = entry.target;
+    if (!entry.isIntersecting) {
+     if (!node.dataset.storefrontReveal) node.dataset.storefrontReveal = 'pending';
+     continue;
     }
-    entry.target.dataset.storefrontReveal = 'visible';
-    observer.unobserve(entry.target);
+    if (node.dataset.storefrontReveal === 'pending') {
+     const index = batch.get(node.parentElement) || 0;
+     batch.set(node.parentElement, index + 1);
+     if (index) {
+      node.style.setProperty('--fk-reveal-delay', Math.min(index, 4) * 50 + 'ms');
+      setTimeout(() => node.style.removeProperty('--fk-reveal-delay'), 700);
+     }
+    }
+    node.dataset.storefrontReveal = 'visible';
+    observer.unobserve(node);
    }
   }, {threshold: 0.05});
   scope.querySelectorAll(targets).forEach(node => {
-   if (node.hasAttribute('data-storefront-reveal')) return;
-   const rect = node.getBoundingClientRect();
-   // Above-the-fold content is never hidden after its initial paint.
-   if (rect.top < innerHeight && rect.bottom > 0) { node.dataset.storefrontReveal = 'visible'; return; }
-   node.dataset.storefrontReveal = 'pending';
+   if (node.hasAttribute('data-storefront-reveal') || observed.has(node)) return;
+   observed.add(node);
    observer.observe(node);
   });
  };
@@ -42,7 +50,7 @@
  preferences.observe(document.documentElement, {attributes: true, attributeFilter: ['data-a11y-paused']});
  document.addEventListener('shopify:section:load', event => { if (home.contains(event.target)) setup(event.target); });
  document.addEventListener('shopify:section:unload', event => {
-  event.target.querySelectorAll('[data-storefront-reveal]').forEach(node => observer?.unobserve(node));
+  event.target.querySelectorAll(targets).forEach(node => observer?.unobserve(node));
  });
  window.addEventListener('pagehide', () => { showAll(); preferences.disconnect(); }, {once: true});
 })();

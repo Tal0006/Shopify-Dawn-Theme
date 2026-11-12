@@ -1,6 +1,17 @@
 (() => {
   'use strict';
 
+  // First scroll-position checks run together just after the first frame has painted, when layout is clean: scrollY
+  // is read once and handed to each check, and each check reads before it writes, so loading never forces a layout.
+  const firstFrameChecks = [];
+  const afterFirstFrame = check => {
+    if (firstFrameChecks.push(check) > 1) return;
+    requestAnimationFrame(() => setTimeout(() => {
+      const y = window.scrollY;
+      for (const run of firstFrameChecks.splice(0)) run(y);
+    }, 0));
+  };
+
   // One delegated card handler also covers recommendations and Theme Editor reloads.
   const cardCartPending = new WeakSet();
   const cardFeedbackTimers = new WeakMap();
@@ -723,14 +734,20 @@
   const reviewObservers = new WeakMap();
   function reviewReveal(scope) {
     for (const card of scope.querySelectorAll('[data-review-cta]')) {
-      if (card.dataset.reviewReveal) continue;
+      if (card.dataset.reviewReveal || reviewObservers.has(card)) continue;
       const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused') || window.Shopify?.designMode;
-      const rect = card.getBoundingClientRect();
-      if (still || !('IntersectionObserver' in window) || (rect.top < window.innerHeight && rect.bottom > 0)) { card.dataset.reviewReveal = 'visible'; continue; }
-      card.dataset.reviewReveal = 'pending';
+      if (still || !('IntersectionObserver' in window)) { card.dataset.reviewReveal = 'visible'; continue; }
+      // The observer's first report says whether the card is on screen (no layout read during load): on screen it
+      // stays visible; off screen it becomes pending (instantly) and enters when it scrolls in.
+      let first = true;
       const observer = new IntersectionObserver(entries => {
-        if (!entries.some(entry => entry.isIntersecting)) return;
-        card.dataset.reviewReveal = 'entered';
+        const visible = entries.some(entry => entry.isIntersecting);
+        if (first) {
+          first = false;
+          if (!visible) { card.dataset.reviewReveal = 'pending'; return; }
+          card.dataset.reviewReveal = 'visible';
+        } else if (!visible) return;
+        else card.dataset.reviewReveal = 'entered';
         observer.disconnect();
         reviewObservers.delete(card);
       }, {threshold: 0.2});
@@ -896,22 +913,27 @@
   // Mobile sticky add-to-cart (snippets/product-sticky-atc.liquid): shown once the main add button has scrolled
   // above the viewport; it submits the main form, so quantity, variant and feedback stay in one place.
   const stickyMobile = window.matchMedia('(max-width: 767px)');
-  let stickyObserver = null;
+  let stickyObserver = null, stickySizer = null;
   function stickyBar() {
     stickyObserver?.disconnect();
     stickyObserver = null;
+    stickySizer?.disconnect();
+    stickySizer = null;
     const bar = document.querySelector('[data-sticky-atc]');
     const target = bar?.closest('[data-product-purchase]')?.querySelector('.product-page__add, .product-page__notify');
     const setVisible = visible => {
       if (!bar) { document.documentElement.removeAttribute('data-sticky-atc-visible'); return; }
       if (!visible && bar.contains(document.activeElement)) return;
       bar.hidden = !visible;
-      if (visible) {
-        document.documentElement.setAttribute('data-sticky-atc-visible', '');
-        document.documentElement.style.setProperty('--sticky-atc-height', bar.offsetHeight + 'px');
-      } else document.documentElement.removeAttribute('data-sticky-atc-visible');
+      document.documentElement.toggleAttribute('data-sticky-atc-visible', visible);
     };
     if (!bar || !target || !('IntersectionObserver' in window)) { setVisible(false); return; }
+    // The bar's height arrives from a ResizeObserver (after layout, before paint), never from a layout read.
+    stickySizer = new ResizeObserver(([entry]) => {
+      const height = Math.round(entry.borderBoxSize?.[0]?.blockSize ?? 0);
+      if (height) document.documentElement.style.setProperty('--sticky-atc-height', height + 'px');
+    });
+    stickySizer.observe(bar);
     stickyObserver = new IntersectionObserver(([entry]) => setVisible(stickyMobile.matches && !entry.isIntersecting && entry.boundingClientRect.top < 0));
     stickyObserver.observe(target);
   }
@@ -944,6 +966,7 @@
       const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused');
       const show = (target, announce) => {
         index = (target + items.length) % items.length;
+        bar.dataset.rotated = '';
         live.setAttribute('aria-live', announce ? 'polite' : 'off');
         items.forEach((item, n) => { item.hidden = n !== index; });
       };
@@ -982,15 +1005,16 @@
       const node = header();
       if (node && !compact) html.style.setProperty('--header-expanded-height', node.offsetHeight + 'px');
     };
-    const update = () => {
+    const update = (initial = false, y = window.scrollY) => {
       frame = 0;
-      const y = window.scrollY;
-      html.toggleAttribute('data-header-scrolled', y > 4);
+      // Reads first (scroll position, expanded height), then writes, so these checks never force a layout.
       // Never change layout under an open mobile menu.
-      if (document.querySelector('.storefront-header .navigation-holder.slideInn')) return;
-      const next = compact ? y > 40 : y > 120;
+      const menuOpen = !!document.querySelector('.storefront-header .navigation-holder.slideInn');
+      const next = menuOpen ? compact : compact ? y > 40 : y > 120;
+      const expanded = !compact && (initial === true || next) ? header()?.offsetHeight : 0;
+      html.toggleAttribute('data-header-scrolled', y > 4);
+      if (expanded) html.style.setProperty('--header-expanded-height', expanded + 'px');
       if (next === compact) return;
-      if (next) measureExpanded();
       compact = next;
       html.toggleAttribute('data-header-compact', compact);
       if (compact) {
@@ -998,8 +1022,8 @@
         if (node) html.style.setProperty('--header-compact-height', node.offsetHeight + 'px');
       }
     };
-    measureExpanded();
-    update();
+    // First check after the first frame (layout is clean then); at the top of the page nothing is compact anyway.
+    afterFirstFrame(y => update(true, y));
     window.addEventListener('scroll', () => { if (!frame) frame = requestAnimationFrame(update); }, {passive: true});
     window.addEventListener('resize', () => {
       if (compact) { compact = false; html.removeAttribute('data-header-compact'); }
@@ -1009,7 +1033,7 @@
     document.addEventListener('shopify:section:load', event => { if (event.target.querySelector?.('.storefront-header')) { measureExpanded(); update(); } });
   })();
 
-  // Back-to-top button (formerly in the legacy script.js). Same markup and styles (style.css .back-to-top): appears
+  // Back-to-top button (formerly in the legacy script.js). Same markup and styles (theme.css .back-to-top): appears
   // after 1000px with a 600ms fade, scrolls smoothly to the top; with reduced motion or the accessibility pause it
   // appears without fading and jumps to the top, moving focus to the skip link.
   (() => {
@@ -1023,8 +1047,8 @@
     document.body.append(button);
     const still = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.hasAttribute('data-a11y-paused');
     let shown = false, fade = null;
-    const toggle = () => {
-      const next = window.scrollY > 1000;
+    const toggle = (y = window.scrollY) => {
+      const next = y > 1000;
       if (next === shown) return;
       shown = next;
       fade?.cancel();
@@ -1038,8 +1062,8 @@
         fade.onfinish = () => { if (!shown) button.style.display = 'none'; };
       }
     };
-    window.addEventListener('scroll', toggle, {passive: true});
-    toggle();
+    window.addEventListener('scroll', () => toggle(), {passive: true});
+    afterFirstFrame(toggle);
     button.addEventListener('click', event => {
       event.preventDefault();
       if (still()) {
@@ -1052,12 +1076,12 @@
   })();
 
   // Classic fixed header (formerly script.js), only when the sticky header setting is off: past 300px the header
-  // becomes position: fixed with a short slide-in (style.css .site-header.header-fixed + the fadeInDown animation).
+  // becomes position: fixed with a short slide-in (theme.css .site-header.header-fixed + the fadeInDown animation).
   (() => {
     if (document.documentElement.hasAttribute('data-sticky-header')) return;
     let fixed = false;
-    const update = () => {
-      const next = window.scrollY > 300;
+    const update = (y = window.scrollY) => {
+      const next = y > 300;
       if (next === fixed) return;
       fixed = next;
       document.querySelectorAll('.site-header').forEach(header => {
@@ -1066,8 +1090,8 @@
         header.classList.toggle('animated', fixed);
       });
     };
-    window.addEventListener('scroll', update, {passive: true});
-    update();
+    window.addEventListener('scroll', () => update(), {passive: true});
+    afterFirstFrame(update);
   })();
 
   // Mobile menu: a tap outside the open menu closes it (taps inside it, including empty space, do nothing). The
