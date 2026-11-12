@@ -8,10 +8,13 @@ import {Groups} from './groups.js';
 import {Areas} from './areas.js';
 import {Shopify,type CartValidator} from './shopify.js';
 import {Auth,same} from './auth.js';
-import {adminPage,loginPage,adminCSS} from './admin.js';
+import {loginPage,dashboardPage,groupPage,memberPage,areasPage,auditView,errorPage,adminCSS,adminJS} from './admin.js';
+import {AdminData,csv} from './admin-data.js';
+import {audit,actorOf,auditPage} from './audit.js';
+import {safeNext} from './auth.js';
 import {ApiError,type ErrorCode} from './domain.js';
 export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg)){
- const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),auth=new Auth(db,cfg);
+ const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator);
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
  app.use((_req,res,next)=>{
   res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
@@ -40,25 +43,110 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.use(express.json({limit:'24kb'}));
  app.use(express.urlencoded({extended:false,limit:'4kb'}));
  const adminOrigin:express.RequestHandler=(req,_res,next)=>{if(req.get('Origin')!==cfg.origin)throw new ApiError(403,'INVALID_ORIGIN');next();};
- app.get('/',(_req,res)=>res.redirect(303,'/admin'));
- app.get('/admin/style.css',(_req,res)=>res.type('css').send(adminCSS));
- app.get('/admin',async(req,res)=>{const session=await auth.session(req);res.type('html').send(session?adminPage(await groups.list(),await areas.adminList(),session.csrf):loginPage());});
- app.post('/admin/login',adminOrigin,async(req,res)=>{if(!req.is('application/x-www-form-urlencoded'))throw new ApiError(415,'INVALID_CONTENT_TYPE');await auth.login(req,res);});
- app.use('/admin',async(req,res,next)=>{
-  const session=await auth.session(req);if(!session)throw new ApiError(401,'ADMIN_AUTH_REQUIRED','גישה אינה מורשית');
-  if(!['GET','HEAD'].includes(req.method)&&(req.get('Origin')!==cfg.origin||!same(req.get('X-CSRF-Token')||req.body?.csrf,session.csrf)))throw new ApiError(403,'CSRF_REQUIRED');
+ // Every admin response: never indexed, never cached, and only same-origin script/style (no inline code).
+ app.use('/admin',(_req,res,next)=>{
+  res.set({'X-Robots-Tag':'noindex, nofollow','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
   next();
  });
- app.get('/admin/api/groups',async(_req,res)=>res.json({groups:await groups.list()}));
- app.post('/admin/groups/:publicId/approve',async(req,res)=>{await groups.approve(req.params.publicId);res.redirect(303,'/admin');});
- app.post('/admin/api/groups/:publicId/approve',async(req,res)=>res.json({group:await groups.approve(req.params.publicId)}));
+ app.get('/',(_req,res)=>res.redirect(303,'/admin'));
+ app.get('/admin/style.css',(_req,res)=>res.type('css').send(adminCSS));
+ app.get('/admin/app.js',(_req,res)=>res.type('js').send(adminJS));
+ app.get('/admin',async(req,res,next)=>{
+  const session=await auth.session(req);
+  if(!session){res.type('html').send(loginPage({expired:req.query.expired==='1',next:safeNext(req.query.next)}));return;}
+  res.locals.session=session;next();
+ });
+ app.post('/admin/login',adminOrigin,async(req,res)=>{
+  if(!req.is('application/x-www-form-urlencoded'))throw new ApiError(415,'INVALID_CONTENT_TYPE');
+  try{await auth.login(req,res);}
+  catch(error){
+   if(error instanceof ApiError&&(error.code==='LOGIN_FAILED'||error.code==='RATE_LIMITED')){
+    if(error.code==='RATE_LIMITED')res.set('Retry-After','900');
+    res.status(error.status).type('html').send(loginPage({failed:error.code==='LOGIN_FAILED',limited:error.code==='RATE_LIMITED',next:safeNext(req.body?.next)}));return;
+   }
+   throw error;
+  }
+ });
+ app.use('/admin',async(req,res,next)=>{
+  const session=res.locals.session||await auth.session(req);
+  if(!session){
+   // Pages send an expired session back to the login form (and then to the same page); the JSON API answers 401.
+   if(!req.path.startsWith('/api/')&&['GET','HEAD'].includes(req.method)){res.redirect(303,'/admin?expired=1&next='+encodeURIComponent(safeNext(req.originalUrl)));return;}
+   if(!req.path.startsWith('/api/')){res.redirect(303,'/admin?expired=1');return;}
+   throw new ApiError(401,'ADMIN_AUTH_REQUIRED','גישה אינה מורשית');
+  }
+  if(!['GET','HEAD'].includes(req.method)&&(req.get('Origin')!==cfg.origin||!same(req.get('X-CSRF-Token')||req.body?.csrf,session.csrf)))throw new ApiError(403,'CSRF_REQUIRED');
+  res.locals.session=session;res.locals.actor=actorOf(session);
+  next();
+ });
+ const csrfOf=(res:express.Response)=>res.locals.session.csrf as string;
+ const noticeOf=(value:unknown)=>typeof value==='string'&&/^[a-z_]{1,30}$/.test(value)?value:undefined;
+ // Dashboard home: summary cards plus the server-side filtered, sorted and paginated groups table.
+ app.get('/admin',async(req,res)=>{
+  const [metrics,list,areaList]=await Promise.all([admin.dashboard(),admin.listGroups(req.query),admin.areas()]);
+  res.type('html').send(dashboardPage({metrics,list,areas:areaList,csrf:csrfOf(res)}));
+ });
+ app.get('/admin/groups/:publicId',async(req,res)=>{
+  const data=await admin.members(req.params.publicId,req.query);
+  res.type('html').send(groupPage({...data,csrf:csrfOf(res),notice:noticeOf(req.query.notice),error:noticeOf(req.query.error)||(req.query.error==='APPROVAL_NOT_ALLOWED'?'APPROVAL_NOT_ALLOWED':undefined)}));
+ });
+ app.get('/admin/groups/:publicId/members/:memberId',async(req,res)=>{
+  const data=await admin.member(req.params.publicId,req.params.memberId);
+  res.type('html').send(memberPage({...data,csrf:csrfOf(res)}));
+ });
+ app.get('/admin/areas',async(req,res)=>res.type('html').send(areasPage({areas:await areas.adminList(),csrf:csrfOf(res),notice:noticeOf(req.query.notice)})));
+ app.get('/admin/audit',async(req,res)=>res.type('html').send(auditView({...await auditPage(db,req.query),csrf:csrfOf(res)})));
+ // CSV exports (members, or one row per stored cart line). UTF-8 with BOM; formula-like cells neutralised in csv().
+ const dateText=(iso:string)=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Jerusalem',dateStyle:'short',timeStyle:'medium'}).format(new Date(iso));
+ const sendCsv=(res:express.Response,name:string,body:string)=>{res.set({'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="'+name+'"'});res.send(body);};
+ app.get('/admin/groups/:publicId/export.csv',async(req,res)=>{
+  const {group,members}=await admin.exportRows(req.params.publicId);
+  await audit(db,{action:'group.export',actor:res.locals.actor,target:group.publicId,result:'OK',detail:'members'});
+  sendCsv(res,'group-'+group.shortId+'-members.csv',csv([
+   ['אזור','מזהה קבוצה','סטטוס קבוצה','אימייל','טלפון','סטטוס לקוח','סכום התחייבות (₪)','שורות בסל','הצטרפות','עדכון אחרון'],
+   ...members.map(m=>[group.areaName,group.publicId,group.status,m.email,m.phone,m.status,(m.pledgedTotalAgorot/100).toFixed(2),m.cartLines,dateText(m.createdAt),dateText(m.updatedAt)])
+  ]));
+ });
+ app.get('/admin/groups/:publicId/export-lines.csv',async(req,res)=>{
+  const {group,members}=await admin.exportRows(req.params.publicId);
+  await audit(db,{action:'group.export',actor:res.locals.actor,target:group.publicId,result:'OK',detail:'cart-lines'});
+  sendCsv(res,'group-'+group.shortId+'-cart-lines.csv',csv([
+   ['מזהה קבוצה','אימייל','טלפון','סטטוס לקוח','מזהה וריאנט','כמות','מחיר יחידה שנשמר (₪)','סה"כ שורה שנשמר (₪)'],
+   ...members.flatMap(m=>m.snapshot.map(line=>{const unit=/^\d{1,12}$/.test(String(line.unitAgorot))?Number(line.unitAgorot):0;
+    return [group.publicId,m.email,m.phone,m.status,String(line.variantId).replace('gid://shopify/ProductVariant/',''),Number(line.quantity),(unit/100).toFixed(2),(unit*Number(line.quantity)/100).toFixed(2)];}))
+  ]));
+ });
+ // JSON API for the same data (authenticated; customer details only here, never on /api/v1).
+ app.get('/admin/api/dashboard',async(_req,res)=>res.json({dashboard:await admin.dashboard()}));
+ app.get('/admin/api/groups',async(req,res)=>res.json(await admin.listGroups(req.query)));
+ app.get('/admin/api/groups/:publicId',async(req,res)=>{const {_id,...group}=await admin.group(req.params.publicId);res.json({group});});
+ app.get('/admin/api/groups/:publicId/members',async(req,res)=>res.json(await admin.members(req.params.publicId,req.query)));
+ app.get('/admin/api/groups/:publicId/members/:memberId',async(req,res)=>res.json(await admin.member(req.params.publicId,req.params.memberId)));
+ // Approval: the only group transition the current domain supports. Audited; the HTML form needs an explicit tick.
+ const approve=async(res:express.Response,id:string)=>{
+  try{const group=await groups.approve(id);await audit(db,{action:'group.approve',actor:res.locals.actor,target:id,result:'OK'});return group;}
+  catch(error){await audit(db,{action:'group.approve',actor:res.locals.actor,target:id,result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});throw error;}
+ };
+ app.post('/admin/groups/:publicId/approve',async(req,res)=>{
+  const id=req.params.publicId,base='/admin/groups/'+encodeURIComponent(id);
+  if(req.body?.confirm!=='yes'){res.redirect(303,base+'?error=confirm');return;}
+  try{await approve(res,id);}
+  catch(error){if(error instanceof ApiError&&error.code==='APPROVAL_NOT_ALLOWED'){res.redirect(303,base+'?error=APPROVAL_NOT_ALLOWED');return;}throw error;}
+  res.redirect(303,base+'?notice=approved');
+ });
+ app.post('/admin/api/groups/:publicId/approve',async(req,res)=>res.json({group:await approve(res,req.params.publicId)}));
  app.post('/admin/logout',async(req,res)=>auth.logout(req,res));
+ app.get('/admin/api/audit',async(req,res)=>res.json(await auditPage(db,req.query)));
  // Delivery areas: same admin session, Origin and CSRF checks as group approval. HTML forms redirect; JSON API returns data.
+ const areaChange=async<T extends {publicId?:string}>(res:express.Response,action:'area.create'|'area.update',target:string|null,run:()=>Promise<T>)=>{
+  try{const area=await run();await audit(db,{action,actor:res.locals.actor,target:area?.publicId??target,result:'OK'});return area;}
+  catch(error){await audit(db,{action,actor:res.locals.actor,target,result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});throw error;}
+ };
  app.get('/admin/api/areas',async(_req,res)=>res.json({areas:await areas.adminList()}));
- app.post('/admin/api/areas',async(req,res)=>res.status(201).json({area:await areas.create(req.body)}));
- app.post('/admin/api/areas/:publicId',async(req,res)=>res.json({area:await areas.update(req.params.publicId,req.body)}));
- app.post('/admin/areas',async(req,res)=>{await areas.create(req.body,true);res.redirect(303,'/admin');});
- app.post('/admin/areas/:publicId',async(req,res)=>{await areas.update(req.params.publicId,req.body,true);res.redirect(303,'/admin');});
+ app.post('/admin/api/areas',async(req,res)=>res.status(201).json({area:await areaChange(res,'area.create',null,()=>areas.create(req.body))}));
+ app.post('/admin/api/areas/:publicId',async(req,res)=>res.json({area:await areaChange(res,'area.update',req.params.publicId,()=>areas.update(req.params.publicId,req.body))}));
+ app.post('/admin/areas',async(req,res)=>{await areaChange(res,'area.create',null,()=>areas.create(req.body,true));res.redirect(303,'/admin/areas?notice=area_saved');});
+ app.post('/admin/areas/:publicId',async(req,res)=>{await areaChange(res,'area.update',req.params.publicId,()=>areas.update(req.params.publicId,req.body,true));res.redirect(303,'/admin/areas?notice=area_saved');});
  // Public delivery areas (no coordinates) and the server-side nearest-area suggestion (coordinates never stored).
  app.get('/api/v1/areas',async(_req,res)=>res.json({areas:await areas.list()}));
  app.post('/api/v1/areas/nearest',async(req,res)=>res.json(await areas.nearest(req.body)));
@@ -79,7 +167,11 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   if(status===429)res.set('Retry-After','600');
   const code:ErrorCode=error instanceof ApiError?error.code:status===413?'BODY_TOO_LARGE':status===400?'INVALID_INPUT':'SERVICE_UNAVAILABLE';
   // Never serialize exception/provider/database text, customer input, headers or config.
-  res.status(status).json({error:error instanceof ApiError?error.message:'לא ניתן להשלים את הבקשה כרגע.',code});
+  const message=error instanceof ApiError?error.message:'לא ניתן להשלים את הבקשה כרגע.';
+  if(_req.path.startsWith('/admin')&&!_req.path.startsWith('/admin/api/')&&['GET','HEAD'].includes(_req.method)&&_req.path!=='/admin/style.css'&&_req.path!=='/admin/app.js'){
+   res.status(status).type('html').send(errorPage(status,message,res.locals.session?.csrf));return;
+  }
+  res.status(status).json({error:message,code});
  });
  return app;
 }

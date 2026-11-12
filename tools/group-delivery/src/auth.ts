@@ -4,6 +4,9 @@ import type {Request,Response} from 'express';
 import type {Config} from './config.js';
 import type {Database} from './db.js';
 import {ApiError,hash} from './domain.js';
+import {audit,actorOf} from './audit.js';
+// Only same-site admin paths may be used as a post-login destination (no open redirects).
+export const safeNext=(value:unknown)=>typeof value==='string'&&/^\/admin(?:\/[A-Za-z0-9._~\/-]*)?(?:\?[A-Za-z0-9._~=&%+-]*)?$/.test(value)&&!value.includes('//')&&value.length<=300?value:'/admin';
 export const same=(a:unknown,b:string)=>typeof a==='string'&&timingSafeEqual(Buffer.from(hash(a),'hex'),Buffer.from(hash(b),'hex'));
 export class Auth{
  private cookie:string;
@@ -25,11 +28,19 @@ export class Auth{
  async login(req:Request,res:Response){
   await this.limit(req,'login',10,900);
   const usernameOK=same(req.body?.username,this.config.username),passwordOK=same(req.body?.password,this.config.password);
-  if(!usernameOK||!passwordOK)throw new ApiError(401,'LOGIN_FAILED','שם המשתמש או הסיסמה אינם נכונים');
+  // One message for any mismatch: whether the username exists is never revealed. The attempt is audited anonymously.
+  if(!usernameOK||!passwordOK){await audit(this.db,{action:'login',actor:'anonymous',result:'FAILED'});throw new ApiError(401,'LOGIN_FAILED','שם המשתמש או הסיסמה אינם נכונים');}
   await this.db.query('DELETE FROM admin_sessions WHERE token_hash=$1 OR expires_at<=NOW()',[hash(this.token(req))]);
   const token=randomBytes(32).toString('hex'),csrf=randomBytes(32).toString('hex');
   await this.db.query("INSERT INTO admin_sessions(token_hash,csrf,expires_at) VALUES($1,$2,NOW()+INTERVAL '8 hours')",[hash(token),csrf]);
-  res.cookie(this.cookie,token,{...this.options(),maxAge:8*3600000});res.redirect(303,'/admin');
+  await audit(this.db,{action:'login',actor:actorOf({token_hash:hash(token)}),result:'OK'});
+  res.cookie(this.cookie,token,{...this.options(),maxAge:8*3600000});res.redirect(303,safeNext(req.body?.next));
  }
- async logout(req:Request,res:Response){await this.db.query('DELETE FROM admin_sessions WHERE token_hash=$1',[hash(this.token(req))]);res.clearCookie(this.cookie,this.options());res.redirect(303,'/admin');}
+ // Logout deletes the server session (the cookie is useless afterwards) and asks the browser to drop cached admin pages.
+ async logout(req:Request,res:Response){
+  const tokenHash=hash(this.token(req));
+  await this.db.query('DELETE FROM admin_sessions WHERE token_hash=$1',[tokenHash]);
+  await audit(this.db,{action:'logout',actor:actorOf({token_hash:tokenHash}),result:'OK'});
+  res.set('Clear-Site-Data','"cache"');res.clearCookie(this.cookie,this.options());res.redirect(303,'/admin');
+ }
 }

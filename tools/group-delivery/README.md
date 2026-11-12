@@ -74,6 +74,7 @@ Only opaque member receipts (group public ID + random bearer token + save time) 
 - delivery_groups: internal/public UUIDs, public area label, normalized locality key, private fixed anchor and moving center, integer threshold/pledged/paid totals, status, expiry and timestamps.
 - group_members: internal UUID, group FK, normalized email/phone, locality and rounded private coordinates, validated JSON cart snapshot, integer pledge, hashed bearer token, PLEDGED/WITHDRAWN state and timestamps. Per-group contact uniqueness prevents duplicate pledges.
 - admin_sessions: hashed cookie token, CSRF nonce and expiry.
+- admin_audit (migration 003): admin actions and exports with safe metadata only.
 - request_limits: HMAC IP bucket identifiers and expiring counters.
 - schema_migrations / schema_migration_lock and group_coordination: migration tracking and database coordination.
 
@@ -113,7 +114,7 @@ Groups created before delivery areas (free text and/or coordinates) are historic
 
 ### Area admin
 
-The existing `/admin` page (same session, Origin and CSRF protection) lists all areas with edit forms and an add form: display name, center latitude/longitude, sort order and active flag. JSON equivalents: `GET /admin/api/areas`, `POST /admin/api/areas` and `POST /admin/api/areas/:publicId` (X-CSRF-Token). Duplicate names return 409 AREA_EXISTS; unknown areas 404 AREA_NOT_FOUND.
+The `/admin/areas` page (same session, Origin and CSRF protection) lists all areas with edit forms and an add form: display name, center latitude/longitude, sort order and active flag. JSON equivalents: `GET /admin/api/areas`, `POST /admin/api/areas` and `POST /admin/api/areas/:publicId` (X-CSRF-Token). Duplicate names return 409 AREA_EXISTS; unknown areas 404 AREA_NOT_FOUND.
 
 ## APIs
 
@@ -144,9 +145,26 @@ Open /admin. Login uses ADMIN_USERNAME/ADMIN_PASSWORD checked on the server, fol
 - Session and receipt tokens stored only as SHA-256 hashes.
 - Exact-origin CSRF protection; per-session CSRF nonce required for approval/logout.
 - CORS applies only to public API paths, never credentialed admin routes.
-- Admin list prioritizes threshold-reached groups and shows up to 200 records with totals, counts and dates; no customer contacts.
-- GET /admin/api/groups and POST /admin/api/groups/:publicId/approve require the admin cookie. Approval also requires X-CSRF-Token (available in the authenticated page's hidden form).
-- Merchant HTML approval/logout forms submit CSRF directly.
+- Every /admin response sends `X-Robots-Tag: noindex, nofollow`, `Cache-Control: no-store` and a same-origin-only CSP (`script-src 'self'`, no inline script or style). Logout deletes the server session and sends `Clear-Site-Data: "cache"`; /admin/app.js reloads back/forward-cached pages so an old page is never shown from memory.
+- Unauthenticated page requests redirect to the login form (`/admin?expired=1&next=…`, same-site admin paths only); /admin/api requests get 401. A wrong username or password gets the same message, so account existence is never revealed.
+- Merchant HTML approval/logout forms submit CSRF directly; approval additionally requires an explicit confirmation tick.
+
+### Admin dashboard (store owner only)
+
+Server-rendered Hebrew RTL pages behind the admin session; customer email and phone appear only here, never on /api/v1.
+
+| Page | Purpose |
+|---|---|
+| /admin | Summary cards (active groups = OPEN/THRESHOLD_REACHED, reached, active customers = distinct emails of PLEDGED members in active groups, active pledged total, groups opened today / this week in Israel time) and the groups table with server-side search (group id prefix, customer email, phone in local or international form), area, status, active/closed and date filters, sortable columns and pagination (25 per page, max 100). |
+| /admin/groups/:publicId | Group header with progress toward the stored threshold, lifecycle dates, approval (THRESHOLD_REACHED only, explicit confirmation), CSV exports and the paginated members table (status filter, mailto/tel/WhatsApp links and copy buttons; nothing is sent automatically). |
+| /admin/groups/:publicId/members/:memberId | Contact details and the stored cart snapshot (quantity, stored unit price, stored line total, stored pledge). Product titles and today's Shopify price come from one batched Storefront request and are shown for comparison only. |
+| /admin/groups/:publicId/export.csv, export-lines.csv | Members, or one row per stored cart line. UTF-8 with BOM; cells starting with = + - @ tab or CR are prefixed with an apostrophe (formula injection). Each export is audited. |
+| /admin/areas | Delivery-area management (unchanged behaviour). |
+| /admin/audit | Admin audit log: login/logout, approvals, area changes and exports with actor (`session:` + 12 hex of the session hash), target, result and error code. Never passwords, tokens, bodies or contact details. |
+
+JSON equivalents (same session): `GET /admin/api/dashboard`, `GET /admin/api/groups`, `GET /admin/api/groups/:publicId`, `GET /admin/api/groups/:publicId/members`, `GET /admin/api/groups/:publicId/members/:memberId`, `GET /admin/api/audit`.
+
+Intentionally not available: deleting or editing groups or members, changing pledges, cancelling, marking delivered, payments, refunds or messaging. The domain has no safe transitions for these yet.
 - Rate limits in PostgreSQL: 20 public writes / 10 minutes / IP, 120 public reads / 10 minutes / IP, 10 admin login attempts / 15 minutes / IP.
 - Parameterized SQL, validated inputs, fixed safe error messages, canonical host/TLS checks, narrow proxy trust and bounded request/variant counts.
 - No customer bodies, contacts, exact coordinates, tokens, signatures or secrets are logged.

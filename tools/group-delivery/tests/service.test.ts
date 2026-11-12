@@ -411,7 +411,10 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    assert.equal((await fetch(cfg.origin+'/admin/api/areas')).status,401);
    assert.equal((await post('/admin/api/areas',{name:'דימונה',latitude:31.07,longitude:35.03})).status,401);
    const {cookie,page,csrf}=await loginAdmin();
-   assert.match(page,/אזורי משלוח/);assert.match(page,/action="\/admin\/areas"/);
+   // Area management lives on its own admin page (linked from the dashboard navigation).
+   assert.match(page,/href="\/admin\/areas"/);
+   const areasHtml=await(await fetch(cfg.origin+'/admin/areas',{headers:{Cookie:cookie}})).text();
+   assert.match(areasHtml,/אזורי משלוח/);assert.match(areasHtml,/action="\/admin\/areas"/);
    assert.equal((await post('/admin/api/areas',{name:'דימונה',latitude:31.07,longitude:35.03},{Cookie:cookie,'X-CSRF-Token':'bad'})).status,403);
    assert.equal((await post('/admin/api/areas',{name:'דימונה',latitude:31.07,longitude:35.03},{Cookie:cookie,'X-CSRF-Token':csrf,Origin:'https://evil.example'})).status,403);
    assert.equal((await fetch(cfg.origin+'/admin/areas',{method:'POST',redirect:'manual',headers:{Cookie:cookie,Origin:cfg.origin,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({name:'דימונה',latitude:'31.07',longitude:'35.03'})})).status,403,'form without csrf');
@@ -437,7 +440,7 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    assert.ok(!(await publicAreas()).some(item=>item.publicId===area.publicId));
    assert.equal(((await (await fetch(cfg.origin+'/admin/api/areas',{headers:{Cookie:cookie}})).json()) as any).areas.find((item:any)=>item.publicId===area.publicId).active,false);
    assert.equal((await service.get(member.group.publicId)).participantCount,1);
-   assert.match(await(await fetch(cfg.origin+'/admin',{headers:{Cookie:cookie}})).text(),/דימונה והסביבה \(לא פעיל\)/);
+   assert.match(await(await fetch(cfg.origin+'/admin/areas',{headers:{Cookie:cookie}})).text(),/דימונה והסביבה \(לא פעיל\)/);
    assert.equal((await post('/admin/api/areas/00000000-0000-4000-8000-000000000000',{name:'אין'},{Cookie:cookie,'X-CSRF-Token':csrf})).status,404);
    // HTML form create with an unchecked checkbox creates an inactive area.
    assert.equal((await fetch(cfg.origin+'/admin/areas',{method:'POST',redirect:'manual',headers:{Cookie:cookie,Origin:cfg.origin,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({csrf,name:'ירוחם',latitude:'30.987',longitude:'34.931',sortOrder:'90'})})).status,303);
