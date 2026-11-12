@@ -348,6 +348,30 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.notEqual(await ev('localStorage.getItem(widget.receiptPrefix+"11111111-1111-4111-8111-111111111111")'),null,'receipts are per group');
    assert.ok(!(await ev('localStorage.getItem(widget.receiptPrefix+"22222222-2222-4222-8222-222222222222")')).includes('starter@'));
   });
+  await t.test('Completed delivery: the old receipt shows the completed state; the normal area join starts the next cycle',async()=>{
+   const OLD='33333333-3333-4333-8333-333333333333',NEW='22222222-2222-4222-8222-222222222222';
+   await ev('localStorage.removeItem(widget.receiptPrefix+"'+NEW+'");localStorage.setItem(widget.receiptPrefix+"'+OLD+'",JSON.stringify({publicId:"'+OLD+'",memberToken:"c".repeat(64),savedAt:Date.now()+60000}));'+
+    'group={...group,publicId:"'+OLD+'",status:"COMPLETED"};existing=false;quantity=1;'+reconnect);
+   await wait('!widget.hasAttribute("aria-busy")&&widget.group?.publicId==="'+OLD+'"');
+   assert.equal(await ev('widget.querySelector("[data-group-state]").textContent'),tr.group_delivery.status.completed);
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.delivery_completed);
+   assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),true,'a completed group takes no pledge changes');
+   assert.equal(await ev('widget.querySelector("[data-withdraw]").hidden'),true);
+   assert.equal(await ev('requests.filter(r=>r.url.includes("'+OLD+'")&&/update-pledge|withdraw|\\/join$/.test(r.url)).length'),0,'nothing is sent to the completed group');
+   // The shopper searches their area as usual: no open group, so Join starts the next cycle with a new receipt.
+   await type('אופ');await key('ArrowDown');await key('Enter');
+   await ev('widget.querySelector("[data-find-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
+   assert.equal(await ev('widget.querySelector("[data-group-panel]").hasAttribute("data-group-pending")'),true);
+   assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),false,'joining the new cycle is the normal join');
+   await ev('group={...group,status:"OPEN"};widget.querySelector("[name=email]").value="returning@example.test";widget.querySelector("[name=phone]").value="0507654300";widget.querySelector("[data-join-group]").requestSubmit()');
+   await wait('!widget.hasAttribute("aria-busy")&&widget.group?.publicId==="'+NEW+'"');
+   const join=await ev('requests.filter(r=>r.url.endsWith("/groups/join")).at(-1)');
+   assert.equal(join.body.areaPublicId,OFAKIM);assert.ok(!join.headers?.Authorization,'the old receipt is never sent with the new join');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.started);
+   assert.equal(await ev('JSON.parse(localStorage.getItem(widget.receiptPrefix+"'+NEW+'")).memberToken'),'b'.repeat(64));
+   assert.equal(await ev('JSON.parse(localStorage.getItem(widget.receiptPrefix+"'+OLD+'")).memberToken'),'c'.repeat(64),'the old receipt stays with its historical group');
+   await ev('localStorage.removeItem(widget.receiptPrefix+"'+OLD+'");widget.receipts.delete("'+OLD+'")');
+  });
   await t.test('Area combobox: filtering, keyboard navigation, selection state and exact typed names',async()=>{
    await ev('existing=true;group.status="OPEN";'+input+'.value="";widget.clearArea();widget.closeAreas()');
    // focus() fires no event when the input already has focus (perform() may restore it), so blur first.

@@ -3,7 +3,8 @@
 // pagination all run in SQL; the browser never receives more than one page.
 import type {Database} from './db.js';
 import {ApiError,publicId} from './domain.js';
-import {ACTIVE_MEMBER_STATUS,GROUP_CAPACITY,type Groups} from './groups.js';
+import {ACTIVE_MEMBER_STATUS,GROUP_CAPACITY,OPERATIONAL_STATUSES,acceptsPledges,operationalTargets,type Groups} from './groups.js';
+import {operationalHistory} from './audit.js';
 import type {CartValidator,SnapshotLine} from './shopify.js';
 
 // Every status allowed by the schema; only the first four are reachable by the current (non-payment) code paths.
@@ -11,6 +12,10 @@ export const GROUP_STATUSES=['OPEN','THRESHOLD_REACHED','APPROVED','EXPIRED','PA
 export const REACHABLE_STATUSES=['OPEN','THRESHOLD_REACHED','APPROVED','EXPIRED'] as const;
 // Accepting pledges: the same rule as join/update in groups.ts (expired groups are marked EXPIRED before reading).
 export const ACTIVE_STATUSES=['OPEN','THRESHOLD_REACHED'];
+// SQL form of groups.acceptsPledges (alias g): a completed delivery is never active, whatever its business status.
+const ACCEPTING="g.status IN ('OPEN','THRESHOLD_REACHED') AND g.operational_status<>'COMPLETED'";
+// Delivery-cycle views: current (not completed), awaiting delivery (ready or on the way), completed.
+export const VIEWS:Record<string,string>={current:"g.operational_status<>'COMPLETED'",awaiting:"g.operational_status IN ('READY_FOR_DELIVERY','OUT_FOR_DELIVERY')",completed:"g.operational_status='COMPLETED'"};
 export const MEMBER_STATUSES=['PLEDGED','WITHDRAWN'] as const;
 const TZ='Asia/Jerusalem';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -45,23 +50,28 @@ const dateParam=(value:unknown)=>{
 };
 const likeEscape=(value:string)=>value.replace(/[\\%_]/g,match=>'\\'+match);
 
-export interface GroupFilters {q:string;area:string;status:string;state:string;from:string;to:string;sort:string;dir:'asc'|'desc'}
-export const SORTS:Record<string,string>={created:'g.created_at',updated:'g.updated_at',area:'g.area_name',status:'g.status',pledged:'g.pledged_total_agorot',members:'active_members',expires:'g.expires_at'};
+export interface GroupFilters {q:string;area:string;status:string;state:string;op:string;view:string;from:string;to:string;sort:string;dir:'asc'|'desc'}
+export const SORTS:Record<string,string>={created:'g.created_at',updated:'g.updated_at',area:'g.area_name',status:'g.status',pledged:'g.pledged_total_agorot',members:'active_members',expires:'g.expires_at',
+ operational:"array_position(ARRAY['NEW','IN_PROGRESS','READY_FOR_DELIVERY','OUT_FOR_DELIVERY','COMPLETED']::text[],g.operational_status)",completed:'g.completed_at'};
 export function groupFilters(query:any):GroupFilters{
  const text=(value:unknown,max:number)=>typeof value==='string'?value.trim().slice(0,max):'';
- const area=text(query?.area,40),status=text(query?.status,30),state=text(query?.state,10),sort=text(query?.sort,10),dir=text(query?.dir,4);
+ const area=text(query?.area,40),status=text(query?.status,30),state=text(query?.state,10),op=text(query?.op,30),view=text(query?.view,12),sort=text(query?.sort,12),dir=text(query?.dir,4);
  if(area&&area!=='none'&&!UUID.test(area))throw new ApiError(400,'INVALID_INPUT','אזור לא תקין.');
  if(status&&!(GROUP_STATUSES as readonly string[]).includes(status))throw new ApiError(400,'INVALID_INPUT','סטטוס לא תקין.');
  if(state&&!['active','closed'].includes(state))throw new ApiError(400,'INVALID_INPUT','מצב לא תקין.');
+ if(op&&!(OPERATIONAL_STATUSES as readonly string[]).includes(op))throw new ApiError(400,'INVALID_INPUT','סטטוס משלוח לא תקין.');
+ if(view&&!VIEWS[view])throw new ApiError(400,'INVALID_INPUT','תצוגה לא תקינה.');
  const from=text(query?.from,10),to=text(query?.to,10);dateParam(from);dateParam(to);
- return {q:text(query?.q,120),area,status,state,from,to,sort:SORTS[sort]?sort:'created',dir:dir==='asc'?'asc':'desc'};
+ return {q:text(query?.q,120),area,status,state,op,view,from,to,sort:SORTS[sort]?sort:'created',dir:dir==='asc'?'asc':'desc'};
 }
 
 const groupRow=(row:any)=>{
  const total=Number(row.pledged_total_agorot),threshold=Number(row.threshold_agorot);
  return {
   publicId:row.public_id,shortId:String(row.public_id).slice(0,8),areaName:row.area_name,areaPublicId:row.area_public_id??null,legacy:row.area_id===null,
-  status:row.status,active:ACTIVE_STATUSES.includes(row.status),pledgedTotalAgorot:total,thresholdAgorot:threshold,
+  status:row.status,active:acceptsPledges(row),pledgedTotalAgorot:total,
+  // Admin delivery workflow (migration 005). completedBy is an anonymous session reference.
+  operationalStatus:row.operational_status,completedAt:row.completed_at?new Date(row.completed_at).toISOString():null,completedBy:row.completed_by??null,thresholdAgorot:threshold,
   remainingAgorot:Math.max(0,threshold-total),progressPercent:threshold>0?Math.min(100,Math.floor(total*100/threshold)):0,
   activeMembers:Number(row.active_members),totalMembers:Number(row.all_members),
   createdAt:new Date(row.created_at).toISOString(),updatedAt:new Date(row.updated_at).toISOString(),expiresAt:new Date(row.expires_at).toISOString()
@@ -89,21 +99,29 @@ export class AdminData{
   await this.fresh();
   const {dayStart,weekStart}=israelToday(now);
   const row=(await this.db.query(`SELECT
-   COUNT(*) FILTER (WHERE status IN ('OPEN','THRESHOLD_REACHED'))::int AS active_groups,
-   COUNT(*) FILTER (WHERE status='THRESHOLD_REACHED')::int AS reached_groups,
+   COUNT(*) FILTER (WHERE ${ACCEPTING})::int AS active_groups,
+   COUNT(*) FILTER (WHERE g.status='THRESHOLD_REACHED' AND g.operational_status<>'COMPLETED')::int AS reached_groups,
+   COUNT(*) FILTER (WHERE g.operational_status='NEW' AND g.status='APPROVED')::int AS op_new,
+   COUNT(*) FILTER (WHERE g.operational_status='IN_PROGRESS')::int AS op_in_progress,
+   COUNT(*) FILTER (WHERE g.operational_status='READY_FOR_DELIVERY')::int AS op_ready,
+   COUNT(*) FILTER (WHERE g.operational_status='OUT_FOR_DELIVERY')::int AS op_out,
+   COUNT(*) FILTER (WHERE g.completed_at>=$1)::int AS completed_today,
+   COUNT(*) FILTER (WHERE g.operational_status='COMPLETED')::int AS completed_all,
    COUNT(*) FILTER (WHERE status='APPROVED')::int AS approved_groups,
    COUNT(*) FILTER (WHERE status='EXPIRED')::int AS expired_groups,
    COUNT(*)::int AS all_groups,
-   COALESCE(SUM(pledged_total_agorot) FILTER (WHERE status IN ('OPEN','THRESHOLD_REACHED')),0)::bigint AS active_pledged,
+   COALESCE(SUM(g.pledged_total_agorot) FILTER (WHERE ${ACCEPTING}),0)::bigint AS active_pledged,
    COUNT(*) FILTER (WHERE created_at>=$1)::int AS opened_today,
    COUNT(*) FILTER (WHERE created_at>=$2)::int AS opened_week
-   FROM delivery_groups`,[dayStart.toISOString(),weekStart.toISOString()])).rows[0];
+   FROM delivery_groups g`,[dayStart.toISOString(),weekStart.toISOString()])).rows[0];
   const customers=(await this.db.query(`SELECT COUNT(DISTINCT m.email)::int AS customers,COUNT(*)::int AS pledges FROM group_members m JOIN delivery_groups g ON g.id=m.group_id
-   WHERE m.status='${ACTIVE_MEMBER_STATUS}' AND g.status IN ('OPEN','THRESHOLD_REACHED')`)).rows[0];
+   WHERE m.status='${ACTIVE_MEMBER_STATUS}' AND ${ACCEPTING}`)).rows[0];
   return {
    activeGroups:row.active_groups,reachedGroups:row.reached_groups,approvedGroups:row.approved_groups,expiredGroups:row.expired_groups,allGroups:row.all_groups,
    activeCustomers:customers.customers,activePledges:customers.pledges,activePledgedAgorot:Number(row.active_pledged),
    openedToday:row.opened_today,openedThisWeek:row.opened_week,
+   // Delivery workflow: approved groups not yet handled, then each stage; completed today (Israel day) and in total.
+   operational:{newDeliveries:row.op_new,inProgress:row.op_in_progress,readyForDelivery:row.op_ready,outForDelivery:row.op_out,completedToday:row.completed_today,completed:row.completed_all},
    generatedAt:now.toISOString(),dayStart:dayStart.toISOString(),weekStart:weekStart.toISOString()
   };
  }
@@ -121,7 +139,9 @@ export class AdminData{
   }
   if(filters.area==='none')add('g.area_id IS NULL');else if(filters.area)add('a.public_id=?',filters.area);
   if(filters.status)add('g.status=?',filters.status);
-  if(filters.state==='active')add("g.status IN ('OPEN','THRESHOLD_REACHED')");else if(filters.state==='closed')add("g.status NOT IN ('OPEN','THRESHOLD_REACHED')");
+  if(filters.state==='active')add(ACCEPTING);else if(filters.state==='closed')add('NOT ('+ACCEPTING+')');
+  if(filters.op)add('g.operational_status=?',filters.op);
+  if(filters.view)add(VIEWS[filters.view]);
   const from=dateParam(filters.from),to=dateParam(filters.to);
   if(from)add('g.created_at>=?',israelMidnight(from.year,from.month,from.day).toISOString());
   if(to)add('g.created_at<?',israelMidnight(to.year,to.month,to.day+1).toISOString());
@@ -137,8 +157,10 @@ export class AdminData{
   if(!row)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
   const withdrawn=(await this.db.query("SELECT COUNT(*)::int AS n FROM group_members m WHERE m.group_id=$1 AND m.status='WITHDRAWN'",[row.id])).rows[0].n;
   // Capacity: active members against the domain limit (withdrawn rows hold no slot).
-  return {...groupRow(row),withdrawnMembers:withdrawn,capacity:{active:Number(row.active_members),limit:GROUP_CAPACITY},_id:row.id as string};
+  return {...groupRow(row),operationalTargets:operationalTargets(row.operational_status),withdrawnMembers:withdrawn,capacity:{active:Number(row.active_members),limit:GROUP_CAPACITY},_id:row.id as string};
  }
+ // Operational timeline of one group (successful transitions from the audit log, oldest first).
+ async timeline(id:string){return operationalHistory(this.db,publicId(id));}
  async members(id:string,query:any){
   const group=await this.group(id),page=pageOf(query,50);
   const status=typeof query?.memberStatus==='string'&&(MEMBER_STATUSES as readonly string[]).includes(query.memberStatus)?query.memberStatus:'';

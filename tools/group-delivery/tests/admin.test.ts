@@ -80,7 +80,7 @@ test('Admin dashboard service',{timeout:180000},async t=>{
   await t.test('groups list: pagination with limits, sorting, filters and search run on the server',async()=>{
    const all=await json('/admin/api/groups?pageSize=5',cookie);
    assert.deepEqual(all.pagination,{page:1,pageSize:5,total:5,pageCount:1});
-   assert.deepEqual(Object.keys(all.groups[0]).sort(),['active','activeMembers','areaName','areaPublicId','createdAt','expiresAt','legacy','pledgedTotalAgorot','progressPercent','publicId','remainingAgorot','shortId','status','thresholdAgorot','totalMembers','updatedAt']);
+   assert.deepEqual(Object.keys(all.groups[0]).sort(),['active','activeMembers','areaName','areaPublicId','completedAt','completedBy','createdAt','expiresAt','legacy','operationalStatus','pledgedTotalAgorot','progressPercent','publicId','remainingAgorot','shortId','status','thresholdAgorot','totalMembers','updatedAt']);
    assert.ok(!JSON.stringify(all).includes('@example.test'),'no contact details in the list');
    assert.equal((await json('/admin/api/groups?pageSize=1000',cookie)).pagination.pageSize,100,'maximum page size');
    const small=await json('/admin/api/groups?pageSize=5&page=2',cookie);assert.equal(small.groups.length,0);assert.equal(small.pagination.page,2);

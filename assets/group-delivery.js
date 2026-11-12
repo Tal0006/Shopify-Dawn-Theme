@@ -491,7 +491,10 @@
    this.querySelector('[data-remaining]').textContent=this.dataset.remaining.replace('__AMOUNT__',this.currency.format(group.remainingAmountAgorot/100));
    this.querySelector('[data-participants]').textContent=group.participantCount===1?this.dataset.countOne:this.dataset.count.replace('__COUNT__',group.participantCount);
    const time=this.querySelector('[data-expiry]');time.dateTime=group.expiresAt;time.textContent=new Intl.DateTimeFormat(this.dataset.locale||'he').format(new Date(group.expiresAt));
-   if(!['OPEN','THRESHOLD_REACHED'].includes(group.status))this.message.textContent=this.dataset.closed;
+   // COMPLETED: the delivery was completed and the group is history. Its receipt stays with it; joining the area's
+   // next delivery is the normal area search and join, never an automatic move.
+   if(group.status==='COMPLETED')this.message.textContent=this.dataset.deliveryCompleted;
+   else if(!['OPEN','THRESHOLD_REACHED'].includes(group.status))this.message.textContent=this.dataset.closed;
    this.controls();
   }
  }

@@ -55,7 +55,7 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
   });
 
   await t.test('dashboard: metrics, groups table, sortable headers, no overflow at 1280/1440/1920',async()=>{
-   assert.equal(await ev('document.querySelectorAll(".metric").length'),6);
+   assert.equal(await ev('document.querySelectorAll(".metric").length'),11,'6 business + 5 delivery-workflow cards');
    assert.equal(await ev('document.querySelector(".metric strong").textContent'),'3');
    assert.equal(await ev('document.querySelectorAll(".table--groups tbody tr").length'),5);
    assert.equal(await ev('document.querySelector("th[aria-sort]").textContent.trim().startsWith("נפתחה")'),true);
@@ -199,6 +199,70 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    assert.equal(await ev(overflow),false);
    if(shots){writeFileSync(join(shots,'admin-mobile-remove-dialog.png'),Buffer.from((await call('Page.captureScreenshot',{format:'png'})).data,'base64'));}
    await ev('document.querySelector("[data-dialog-cancel]").click()');await wait('!document.querySelector("#withdraw-dialog").open');
+   await size(1440);
+  });
+
+  await t.test('delivery workflow: stepper, status selector, timeline, completion dialog, history views and metrics',async()=>{
+   const key=async(key:string,code:string,vk:number)=>{for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key,code,windowsVirtualKeyCode:vk,...(type==='keyDown'&&key==='Enter'?{text:String.fromCharCode(13)}:{})});};
+   const opStatus=()=>ev('fetch("/admin/api/groups/'+ids.approved+'").then(r=>r.json()).then(d=>d.group.operationalStatus)');
+   await go('/admin');
+   assert.deepEqual(await ev('[...document.querySelectorAll(".metrics--ops .metric__label")].map(e=>e.textContent)'),['משלוחים חדשים','בטיפול','מוכנים למשלוח','יצאו למשלוח','הושלמו היום']);
+   assert.equal(await ev('document.querySelector(".metrics--ops .metric__value").textContent'),'1','the approved group awaits handling');
+   assert.equal(await ev('[...document.querySelectorAll(".table--groups thead th")].some(th=>th.textContent.trim()==="משלוח")'),true);
+   await go('/admin/groups/'+ids.approved);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".steps .step__label")].map(e=>e.textContent)'),['חדש','בטיפול','מוכן למשלוח','יצא למשלוח','הושלם']);
+   assert.equal(await ev('document.querySelector(".step[aria-current=step] .step__label").textContent'),'חדש');
+   assert.equal(await ev('getComputedStyle(document.querySelector(".steps")).direction'),'rtl');
+   // Status selector (server-rendered form): forward, back, forward again.
+   const move=async(label:string)=>{
+    await ev('(()=>{const s=document.querySelector("#op-status");s.value=[...s.options].find(o=>o.textContent==='+JSON.stringify(label)+').value;s.form.requestSubmit();})()');
+    await wait('document.querySelector(".notice--ok")?.textContent==="סטטוס המשלוח עודכן."');
+   };
+   assert.deepEqual(await ev('[...document.querySelectorAll("#op-status option")].map(o=>o.textContent)'),['בטיפול']);
+   await move('בטיפול');await move('מוכן למשלוח');await move('בטיפול (חזרה)');await move('מוכן למשלוח');await move('יצא למשלוח');
+   assert.equal(await ev('document.querySelector(".step[aria-current=step] .step__label").textContent'),'יצא למשלוח');
+   assert.equal(await ev('document.querySelectorAll(".step--done").length'),3);
+   assert.equal(await ev('document.querySelectorAll(".ops-history li").length'),5);assert.match(await ev('document.querySelector(".ops-history").textContent'),/חדש ← בטיפול.*מוכן למשלוח ← בטיפול/);
+   // Completion dialog: keyboard opens it with focus on Cancel; Escape and Cancel change nothing.
+   await ev('document.querySelector("[data-open-dialog=complete-dialog]").focus()');await key('Enter','Enter',13);
+   await wait('document.querySelector("#complete-dialog").matches(":modal")');
+   assert.equal(await ev('document.activeElement.textContent'),'ביטול');
+   const text=await ev('document.querySelector("#complete-dialog").innerText');
+   assert.match(text,/השלמת המשלוח/);assert.match(text,/אשקלון/);assert.match(text,/625\.00/);assert.match(text,new RegExp(ids.approved));assert.match(text,/המשלוח הנוכחי ייסגר ויישמר בהיסטוריה/);
+   await key('Escape','Escape',27);await wait('!document.querySelector("#complete-dialog").open');
+   assert.equal(await ev('document.activeElement.getAttribute("data-open-dialog")'),'complete-dialog');
+   await ev('document.querySelector("[data-open-dialog=complete-dialog]").click()');await wait('document.querySelector("#complete-dialog").open');
+   await ev('document.querySelector("#complete-dialog [data-dialog-cancel]").click()');await wait('!document.querySelector("#complete-dialog").open');
+   assert.equal(await ev('document.body.hasAttribute("data-loading")'),false);assert.equal(await opStatus(),'OUT_FOR_DELIVERY');
+   await ev('document.querySelector("[data-open-dialog=complete-dialog]").click()');await wait('document.querySelector("#complete-dialog").open');await shot('admin-complete-dialog');
+   await ev('document.querySelector("#complete-dialog [data-dialog-cancel]").focus()');await key('Tab','Tab',9);
+   assert.equal(await ev('document.activeElement.textContent'),'סיום המשלוח');
+   await key('Enter','Enter',13);
+   await wait('location.search==="?notice=delivery_completed"&&!!document.querySelector(".completed-summary")');
+   assert.match(await ev('document.querySelector(".notice--ok").textContent'),/המשלוח הושלם ונשמר בהיסטוריה/);
+   assert.equal(await ev('document.querySelector(".page-head .chip--op").textContent'),'הושלם');
+   assert.equal(await ev('!!document.querySelector("#op-status")||!!document.querySelector("[data-open-dialog=complete-dialog]")'),false,'completed is terminal');
+   assert.equal(await ev('document.querySelectorAll(".step--done").length'),5,'every step done, including the final one');
+   assert.equal(await ev('document.querySelectorAll(".table--members tbody tr").length'),1,'members stay visible');
+   await shot('admin-group-completed');
+   // History views and the operational filter.
+   await go('/admin');
+   assert.equal(await ev('[...document.querySelectorAll(".metrics--ops .metric")].find(m=>m.textContent.includes("הושלמו היום")).querySelector(".metric__value").textContent'),'1');
+   await ev('[...document.querySelectorAll(".segmented--views a")].find(a=>a.textContent==="הושלמו").click()');
+   await wait('location.search.includes("view=completed")&&document.querySelectorAll(".table--groups tbody tr").length===1');
+   assert.equal(await ev('document.querySelector(".table--groups tbody .chip--op").textContent'),'הושלם');
+   await ev('[...document.querySelectorAll(".segmented--views a")].find(a=>a.textContent==="פעילים").click()');
+   await wait('location.search.includes("view=current")&&document.querySelectorAll(".table--groups tbody tr").length===4');
+   await go('/admin');await ev('document.querySelector("#op").value="COMPLETED";document.querySelector(".filters").requestSubmit()');
+   await wait('location.search.includes("op=COMPLETED")&&document.querySelectorAll(".table--groups tbody tr").length===1');
+   // Mobile: the stepper stacks, no overflow, 44px controls, dialog fits.
+   await size(390,844);
+   await go('/admin/groups/'+ids.reached);
+   assert.equal(await ev(overflow),false);
+   assert.equal(await ev('getComputedStyle(document.querySelector(".steps")).gridTemplateColumns.split(" ").length'),1);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".ops .btn,.ops select")].filter(e=>e.offsetParent&&e.getBoundingClientRect().height<43.5).map(e=>e.outerHTML.slice(0,60))'),[]);
+   await shot('admin-mobile-operations');
+   await go('/admin?view=completed');assert.equal(await ev(overflow),false);
    await size(1440);
   });
 

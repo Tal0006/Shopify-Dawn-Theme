@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import {config,type Config} from './config.js';
 import {database,migrate,type Database} from './db.js';
-import {Groups} from './groups.js';
+import {Groups,OPERATIONAL_STATUSES} from './groups.js';
 import {Areas} from './areas.js';
 import {Shopify,type CartValidator} from './shopify.js';
 import {Auth,same} from './auth.js';
@@ -80,6 +80,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   next();
  });
  const csrfOf=(res:express.Response)=>res.locals.session.csrf as string;
+ // Error codes the group page knows how to explain (anything else is ignored).
+ const GROUP_PAGE_ERRORS=['APPROVAL_NOT_ALLOWED','INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED'];
  const noticeOf=(value:unknown)=>typeof value==='string'&&/^[a-z_]{1,30}$/.test(value)?value:undefined;
  // Dashboard home: summary cards plus the server-side filtered, sorted and paginated groups table.
  app.get('/admin',async(req,res)=>{
@@ -87,8 +89,9 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   res.type('html').send(dashboardPage({metrics,list,areas:areaList,csrf:csrfOf(res)}));
  });
  app.get('/admin/groups/:publicId',async(req,res)=>{
-  const data=await admin.members(req.params.publicId,req.query);
-  res.type('html').send(groupPage({...data,csrf:csrfOf(res),notice:noticeOf(req.query.notice),error:noticeOf(req.query.error)||(req.query.error==='APPROVAL_NOT_ALLOWED'?'APPROVAL_NOT_ALLOWED':undefined)}));
+  const [data,timeline]=await Promise.all([admin.members(req.params.publicId,req.query),admin.timeline(req.params.publicId)]);
+  const error=typeof req.query.error==='string'&&GROUP_PAGE_ERRORS.includes(req.query.error)?req.query.error:noticeOf(req.query.error);
+  res.type('html').send(groupPage({...data,timeline,csrf:csrfOf(res),notice:noticeOf(req.query.notice),error,confirming:req.query.confirm==='complete'}));
  });
  app.get('/admin/groups/:publicId/members/:memberId',async(req,res)=>{
   const data=await admin.member(req.params.publicId,req.params.memberId);
@@ -166,6 +169,33 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   const {group,member,previous,changed}=await removeMember(res,req.params.publicId,req.params.memberId,req.body?.confirm===true);
   res.json({group,member,previous,changed});
  });
+ // Operational delivery workflow (admin only). The transition and its audit row commit together inside
+ // groups.setOperationalStatus; refused attempts are audited here. COMPLETED needs an explicit confirmation.
+ const operational=async(res:express.Response,id:string,body:{status?:unknown;confirm?:boolean})=>{
+  try{return await groups.setOperationalStatus(id,body,res.locals.actor);}
+  catch(error){
+   const target=typeof body.status==='string'&&(OPERATIONAL_STATUSES as readonly string[]).includes(body.status)?body.status:null;
+   await audit(db,{action:target==='COMPLETED'?'group.complete':'group.operational_status_change',actor:res.locals.actor,target:id,newStatus:target,
+    result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});
+   throw error;
+  }
+ };
+ app.post('/admin/groups/:publicId/operational-status',async(req,res)=>{
+  const id=req.params.publicId,base='/admin/groups/'+encodeURIComponent(id);
+  try{
+   const result=await operational(res,id,{status:req.body?.status,confirm:req.body?.confirm==='yes'});
+   res.redirect(303,base+'?notice='+(!result.changed?'operational_unchanged':result.status==='COMPLETED'?'delivery_completed':'operational_updated'));
+  }catch(error){
+   if(error instanceof ApiError&&GROUP_PAGE_ERRORS.includes(error.code)){res.redirect(303,base+'?error='+error.code);return;}
+   throw error;
+  }
+ });
+ app.post('/admin/api/groups/:publicId/operational-status',async(req,res)=>{
+  const result=await operational(res,req.params.publicId,{status:req.body?.status,confirm:req.body?.confirm===true});
+  const {_id,...group}=await admin.group(req.params.publicId);
+  res.json({previous:result.previous,status:result.status,changed:result.changed,group});
+ });
+ app.get('/admin/api/groups/:publicId/timeline',async(req,res)=>res.json({timeline:await admin.timeline(req.params.publicId)}));
  app.post('/admin/logout',async(req,res)=>auth.logout(req,res));
  app.get('/admin/api/audit',async(req,res)=>res.json(await auditPage(db,req.query)));
  // Delivery areas: same admin session, Origin and CSRF checks as group approval. HTML forms redirect; JSON API returns data.

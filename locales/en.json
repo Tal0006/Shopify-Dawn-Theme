@@ -845,6 +845,7 @@
     "withdraw_cancel": "Cancel",
     "withdrawn": "Your pledge was removed from the group.",
     "withdrawn_state": "Your pledge is not active right now. You can renew it from your current cart.",
+    "delivery_completed": "This group delivery has already been completed. To join the next delivery, choose your area and search for a group.",
     "standard": "This location may be within the standard delivery radius. Check ordinary delivery options before joining.",
     "status": {
       "open": "Open to join",

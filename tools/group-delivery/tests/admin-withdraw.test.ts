@@ -67,7 +67,7 @@ test('Admin removal of a customer from a group',{timeout:180000},async t=>{
    assert.match(page,/הסרת לקוח מהמשלוח הקבוצתי/);assert.match(page,/הלקוח יוסר מהקבוצה וההתחייבות שלו בסך .*80\.00.* תוסר מהסכום הכולל\./);
    assert.match(page,/הפעולה תישמר ביומן הפעולות\./);assert.match(page,/bob@example\.test/);assert.match(page,/\+972502222222/);assert.match(page,/אשדוד · <code dir="ltr">/);
    // Cancel first, with autofocus; the destructive button second.
-   assert.match(page,/<button type="submit" formmethod="dialog" formnovalidate class="btn btn--quiet" autofocus data-dialog-cancel>ביטול<\/button><button type="submit" class="btn btn--danger" data-withdraw-submit>הסר מהקבוצה<\/button>/);
+   assert.match(page,/<button type="submit" formmethod="dialog" formnovalidate class="btn btn--quiet" autofocus data-dialog-cancel>ביטול<\/button><button type="submit" class="btn btn--danger" data-once data-withdraw-submit>הסר מהקבוצה<\/button>/);
    assert.match(page,/action="\/admin\/groups\/[^"]+\/members\/[^"]+\/withdraw"/);assert.match(page,/name="confirm" value="yes"/);
    // Without JavaScript the trigger link renders the same confirmation in place.
    assert.match(await(await get('/admin/groups/'+g+'/members/'+ids.bob+'?confirm=withdraw')).text(),/<dialog id="withdraw-dialog"[^>]* open>/);
