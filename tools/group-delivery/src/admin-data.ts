@@ -3,7 +3,7 @@
 // pagination all run in SQL; the browser never receives more than one page.
 import type {Database} from './db.js';
 import {ApiError,publicId} from './domain.js';
-import type {Groups} from './groups.js';
+import {ACTIVE_MEMBER_STATUS,GROUP_CAPACITY,type Groups} from './groups.js';
 import type {CartValidator,SnapshotLine} from './shopify.js';
 
 // Every status allowed by the schema; only the first four are reachable by the current (non-payment) code paths.
@@ -68,12 +68,15 @@ const groupRow=(row:any)=>{
  };
 };
 const GROUP_SELECT=`SELECT g.*,a.public_id AS area_public_id,
- (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id AND m.status='PLEDGED')::int AS active_members,
+ (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id AND m.status='${ACTIVE_MEMBER_STATUS}')::int AS active_members,
  (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id)::int AS all_members
  FROM delivery_groups g LEFT JOIN delivery_areas a ON a.id=g.area_id`;
 const memberRow=(row:any)=>({
  id:row.id,email:row.email,phone:row.phone,status:row.status,pledgedTotalAgorot:Number(row.pledged_total_agorot),
- cartLines:Number(row.cart_lines),createdAt:new Date(row.created_at).toISOString(),updatedAt:new Date(row.updated_at).toISOString()
+ // Lines of the ACTIVE pledge. A withdrawn member's kept snapshot is history and is not counted here.
+ cartLines:row.status===ACTIVE_MEMBER_STATUS?Number(row.cart_lines):0,createdAt:new Date(row.created_at).toISOString(),updatedAt:new Date(row.updated_at).toISOString(),
+ // Recorded since migration 004; NULL for withdrawals made before it (and for active members).
+ withdrawnAt:row.withdrawn_at?new Date(row.withdrawn_at).toISOString():null,withdrawnBy:(row.withdrawn_by as 'MEMBER'|'ADMIN'|null)??null
 });
 // A dialable international number for tel:/WhatsApp links, or null (stored phones are normalized by domain.contact()).
 export const dialable=(phone:string)=>/^\+[1-9]\d{7,14}$/.test(phone)?phone:null;
@@ -96,7 +99,7 @@ export class AdminData{
    COUNT(*) FILTER (WHERE created_at>=$2)::int AS opened_week
    FROM delivery_groups`,[dayStart.toISOString(),weekStart.toISOString()])).rows[0];
   const customers=(await this.db.query(`SELECT COUNT(DISTINCT m.email)::int AS customers,COUNT(*)::int AS pledges FROM group_members m JOIN delivery_groups g ON g.id=m.group_id
-   WHERE m.status='PLEDGED' AND g.status IN ('OPEN','THRESHOLD_REACHED')`)).rows[0];
+   WHERE m.status='${ACTIVE_MEMBER_STATUS}' AND g.status IN ('OPEN','THRESHOLD_REACHED')`)).rows[0];
   return {
    activeGroups:row.active_groups,reachedGroups:row.reached_groups,approvedGroups:row.approved_groups,expiredGroups:row.expired_groups,allGroups:row.all_groups,
    activeCustomers:customers.customers,activePledges:customers.pledges,activePledgedAgorot:Number(row.active_pledged),
@@ -133,7 +136,8 @@ export class AdminData{
   const row=(await this.db.query(GROUP_SELECT+' WHERE g.public_id=$1',[publicId(id)])).rows[0];
   if(!row)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
   const withdrawn=(await this.db.query("SELECT COUNT(*)::int AS n FROM group_members m WHERE m.group_id=$1 AND m.status='WITHDRAWN'",[row.id])).rows[0].n;
-  return {...groupRow(row),withdrawnMembers:withdrawn,_id:row.id as string};
+  // Capacity: active members against the domain limit (withdrawn rows hold no slot).
+  return {...groupRow(row),withdrawnMembers:withdrawn,capacity:{active:Number(row.active_members),limit:GROUP_CAPACITY},_id:row.id as string};
  }
  async members(id:string,query:any){
   const group=await this.group(id),page=pageOf(query,50);
@@ -141,7 +145,7 @@ export class AdminData{
   const values:any[]=[group._id];let clause='WHERE group_id=$1';
   if(status){values.push(status);clause+=' AND status=$2';}
   const total=(await this.db.query('SELECT COUNT(*)::int AS n FROM group_members '+clause,values)).rows[0].n;
-  const rows=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at
+  const rows=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by
    FROM group_members ${clause} ORDER BY created_at ASC,id ASC LIMIT ${page.pageSize} OFFSET ${(page.page-1)*page.pageSize}`,values)).rows;
   const {_id,...publicGroup}=group;
   return {group:publicGroup,members:rows.map(memberRow),pagination:meta(page,total),memberStatus:status};
@@ -151,7 +155,7 @@ export class AdminData{
  async member(id:string,memberId:string,resolve=true){
   const group=await this.group(id);
   if(typeof memberId!=='string'||!UUID.test(memberId))throw new ApiError(404,'NOT_FOUND','הלקוח לא נמצא.');
-  const row=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,cart_snapshot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at
+  const row=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,cart_snapshot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by
    FROM group_members WHERE id=$1 AND group_id=$2`,[memberId,group._id])).rows[0];
   if(!row)throw new ApiError(404,'NOT_FOUND','הלקוח לא נמצא.');
   const snapshot:SnapshotLine[]=Array.isArray(row.cart_snapshot)?row.cart_snapshot:[];
@@ -169,12 +173,14 @@ export class AdminData{
     title:now?.title??null,currentUnitAgorot:now?.currentUnitAgorot??null,availableNow:now?now.available:null};
   });
   const {_id,...publicGroup}=group;
-  return {group:publicGroup,member:{...memberRow(row),snapshotTotalAgorot:lines.reduce((sum,line)=>sum+line.storedLineAgorot,0),lines,productLookup}};
+  return {group:publicGroup,member:{...memberRow(row),
+   // HISTORICAL: the last cart kept after a withdrawal; never counted, restored or used for checkout.
+   snapshotKind:row.status===ACTIVE_MEMBER_STATUS?'ACTIVE' as const:'HISTORICAL' as const,historicalLines:row.status===ACTIVE_MEMBER_STATUS?0:Number(row.cart_lines),snapshotTotalAgorot:lines.reduce((sum,line)=>sum+line.storedLineAgorot,0),lines,productLookup}};
  }
- // All members of a group for the CSV exports (no pagination: a group holds at most 100 members by domain rule).
+ // All members of a group for the CSV exports (no pagination: at most GROUP_CAPACITY active members plus their withdrawn history).
  async exportRows(id:string){
   const group=await this.group(id);
-  const rows=(await this.db.query('SELECT id,email,phone,status,pledged_total_agorot,cart_snapshot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at FROM group_members WHERE group_id=$1 ORDER BY created_at ASC,id ASC',[group._id])).rows;
+  const rows=(await this.db.query('SELECT id,email,phone,status,pledged_total_agorot,cart_snapshot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by FROM group_members WHERE group_id=$1 ORDER BY created_at ASC,id ASC',[group._id])).rows;
   const {_id,...publicGroup}=group;
   return {group:publicGroup,members:rows.map((row:any)=>({...memberRow(row),snapshot:Array.isArray(row.cart_snapshot)?row.cart_snapshot as SnapshotLine[]:[]}))};
  }

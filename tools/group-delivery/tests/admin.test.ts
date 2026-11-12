@@ -113,7 +113,7 @@ test('Admin dashboard service',{timeout:180000},async t=>{
    const group=(await json('/admin/api/groups/'+ids.ashdod,cookie)).group;
    assert.deepEqual([group.areaName,group.status,group.activeMembers,group.totalMembers,group.withdrawnMembers,group.pledgedTotalAgorot,group.thresholdAgorot,group.progressPercent],['אשדוד','OPEN',2,3,1,37500,50000,75]);
    const members=await json('/admin/api/groups/'+ids.ashdod+'/members',cookie);
-   assert.equal(members.members.length,3);assert.deepEqual(Object.keys(members.members[0]).sort(),['cartLines','createdAt','email','id','phone','pledgedTotalAgorot','status','updatedAt']);
+   assert.equal(members.members.length,3);assert.deepEqual(Object.keys(members.members[0]).sort(),['cartLines','createdAt','email','id','phone','pledgedTotalAgorot','status','updatedAt','withdrawnAt','withdrawnBy']);
    assert.equal(members.members[0].email,'dana@example.test');assert.equal(members.members[0].phone,'+972501234567');assert.equal(members.members[0].cartLines,2);
    assert.deepEqual((await json('/admin/api/groups/'+ids.ashdod+'/members?memberStatus=WITHDRAWN',cookie)).members.map((m:any)=>m.email),['leaving@example.test']);
    assert.deepEqual((await json('/admin/api/groups/'+ids.ashdod+'/members?pageSize=5&page=1',cookie)).pagination,{page:1,pageSize:5,total:3,pageCount:1});

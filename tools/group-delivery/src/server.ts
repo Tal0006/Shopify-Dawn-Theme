@@ -92,7 +92,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  });
  app.get('/admin/groups/:publicId/members/:memberId',async(req,res)=>{
   const data=await admin.member(req.params.publicId,req.params.memberId);
-  res.type('html').send(memberPage({...data,csrf:csrfOf(res)}));
+  const error=typeof req.query.error==='string'&&['GROUP_CLOSED','WITHDRAW_CONFIRMATION_REQUIRED'].includes(req.query.error)?req.query.error:undefined;
+  res.type('html').send(memberPage({...data,csrf:csrfOf(res),error,confirming:req.query.confirm==='withdraw'}));
  });
  app.get('/admin/areas',async(req,res)=>res.type('html').send(areasPage({areas:await areas.adminList(),csrf:csrfOf(res),notice:noticeOf(req.query.notice)})));
  app.get('/admin/audit',async(req,res)=>res.type('html').send(auditView({...await auditPage(db,req.query),csrf:csrfOf(res)})));
@@ -112,7 +113,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   await audit(db,{action:'group.export',actor:res.locals.actor,target:group.publicId,result:'OK',detail:'cart-lines'});
   sendCsv(res,'group-'+group.shortId+'-cart-lines.csv',csv([
    ['מזהה קבוצה','אימייל','טלפון','סטטוס לקוח','מזהה וריאנט','כמות','מחיר יחידה שנשמר (₪)','סה"כ שורה שנשמר (₪)'],
-   ...members.flatMap(m=>m.snapshot.map(line=>{const unit=/^\d{1,12}$/.test(String(line.unitAgorot))?Number(line.unitAgorot):0;
+   // Active pledges only: a withdrawn member's kept snapshot is history, not part of the order.
+   ...members.filter(m=>m.status==='PLEDGED').flatMap(m=>m.snapshot.map(line=>{const unit=/^\d{1,12}$/.test(String(line.unitAgorot))?Number(line.unitAgorot):0;
     return [group.publicId,m.email,m.phone,m.status,String(line.variantId).replace('gid://shopify/ProductVariant/',''),Number(line.quantity),(unit/100).toFixed(2),(unit*Number(line.quantity)/100).toFixed(2)];}))
   ]));
  });
@@ -135,6 +137,35 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   res.redirect(303,base+'?notice=approved');
  });
  app.post('/admin/api/groups/:publicId/approve',async(req,res)=>res.json({group:await approve(res,req.params.publicId)}));
+ // Store-owner removal of a customer: the same domain withdrawal as the customer's own (row kept as WITHDRAWN, totals
+ // recalculated under the coordination lock). Explicit confirmation, audited with safe metadata only. Idempotent.
+ const removeMember=async(res:express.Response,id:string,memberId:string,confirmed:boolean)=>{
+  const base={action:'member.withdraw' as const,actor:res.locals.actor,target:id,subject:memberId};
+  try{
+   const result=await groups.adminWithdraw(id,memberId,{confirm:confirmed});
+   await audit(db,{...base,result:'OK',previousStatus:result.previous.status,amountAgorot:result.previous.pledgedTotalAgorot,detail:result.changed?null:'ALREADY_WITHDRAWN'});
+   return result;
+  }catch(error){
+   await audit(db,{...base,result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});
+   throw error;
+  }
+ };
+ app.post('/admin/groups/:publicId/members/:memberId/withdraw',async(req,res)=>{
+  const {publicId:id,memberId}=req.params,member='/admin/groups/'+encodeURIComponent(id)+'/members/'+encodeURIComponent(memberId);
+  if(req.body?.confirm!=='yes'){res.redirect(303,member+'?error=WITHDRAW_CONFIRMATION_REQUIRED');return;}
+  try{
+   const result=await removeMember(res,id,memberId,true);
+   res.redirect(303,'/admin/groups/'+encodeURIComponent(id)+'?notice='+(result.changed?'member_withdrawn':'member_already_withdrawn'));
+  }catch(error){
+   // Known refusals go back to the unchanged member page with a safe message; anything else is the generic error page.
+   if(error instanceof ApiError&&['GROUP_CLOSED','WITHDRAW_CONFIRMATION_REQUIRED'].includes(error.code)){res.redirect(303,member+'?error='+error.code);return;}
+   throw error;
+  }
+ });
+ app.post('/admin/api/groups/:publicId/members/:memberId/withdraw',async(req,res)=>{
+  const {group,member,previous,changed}=await removeMember(res,req.params.publicId,req.params.memberId,req.body?.confirm===true);
+  res.json({group,member,previous,changed});
+ });
  app.post('/admin/logout',async(req,res)=>auth.logout(req,res));
  app.get('/admin/api/audit',async(req,res)=>res.json(await auditPage(db,req.query)));
  // Delivery areas: same admin session, Origin and CSRF checks as group approval. HTML forms redirect; JSON API returns data.
@@ -168,7 +199,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   const code:ErrorCode=error instanceof ApiError?error.code:status===413?'BODY_TOO_LARGE':status===400?'INVALID_INPUT':'SERVICE_UNAVAILABLE';
   // Never serialize exception/provider/database text, customer input, headers or config.
   const message=error instanceof ApiError?error.message:'לא ניתן להשלים את הבקשה כרגע.';
-  if(_req.path.startsWith('/admin')&&!_req.path.startsWith('/admin/api/')&&['GET','HEAD'].includes(_req.method)&&_req.path!=='/admin/style.css'&&_req.path!=='/admin/app.js'){
+  // Admin pages and HTML form posts (approve, remove, areas) get a friendly page; /admin/api and assets keep JSON.
+  if(_req.path.startsWith('/admin')&&!_req.path.startsWith('/admin/api/')&&_req.path!=='/admin/style.css'&&_req.path!=='/admin/app.js'){
    res.status(status).type('html').send(errorPage(status,message,res.locals.session?.csrf));return;
   }
   res.status(status).json({error:message,code});

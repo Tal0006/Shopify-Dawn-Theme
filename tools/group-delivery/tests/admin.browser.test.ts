@@ -89,7 +89,7 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    assert.equal(await ev('document.querySelector(".meter--large [role=progressbar]").getAttribute("aria-valuenow")'),'75');
    assert.match(await ev('document.querySelector(".meter--large").textContent'),/375\.00.*500\.00/);
    assert.equal(await ev('document.querySelectorAll(".table--members tbody tr").length'),3);
-   assert.deepEqual(await ev('[...document.querySelectorAll(".table--members .chip")].map(c=>c.textContent)'),['התחייבות פעילה','התחייבות פעילה','ההתחייבות הוסרה']);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".table--members .chip")].map(c=>c.textContent)'),['התחייבות פעילה','התחייבות פעילה','פרש מהקבוצה']);
    const links=await ev('[...document.querySelector(".table--members tbody tr").querySelectorAll("a.icon-btn")].map(a=>[a.getAttribute("href"),a.target,a.rel])');
    assert.deepEqual(links,[['mailto:dana@example.test','',''],['tel:+972501234567','',''],['https://wa.me/972501234567','_blank','noopener noreferrer']]);
    const csv=await ev('[...document.querySelectorAll("a[download]")].map(a=>a.getAttribute("href"))');
@@ -118,6 +118,88 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    assert.deepEqual(await ev('[...document.querySelectorAll("tbody tr td:first-child")].map(td=>td.textContent.trim())'),['מוצר 1 #1','מוצר 2 #2']);
    assert.match(await ev('document.querySelector("tfoot").textContent'),/סכום התחייבות שנשמר.*250\.00/);
    await shot('admin-member');
+  });
+
+  await t.test('removing a customer: modal confirmation, Cancel/Escape change nothing, confirm updates totals, filters, errors',async()=>{
+   const members=await ev('fetch("/admin/api/groups/'+ids.ashdod+'/members").then(r=>r.json()).then(d=>d.members.map(m=>[m.id,m.email,m.status]))');
+   const [dana,second,leaving]=members;
+   const status=async(id:string)=>ev('fetch("/admin/api/groups/'+ids.ashdod+'/members/'+id+'").then(r=>r.json()).then(d=>d.member.status)');
+   // Enter carries its character so it activates buttons as well as links (a real key press).
+   const key=async(key:string,code:string,vk:number)=>{for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key,code,windowsVirtualKeyCode:vk,...(type==='keyDown'&&key==='Enter'?{text:String.fromCharCode(13)}:{})});};
+   // Only a PLEDGED member of an active group gets the action.
+   await go('/admin/groups/'+ids.ashdod+'/members/'+leaving[0]);
+   assert.equal(await ev('!!document.querySelector("[data-open-dialog]")'),false);assert.equal(await ev('document.querySelector(".page-head .chip").textContent'),'פרש מהקבוצה','self-withdrawal label');
+   await go('/admin/groups/'+ids.ashdod+'/members/'+second[0]);
+   assert.equal(await ev('document.querySelector("[data-open-dialog]").textContent'),'הסר מהמשלוח הקבוצתי');
+   assert.equal(await ev('document.querySelector("#withdraw-dialog").open'),false);
+   // Keyboard: Enter on the trigger opens a modal dialog with focus on Cancel; Escape closes it and focus returns.
+   await ev('document.querySelector("[data-open-dialog]").focus()');await key('Enter','Enter',13);
+   await wait('document.querySelector("#withdraw-dialog").matches(":modal")');
+   assert.equal(await ev('document.activeElement.textContent'),'ביטול');
+   const text=await ev('document.querySelector("#withdraw-dialog").innerText');
+   assert.match(text,/הסרת לקוח מהמשלוח הקבוצתי/);assert.match(text,new RegExp(second[1].replace(/[.]/g,'\\.')));assert.match(text,/125\.00/);assert.match(text,/אשדוד/);assert.match(text,/הפעולה תישמר ביומן הפעולות/);
+   await key('Escape','Escape',27);
+   await wait('!document.querySelector("#withdraw-dialog").open');
+   assert.equal(await ev('document.activeElement.hasAttribute("data-open-dialog")'),true,'focus restored to the trigger');
+   // Cancel button: closes, no request, no loading state.
+   await ev('document.querySelector("[data-open-dialog]").click()');await wait('document.querySelector("#withdraw-dialog").open');
+   await ev('document.querySelector("[data-dialog-cancel]").click()');
+   await wait('!document.querySelector("#withdraw-dialog").open');
+   assert.equal(await ev('document.body.hasAttribute("data-loading")'),false);assert.equal(await ev('location.pathname'),'/admin/groups/'+ids.ashdod+'/members/'+second[0]);
+   assert.equal(await status(second[0]),'PLEDGED','Cancel and Escape change nothing');
+   await size(1440);await ev('document.querySelector("[data-open-dialog]").click()');await wait('document.querySelector("#withdraw-dialog").open');await shot('admin-remove-dialog');
+   // Tab moves from Cancel to the destructive button (focus stays in the modal); Enter confirms.
+   await ev('document.querySelector("[data-dialog-cancel]").focus()');await key('Tab','Tab',9);
+   assert.equal(await ev('document.activeElement.textContent'),'הסר מהקבוצה');
+   await key('Enter','Enter',13);
+   await wait('location.pathname==="/admin/groups/'+ids.ashdod+'"&&!!document.querySelector(".notice--ok")');
+   assert.equal(await ev('document.querySelector(".notice--ok").textContent'),'הלקוח הוסר מהמשלוח הקבוצתי.');
+   // ₪375 − ₪125 = ₪250 of ₪500: totals, progress, counts and badges come from the server after the change.
+   assert.equal(await ev('document.querySelector(".meter--large [role=progressbar]").getAttribute("aria-valuenow")'),'50');
+   assert.match(await ev('document.querySelector(".meter--large").textContent'),/250\.00.*500\.00/);
+   assert.match(await ev('document.querySelector(".facts").textContent'),/משתתפים פעילים1 · 2 הוסרו מהקבוצה/);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".table--members .chip")].map(c=>c.textContent)'),['התחייבות פעילה','הוסר על ידי מנהל','פרש מהקבוצה'],'store-owner removal and self-withdrawal are told apart');
+   await shot('admin-group-after-remove');
+   // Filters: הכול / פעילים / הוסרו מהקבוצה.
+   const filter=async(label:string,rows:number)=>{
+    await ev('[...document.querySelectorAll(".segmented__item")].find(a=>a.textContent==='+JSON.stringify(label)+').click()');
+    await wait('document.querySelector(".segmented__item[aria-current]")?.textContent==='+JSON.stringify(label)+'&&document.querySelectorAll(".table--members tbody tr").length==='+rows);
+   };
+   await filter('הוסרו מהקבוצה',2);await filter('פעילים',1);await filter('הכול',3);
+   // The removed customer's page: who and when, and the kept cart shown as history only.
+   await go('/admin/groups/'+ids.ashdod+'/members/'+second[0]);
+   assert.equal(await ev('document.querySelector(".page-head .chip").textContent'),'הוסר על ידי מנהל');
+   assert.equal(await ev('document.querySelector("#cart-title").textContent'),'הסל האחרון לפני ההסרה');
+   assert.match(await ev('document.querySelector("tfoot").textContent'),/סכום הסל לפני ההסרה \(היסטורי\).*125\.00/);
+   assert.equal(await ev('[...document.querySelectorAll(".facts dt")].some(dt=>dt.textContent==="מועד היציאה"&&dt.nextElementSibling.querySelector("time"))'),true);
+   assert.equal(await ev('!!document.querySelector("[data-open-dialog]")'),false);
+   await shot('admin-member-removed');
+   // Failure: the group closes while the dialog is open. The member page comes back unchanged with a safe error.
+   await go('/admin/groups/'+ids.ashdod+'/members/'+dana[0]);
+   await ev('document.querySelector("[data-open-dialog]").click()');await wait('document.querySelector("#withdraw-dialog").open');
+   await f.db.query("UPDATE delivery_groups SET expires_at=NOW()-INTERVAL '1 minute' WHERE public_id=$1",[ids.ashdod]);
+   await ev('document.querySelector("[data-withdraw-submit]").click()');
+   await wait('location.search==="?error=GROUP_CLOSED"&&!!document.querySelector(".notice--error")');
+   assert.equal(await ev('document.querySelector(".notice--error").textContent'),'לא ניתן להסיר לקוח מקבוצה שאינה פעילה. לא בוצע שינוי.');
+   assert.equal(await ev('document.querySelector(".page-head .chip").textContent'),'התחייבות פעילה','no optimistic status change');
+   assert.match(await ev('document.querySelector(".facts").textContent'),/250\.00/,'pledge still shown');
+   assert.equal(await status(dana[0]),'PLEDGED');
+   assert.equal(await ev('!!document.querySelector("[data-open-dialog]")'),false,'a closed group offers no removal');
+  });
+
+  await t.test('removal dialog on mobile: fits the viewport with 44px buttons',async()=>{
+   await size(390,844);
+   const reached=await ev('fetch("/admin/api/groups/'+ids.reached+'/members").then(r=>r.json()).then(d=>d.members[0].id)');
+   await go('/admin/groups/'+ids.reached+'/members/'+reached);
+   assert.equal(await ev(overflow),false);
+   await ev('document.querySelector("[data-open-dialog]").click()');await wait('document.querySelector("#withdraw-dialog").matches(":modal")');
+   const box=await ev('(()=>{const r=document.querySelector("#withdraw-dialog").getBoundingClientRect();return [r.left,r.right,innerWidth];})()');
+   assert.ok(box[0]>=15&&box[1]<=box[2]-15,'16px gutters: '+box);
+   assert.deepEqual(await ev('[...document.querySelectorAll("#withdraw-dialog .btn")].map(b=>b.getBoundingClientRect().height>=44)'),[true,true]);
+   assert.equal(await ev(overflow),false);
+   if(shots){writeFileSync(join(shots,'admin-mobile-remove-dialog.png'),Buffer.from((await call('Page.captureScreenshot',{format:'png'})).data,'base64'));}
+   await ev('document.querySelector("[data-dialog-cancel]").click()');await wait('!document.querySelector("#withdraw-dialog").open');
+   await size(1440);
   });
 
   await t.test('mobile: stacked cards, no horizontal overflow, 44px targets',async()=>{

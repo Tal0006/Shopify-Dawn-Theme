@@ -7,7 +7,7 @@ export const PUBLIC_ERROR_CODES=['INVALID_INPUT','INVALID_LOCATION','INVALID_CAR
  'ALREADY_JOINED','MEMBER_AUTH_REQUIRED','RATE_LIMITED','INVALID_HOST','INVALID_ORIGIN','NOT_FOUND','BODY_TOO_LARGE','SERVICE_UNAVAILABLE',
  'INVALID_AREA','INVALID_COORDINATES','EMPTY_CART_CANNOT_UPDATE_PLEDGE','WITHDRAW_CONFIRMATION_REQUIRED'] as const;
 // Merchant-only /admin codes; never shown on the storefront.
-export const ADMIN_ERROR_CODES=['LOGIN_FAILED','ADMIN_AUTH_REQUIRED','CSRF_REQUIRED','INVALID_CONTENT_TYPE','APPROVAL_NOT_ALLOWED','AREA_EXISTS','AREA_NOT_FOUND'] as const;
+export const ADMIN_ERROR_CODES=['LOGIN_FAILED','ADMIN_AUTH_REQUIRED','CSRF_REQUIRED','INVALID_CONTENT_TYPE','APPROVAL_NOT_ALLOWED','AREA_EXISTS','AREA_NOT_FOUND','MEMBER_NOT_FOUND'] as const;
 export type ErrorCode=typeof PUBLIC_ERROR_CODES[number]|typeof ADMIN_ERROR_CODES[number];
 export class ApiError extends Error {constructor(public status:number,public code:ErrorCode, message='לא ניתן להשלים את הבקשה. יש לבדוק את הפרטים ולנסות שוב.'){super(message)}}
 export const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
