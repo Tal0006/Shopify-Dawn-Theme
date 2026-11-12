@@ -43,24 +43,30 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    .replace(/<script type="application\/json" data-group-labels>[\s\S]*?<\/script>/,'<script type="application/json" data-group-labels>'+JSON.stringify(labels)+'</script>')
    .replace(/<script type="application\/json" data-group-errors>[\s\S]*?<\/script>/,'<script type="application/json" data-group-errors>'+JSON.stringify(errors)+'</script>')
    .replace(/{{ group_delivery_service_url \| escape }}/g,'https://groups.example.test')
-   .replace(/{{ routes.cart_url }}/g,'/he/cart').replace(/{{ section.id }}/g,'fixture').replace(/{{ request.locale.iso_code }}/g,'he')
-   .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escape(key.split('.').reduce((a,k)=>a[k],tr).replace('{{ area }}','__AREA__').replace('{{ count }}','__COUNT__').replace('{{ amount }}','__AMOUNT__').replace('{{ target }}','__TARGET__')));
+   .replace(/{{ routes.cart_url }}/g,'/he/cart').replace(/{{ routes.cart_add_url }}/g,'/he/cart/add').replace(/{{ section.id }}/g,'fixture').replace(/{{ request.locale.iso_code }}/g,'he')
+   .replace(/{{ '([^']+)' \| t[^}]*}}/g,(_m,key)=>escape(key.split('.').reduce((a,k)=>a[k],tr).replace('{{ area }}','__AREA__').replace('{{ count }}','__COUNT__').replace('{{ amount }}','__AMOUNT__').replace('{{ target }}','__TARGET__').replace('{{ old_price }}','__OLD__').replace('{{ new_price }}','__NEW__').replace('{{ old_quantity }}','__OLD__').replace('{{ new_quantity }}','__NEW__').replace('{{ quantity }}','__QUANTITY__')));
   await ev('document.querySelector("main").innerHTML='+JSON.stringify(markup));
   await ev(`
    sessionStorage.clear();localStorage.clear();window.requests=[];window.logged=[];window.existing=true;window.updateResponse=null;window.getResponse=null;
    for(const level of ['log','info','warn','error','debug']){const original=console[level].bind(console);console[level]=(...args)=>{logged.push(args.map(String).join(' '));original(...args);};}window.geoCalls=0;window.apiFailure=false;window.quantity=1;
-   window.geoMode='success';window.nearestArea=null;
+   window.geoMode='success';window.nearestArea=null;window.cartItems=null;window.cartAdds=[];window.cartAddResponse=null;window.memberResponse=null;window.withdrawResponse=null;
+   // One re-checked snapshot line as POST /groups/:id/member returns it (defaults: variant 101, unchanged).
+   window.memberLine=(over={})=>({variantId:'101',title:'אבקת כביסה',quantity:1,storedUnitAgorot:1590,currentUnitAgorot:1590,available:true,restorableQuantity:over.quantity??1,maxAvailableQuantity:100,priceChanged:false,reason:'AVAILABLE',...over});
    window.geolocationMock={getCurrentPosition(success,fail){geoCalls++;if(geoMode==='denied')fail({code:1});else if(geoMode==='error')fail({code:2});else success({coords:{latitude:31.812345,longitude:34.654321}});}};
    Object.defineProperty(navigator,'geolocation',{configurable:true,value:geolocationMock});
    window.areaList=[{"publicId":"6f1a2c00-0001-4a00-8000-0000000000a1","name":"באר שבע"},{"publicId":"6f1a2c00-0002-4a00-8000-0000000000a2","name":"אשדוד"},{"publicId":"6f1a2c00-0003-4a00-8000-0000000000a3","name":"אשקלון"},{"publicId":"6f1a2c00-0004-4a00-8000-0000000000a4","name":"קריית גת"},{"publicId":"6f1a2c00-0005-4a00-8000-0000000000a5","name":"נתיבות"},{"publicId":"6f1a2c00-0006-4a00-8000-0000000000a6","name":"אופקים"},{"publicId":"6f1a2c00-0007-4a00-8000-0000000000a7","name":"שדרות"}];
    window.group={publicId:'11111111-1111-4111-8111-111111111111',areaName:'אשדוד',status:'OPEN',participantCount:5,currency:'ILS',thresholdAgorot:50000,pledgedTotalAgorot:36500,remainingAmountAgorot:13500,progressPercent:73,expiresAt:'2050-01-01T00:00:00.000Z'};
    window.fetch=async(input,options={})=>{
     const url=new URL(input,location.origin),body=options.body?JSON.parse(options.body):null;requests.push({url:url.href,method:options.method||'GET',body,headers:options.headers});
+    if(url.pathname==='/he/cart.js'&&window.cartItems)return new Response(JSON.stringify({currency:'ILS',total_price:cartItems.reduce((sum,item)=>sum+item.quantity*(item.price||1590),0),items:cartItems.map(({price,...item})=>item)}));
+    if(url.pathname==='/he/cart/add.js'){cartAdds.push(body);if(window.cartAddResponse)return new Response(JSON.stringify(cartAddResponse.body),{status:cartAddResponse.status});window.cartItems=body.items.map(item=>({variant_id:Number(item.id),quantity:item.quantity,properties:{}}));return new Response(JSON.stringify({items:body.items}));}
     if(url.pathname==='/he/cart.js')return new Response(JSON.stringify({currency:'ILS',total_price:1590*quantity,items:quantity?[{variant_id:101,quantity,properties:{}}]:[]}));
     if(window.apiDelay){const delay=apiDelay;await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,delay);options.signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(new DOMException('Aborted','AbortError'));},{once:true});});}
     if(window.apiNetworkError)throw new TypeError('Failed to fetch');
     if(window.apiResponse)return new Response(apiResponse.raw??JSON.stringify(apiResponse.body),{status:apiResponse.status});
     if(apiFailure)return new Response(JSON.stringify({code:'SERVICE_UNAVAILABLE',error:'upstream secret must not display'}),{status:503});
+    if(url.pathname.endsWith('/member')){if(window.memberResponse)return new Response(JSON.stringify(memberResponse.body),{status:memberResponse.status});return new Response(JSON.stringify({member:{status:'PLEDGED',pledgedTotalAgorot:1590*Math.max(1,quantity),cartCheck:'OK',cart:[memberLine({quantity:Math.max(1,quantity)})]}}));}
+    if(url.pathname.endsWith('/withdraw')){if(window.withdrawResponse)return new Response(JSON.stringify(withdrawResponse.body),{status:withdrawResponse.status});group={...group,participantCount:group.participantCount-1,pledgedTotalAgorot:group.pledgedTotalAgorot-1590};return new Response(JSON.stringify({group,member:{status:'WITHDRAWN',pledgedTotalAgorot:0}}));}
     if(url.pathname.endsWith('/update-pledge')&&window.updateResponse)return new Response(JSON.stringify(updateResponse.body),{status:updateResponse.status});
     if(!body&&url.pathname.includes('/groups/')&&window.getResponse)return new Response(JSON.stringify(getResponse.body),{status:getResponse.status});
     if(url.pathname.endsWith('/api/v1/areas'))return new Response(JSON.stringify({areas:areaList}));
@@ -126,9 +132,14 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.ok(await ev('requests.every(r=>!r.url.includes("checkout")&&!r.url.includes("draft"))'));
   });
   await t.test('Empty carts, safe errors, explicit refresh and closed groups remain usable',async()=>{
+   // A returning member with an empty Shopify cart: the update is never sent (an empty cart is not a withdrawal).
+   const updates=await ev('requests.filter(r=>r.url.endsWith("/update-pledge")).length');
    await ev('quantity=0;widget.querySelector("[data-join-group]").requestSubmit()');await wait('!widget.hasAttribute("aria-busy")');
-   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.updated);
-   assert.deepEqual(await ev('requests.filter(r=>r.url.endsWith("/update-pledge")).at(-1).body.lines'),[]);
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_empty_update);
+   assert.equal(await ev('requests.filter(r=>r.url.endsWith("/update-pledge")).length'),updates,'no update request for an empty cart');
+   assert.ok(await ev('requests.every(r=>!(r.url.endsWith("/update-pledge")&&Array.isArray(r.body?.lines)&&!r.body.lines.length))'),'never lines: []');
+   assert.equal(await ev('widget.querySelector("[data-recovery]").hidden'),false,'recovery state instead');
+   assert.equal(await ev('widget.querySelector("[data-join-button]").hidden'),true,'no update action on an empty cart');
    await ev('quantity=1;apiFailure=true;widget.querySelector("[data-refresh]").click()');await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_unavailable);
    assert.ok(!(await ev('widget.message.textContent')).includes('secret'));
@@ -190,6 +201,125 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    // Restore the membership for the following tests.
    await ev('window.getResponse=null;localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));'+reconnect);
    await wait('!widget.hasAttribute("aria-busy")');
+  });
+  // Returning members (receipt in localStorage): the pledge never changes without an explicit action.
+  const memberReads='requests.filter(r=>r.url.endsWith("/member")).length',updateCount='requests.filter(r=>r.url.endsWith("/update-pledge")).length';
+  const settle=async()=>wait('!widget.hasAttribute("aria-busy")');
+  const restart='{sessionStorage.clear();'+reconnect+'}';
+  await t.test('Returning member, same cart: the current pledge is shown with the normal update action and no recovery',async()=>{
+   await ev('group.status="OPEN";quantity=1;cartItems=null;memberResponse=null;'+restart);await settle();
+   assert.ok(await ev('requests.some(r=>r.url.endsWith("/groups/"+group.publicId+"/member")&&r.method==="POST"&&r.headers.Authorization==="Bearer "+"a".repeat(64))'),'authenticated member read');
+   assert.equal(await ev('widget.querySelector("[data-member]").hidden'),false);
+   assert.equal(await ev('widget.querySelector("[data-member-pledge]").textContent'),await ev(JSON.stringify(tr.group_delivery.current_pledge.replace('{{ amount }}','__AMOUNT__'))+'.replace("__AMOUNT__",widget.currency.format(15.9))'));
+   assert.deepEqual(await ev('["[data-recovery]","[data-member-cart]","[data-member-note]","[data-review]"].map(s=>widget.querySelector(s).hidden)'),[true,true,true,true]);
+   assert.deepEqual(await ev('[widget.querySelector("[data-join-button]").hidden,widget.querySelector("[data-join-button]").textContent,widget.querySelector("[data-withdraw]").hidden]'),[false,tr.group_delivery.update,false]);
+  });
+  await t.test('Returning member, different cart: both amounts shown, nothing updated until the shopper chooses to',async()=>{
+   const before=await ev(updateCount);
+   await ev('quantity=2;memberResponse={status:200,body:{member:{status:"PLEDGED",pledgedTotalAgorot:1590,cartCheck:"OK",cart:[memberLine()]}}};'+restart);await settle();
+   assert.equal(await ev(updateCount),before,'no automatic update');
+   assert.equal(await ev('widget.querySelector("[data-member-cart]").hidden'),false);
+   assert.ok(await ev('widget.querySelector("[data-member-pledge]").textContent.includes("15.90")'),'pledge');
+   assert.ok(await ev('widget.querySelector("[data-member-cart]").textContent.includes("31.80")'),'current cart');
+   assert.equal(await ev('widget.querySelector("[data-member-note]").textContent'),tr.group_delivery.cart_differs);
+   assert.equal(await ev('widget.querySelector("[data-join-button]").textContent'),tr.group_delivery.update_current);
+   await ev('memberResponse=null;widget.querySelector("[data-join-group]").requestSubmit()');await settle();
+   assert.deepEqual(await ev('requests.filter(r=>r.url.endsWith("/update-pledge")).at(-1).body'),{lines:[{variantId:'101',quantity:2}]});
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.updated);
+   assert.equal(await ev('widget.querySelector("[data-join-button]").textContent'),tr.group_delivery.update,'pledge now matches the cart');
+  });
+  const restoreLines='[memberLine(),memberLine({variantId:"102",title:"מרכך כביסה",quantity:2,restorableQuantity:2,currentUnitAgorot:1790,priceChanged:true}),memberLine({variantId:"103",title:"סבון כלים",quantity:4,restorableQuantity:2,maxAvailableQuantity:2,reason:"QUANTITY_REDUCED"}),memberLine({variantId:"104",title:"ספוג",quantity:1,restorableQuantity:0,available:false,currentUnitAgorot:null,maxAvailableQuantity:null,reason:"UNAVAILABLE"})]';
+  await t.test('Returning member, empty Shopify cart: recovery state, review before restoring, only current lines added, pledge untouched',async()=>{
+   const before=await ev(updateCount);
+   await ev('quantity=0;cartItems=null;memberResponse={status:200,body:{member:{status:"PLEDGED",pledgedTotalAgorot:1590+3180+6360+1590,cartCheck:"OK",cart:'+restoreLines+'}}};'+restart);await settle();
+   assert.equal(await ev('widget.querySelector("[data-recovery]").hidden'),false);
+   assert.ok(await ev('widget.querySelector("[data-recovery]").textContent.includes('+JSON.stringify(tr.group_delivery.member_found_heading)+')&&widget.querySelector("[data-recovery]").textContent.includes('+JSON.stringify(tr.group_delivery.member_found_text)+')'));
+   assert.equal(await ev('widget.querySelector("[data-join-button]").hidden'),true,'no update action on an empty cart');
+   assert.equal(await ev('widget.querySelector("[data-empty-cart]").hidden'),true,'recovery replaces the generic empty-cart notice');
+   assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),true,'still recognised as the member');
+   assert.ok(!(await ev('widget.textContent')).includes('טאב'),'no "original tab" instruction');
+   // Show the existing pledge: read-only list, no restore action.
+   await ev('widget.querySelector("[data-show-pledge]").click()');await settle();
+   assert.deepEqual(await ev('[widget.querySelector("[data-review]").hidden,widget.querySelector("[data-review-title]").textContent,widget.querySelectorAll("[data-review-list] li").length,widget.querySelector("[data-review-actions]").hidden]'),[false,tr.group_delivery.pledge_items,4,true]);
+   assert.ok(await ev('widget.querySelector("[data-review-note]").textContent.includes("127.20")'),'current pledge amount');
+   // Restore: a fresh Shopify re-check, every change explained before the cart changes.
+   const reads=await ev(memberReads);
+   await ev('widget.querySelector("[data-restore]").click()');await settle();
+   assert.equal(await ev(memberReads),reads+1,'re-checked now, not from an earlier read');
+   assert.equal(await ev('widget.querySelector("[data-review-title]").textContent'),tr.group_delivery.restore_review);
+   assert.equal(await ev('document.activeElement===widget.querySelector("[data-review-title]")'),true,'focus moves to the review');
+   assert.equal(await ev('widget.querySelector("[data-review-actions]").hidden'),false);
+   const items=await ev('[...widget.querySelectorAll("[data-review-list] li")].map(li=>({state:li.dataset.state,text:li.textContent}))');
+   assert.equal(items[0].state,'unchanged');assert.ok(items[0].text.includes(tr.group_delivery.restore_unchanged));
+   assert.equal(items[1].state,'changed');assert.ok(items[1].text.includes('15.90')&&items[1].text.includes('17.90'),'old and new price');
+   assert.equal(items[2].state,'changed');assert.ok(items[2].text.includes(tr.group_delivery.restore_quantity.replace('{{ old_quantity }}','4').replace('{{ new_quantity }}','2')));
+   assert.equal(items[3].state,'unavailable');assert.ok(items[3].text.includes(tr.group_delivery.restore_unavailable));
+   assert.equal(await ev('cartAdds.length'),0,'nothing added before confirming');
+   await ev('window.cartChanged=0;document.addEventListener("storefront:cart:changed",()=>cartChanged++,{once:true});widget.querySelector("[data-restore-confirm]").click()');await settle();
+   assert.deepEqual(await ev('cartAdds.at(-1)'),{items:[{id:'101',quantity:1},{id:'102',quantity:2},{id:'103',quantity:2}]},'only available lines, current quantities, no prices sent');
+   assert.equal(await ev('cartChanged'),1,'header and drawer refresh through storefront.js');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.restored);
+   assert.deepEqual(await ev('["[data-review]","[data-recovery]","[data-join-button]"].map(s=>widget.querySelector(s).hidden)'),[true,true,false]);
+   assert.equal(await ev('widget.querySelector("[data-join-button]").textContent'),tr.group_delivery.update_restored);
+   assert.equal(await ev('document.activeElement===widget.querySelector("[data-join-button]")'),true);
+   assert.equal(await ev(updateCount),before,'restoring the cart never updates the pledge');
+   // The shopper then chooses to update from the restored cart.
+   await ev('widget.querySelector("[data-join-group]").requestSubmit()');await settle();
+   assert.deepEqual(await ev('requests.filter(r=>r.url.endsWith("/update-pledge")).at(-1).body'),{lines:[{variantId:'101',quantity:1},{variantId:'102',quantity:2},{variantId:'103',quantity:2}]});
+   assert.notEqual(await ev('widget.querySelector("[data-join-button]").textContent'),tr.group_delivery.update_restored);
+  });
+  await t.test('Restore safeguards: Shopify unreachable, nothing available, failed add and member-read failures change nothing',async()=>{
+   const before=await ev(updateCount);
+   await ev('quantity=0;cartItems=null;memberResponse={status:200,body:{member:{status:"PLEDGED",pledgedTotalAgorot:1590,cartCheck:"UNAVAILABLE",cart:null}}};'+restart);await settle();
+   await ev('widget.querySelector("[data-restore]").click()');await settle();
+   assert.deepEqual(await ev('[widget.querySelector("[data-review-note]").textContent,widget.querySelector("[data-review-actions]").hidden]'),[tr.group_delivery.restore_check_unavailable,true],'no stale prices offered');
+   await ev('memberResponse={status:200,body:{member:{status:"PLEDGED",pledgedTotalAgorot:1590,cartCheck:"OK",cart:[memberLine({restorableQuantity:0,available:false,reason:"UNAVAILABLE"})]}}};widget.querySelector("[data-restore]").click()');await settle();
+   assert.deepEqual(await ev('[widget.querySelector("[data-review-note]").textContent,widget.querySelector("[data-review-actions]").hidden]'),[tr.group_delivery.restore_none,true]);
+   await ev('memberResponse=null;cartAddResponse={status:422,body:{description:"x"}};widget.querySelector("[data-restore]").click()');await settle();
+   await ev('widget.querySelector("[data-restore-confirm]").click()');await settle();
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_restore);
+   assert.deepEqual(await ev('[cartItems,widget.querySelector("[data-recovery]").hidden,widget.querySelector("[data-join-button]").hidden]'),[null,false,true]);
+   // Temporary member-read failures keep the receipt and the recovery state; an invalid token removes the receipt.
+   await ev('cartAddResponse=null;memberResponse={status:503,body:{code:"SERVICE_UNAVAILABLE"}};'+restart);await settle();
+   assert.notEqual(await ev('localStorage.getItem('+receiptKey+')'),null);
+   assert.equal(await ev('widget.querySelector("[data-recovery]").hidden'),false);
+   assert.equal(await ev(updateCount),before);
+   await ev('memberResponse={status:401,body:{code:"MEMBER_AUTH_REQUIRED"}};'+restart);await settle();
+   assert.equal(await ev('localStorage.getItem('+receiptKey+')'),null,'revoked receipt removed');
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_receipt);
+   await ev('memberResponse=null;localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));quantity=1;'+restart);await settle();
+  });
+  await t.test('Explicit withdrawal: confirmation dialog, cancel changes nothing, confirm withdraws and keeps the receipt',async()=>{
+   assert.equal(await ev('widget.querySelector("[data-withdraw]").hidden'),false);
+   const withdraws='requests.filter(r=>r.url.endsWith("/withdraw")).length';
+   await ev('widget.querySelector("[data-withdraw]").click()');
+   assert.equal(await ev('widget.querySelector("[data-withdraw-dialog]").open'),true);
+   assert.equal(await ev('document.activeElement===widget.querySelector("[data-withdraw-cancel]")'),true,'the safe choice has focus');
+   await ev('widget.querySelector("[data-withdraw-cancel]").click()');
+   assert.deepEqual(await ev('[widget.querySelector("[data-withdraw-dialog]").open,'+withdraws+']'),[false,0]);
+   await ev('withdrawResponse={status:409,body:{code:"GROUP_CLOSED"}};widget.querySelector("[data-withdraw]").click();widget.querySelector("[data-withdraw-confirm]").click()');await settle();
+   assert.deepEqual(await ev('[widget.querySelector("[data-withdraw-dialog]").open,widget.message.textContent]'),[false,tr.group_delivery.closed]);
+   await ev('withdrawResponse=null;widget.querySelector("[data-withdraw]").click();widget.querySelector("[data-withdraw-confirm]").click()');await settle();
+   const request=await ev('requests.filter(r=>r.url.endsWith("/withdraw")).at(-1)');
+   assert.deepEqual(request.body,{confirm:true});assert.equal(request.headers.Authorization,'Bearer '+'a'.repeat(64));
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.withdrawn);
+   assert.equal(await ev('widget.querySelector("[data-member-pledge]").textContent'),tr.group_delivery.withdrawn_state);
+   assert.deepEqual(await ev('[widget.querySelector("[data-withdraw]").hidden,widget.querySelector("[data-contact-fields]").hidden]'),[true,true]);
+   assert.notEqual(await ev('localStorage.getItem('+receiptKey+')'),null,'receipt kept so the member can pledge again');
+   await ev('memberResponse=null;'+restart);await settle();
+  });
+  await t.test('Already joined without a receipt in this browser: no "original tab", no access from contact details alone',async()=>{
+   for(const file of ['he.default.json','en.json']){
+    const text=JSON.parse(fs.readFileSync(path.join(root,'locales',file),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,'')).group_delivery.duplicate;
+    assert.doesNotMatch(text,/טאב|כרטיסייה|\btab\b/i,file);
+   }
+   await ev('localStorage.removeItem('+receiptKey+');'+restart);await settle();
+   await ev('widget.foundPlace=widget.areas[1];widget.show({...group,status:"OPEN"});quantity=1');
+   await ev('widget.querySelector("[name=email]").value="member@example.test";widget.querySelector("[name=phone]").value="0501234567";window.apiResponse={status:409,body:{code:"ALREADY_JOINED"}};widget.querySelector("[data-join-group]").requestSubmit()');await settle();
+   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.duplicate);
+   assert.equal(await ev('localStorage.getItem('+receiptKey+')'),null,'no receipt from email/phone');
+   assert.equal(await ev('widget.querySelector("[data-member]").hidden'),true);
+   await ev('window.apiResponse=null;localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));'+restart);await settle();
   });
   await t.test('No group yet: searching creates nothing and the join starts the group',async()=>{
    await ev('existing=false;quantity=1');await type('אופ');await key('ArrowDown');await key('Enter');

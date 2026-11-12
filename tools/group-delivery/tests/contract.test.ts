@@ -7,7 +7,7 @@ import {PUBLIC_ERROR_CODES,ADMIN_ERROR_CODES} from '../src/domain.js';
 const theme=new URL('../../../',import.meta.url);
 const read=(path:string)=>readFileSync(new URL(path,theme),'utf8');
 // Browser-side failures owned by assets/group-delivery.js; DEFAULT is the fallback message.
-const CLIENT_CODES=['CART_EMPTY','CART_READ_FAILED','CART_CURRENCY','REQUEST_TIMEOUT','NETWORK_ERROR','INVALID_RESPONSE','AREA_REQUIRED','AREAS_EMPTY','DEFAULT'];
+const CLIENT_CODES=['CART_EMPTY','CART_READ_FAILED','CART_CURRENCY','REQUEST_TIMEOUT','NETWORK_ERROR','INVALID_RESPONSE','AREA_REQUIRED','AREAS_EMPTY','RESTORE_FAILED','DEFAULT'];
 const section=read('sections/group-delivery.liquid');
 const table=section.match(/assign group_errors = '([^']+)' \| split: ','/)?.[1];
 const mapping=new Map((table||'').split(',').map(entry=>entry.split(':') as [string,string]));

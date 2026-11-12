@@ -89,7 +89,7 @@ The only flow is: choose an area → `POST /groups/find` (read-only; an existing
 - Groups are created only by `POST /groups/join`. The match is repeated inside the coordination lock, so two first joins for the same area produce one group with two members.
 - Direct joins (`POST /groups/:publicId/join`) require the group's own area.
 
-Thresholds and expiry are captured when a group is created. Nonzero pledge updates can move OPEN <-> THRESHOLD_REACHED. A zero update withdraws a member and may reopen the group. A matching group has capacity for at most 100 membership records. Merchant approval requires the stored threshold and freezes further member updates. There is no threshold override endpoint.
+Thresholds and expiry are captured when a group is created. Nonzero pledge updates can move OPEN <-> THRESHOLD_REACHED. An empty cart never changes a pledge: update-pledge rejects it with 422 EMPTY_CART_CANNOT_UPDATE_PLEDGE (an expired or cleared Shopify cart reads as empty). Withdrawal is a separate, explicitly confirmed request and may reopen the group; a withdrawn member keeps the receipt and can pledge again with a non-empty cart. A matching group has capacity for at most 100 membership records. Merchant approval requires the stored threshold and freezes further member updates. There is no threshold override endpoint.
 
 Expiry is evaluated from PostgreSQL NOW() during reads, matching, joining, updates, listing and approval; it does not depend on a browser timer. OPEN, THRESHOLD_REACHED and APPROVED groups expire. No background payment/shipping jobs run.
 
@@ -129,7 +129,9 @@ All JSON bodies are limited to 24 KiB. State-changing public API requests requir
 | POST | /api/v1/groups/join | Body: `areaPublicId`, email, phone, lines. Joins the area: under the coordination lock it expires stale groups, re-resolves the area (it must still be active), re-matches, joins the area's open group or creates one with this shopper as its first member, all in one transaction. Returns 201 with group, `created`, private memberToken and validatedPledgeAgorot. |
 | POST | /api/v1/groups/:publicId/join | Body: `areaPublicId`, email, phone, lines. Joins a specific group the shopper was shown; the group must belong to that active area (409 LOCATION_OUTSIDE_GROUP otherwise). Validates fresh Shopify data, then adds one membership; returns group, private memberToken and validatedPledgeAgorot. |
 | GET | /api/v1/groups/:publicId | Aggregate only, no member authorization required. |
-| POST | /api/v1/groups/:publicId/update-pledge | Body: lines, including [] for withdrawal. Requires Authorization: Bearer memberToken. Revalidates prices; returns group and own validatedPledgeAgorot. |
+| POST | /api/v1/groups/:publicId/update-pledge | Body: non-empty lines. Requires Authorization: Bearer memberToken. Revalidates prices; returns group and own validatedPledgeAgorot. An empty lines array is rejected (422 EMPTY_CART_CANNOT_UPDATE_PLEDGE) and never withdraws. |
+| POST | /api/v1/groups/:publicId/member | Body: {}. Requires Authorization: Bearer memberToken. Returns only member.status (PLEDGED/WITHDRAWN), member.pledgedTotalAgorot, member.cartCheck (OK/UNAVAILABLE) and member.cart: the stored snapshot re-checked against Shopify now (variantId, title, quantity, storedUnitAgorot for comparison, currentUnitAgorot, available, restorableQuantity, maxAvailableQuantity, priceChanged, reason AVAILABLE/QUANTITY_REDUCED/UNAVAILABLE). Never returns contact details, the token, its hash or database ids. Counts toward the read rate limit; writes nothing. |
+| POST | /api/v1/groups/:publicId/withdraw | Body: {"confirm":true} (400 WITHDRAW_CONFIRMATION_REQUIRED otherwise). Requires Authorization: Bearer memberToken; open groups only. Sets the pledge to 0 (WITHDRAWN) and returns group and member. |
 | GET | /health | Public status only |
 
 Safe public group fields: publicId, areaName, status, participantCount, currency, thresholdAgorot, pledgedTotalAgorot, remainingAmountAgorot, progressPercent, expiresAt. Contacts, anchors, centers, member locations, cart snapshots, internal member IDs and membership receipts are absent from public GET responses. Receipt tokens are never accepted in a query string.
@@ -152,7 +154,7 @@ Open /admin. Login uses ADMIN_USERNAME/ADMIN_PASSWORD checked on the server, fol
 
 ## Tests and limits
 
-`npm test` uses an on-disk PGlite PostgreSQL engine with the real migrations and SQL, plus mocked Shopify responses. It tests DB restart persistence, duplicate/concurrent joins, anti-chain matching, money, empty-cart withdrawal, threshold changes, expiry, privacy, invalid carts, rate/body/origin limits, admin login, CSRF, approval, freeze and secure cookies.
+`npm test` uses an on-disk PGlite PostgreSQL engine with the real migrations and SQL, plus mocked Shopify responses. It tests DB restart persistence, duplicate/concurrent joins, anti-chain matching, money, empty-cart rejection, explicit confirmed withdrawal, the member read (safe fields, Shopify re-check of price/stock/quantity rules), threshold changes, expiry, privacy, invalid carts, rate/body/origin limits, admin login, CSRF, approval, freeze and secure cookies.
 
 Root `tests/group-delivery.browser.cjs` exercises the actual client script and section styling with mocked cart/service responses, explicit geolocation consent, durable per-group receipts and their migration and stale-receipt rules, the no-group-yet join flow, updates, failures, RTL, reduced motion and narrow widths.
 

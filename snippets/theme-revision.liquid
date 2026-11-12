@@ -1,0 +1,11 @@
+{% doc %}
+  Outputs this theme's revision label (release date + the git commit it was built on), used only as the hidden (non-rendered)
+  data-theme-revision diagnostic on <html> in layout/theme.liquid. It is not a secret and never shown to customers.
+  Update it before each release with: node tests/helpers/theme-revision.cjs --write
+
+  @example
+  <html data-theme-revision="{%- render 'theme-revision' -%}">
+{% enddoc %}
+{%- liquid
+  echo '2026-11-12+e343162'
+-%}

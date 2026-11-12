@@ -9,7 +9,8 @@
  data-found="{{ 'group_delivery.found' | t | escape }}" data-updated="{{ 'group_delivery.updated' | t | escape }}" data-area="{{ 'group_delivery.area' | t: area: '__AREA__' | escape }}"
  data-count="{{ 'group_delivery.participants' | t: count: '__COUNT__' | escape }}" data-remaining="{{ 'group_delivery.remaining' | t: amount: '__AMOUNT__' | escape }}"
  data-update-label="{{ 'group_delivery.update' | t | escape }}" data-join-label="{{ 'group_delivery.join' | t | escape }}" data-closed="{{ 'group_delivery.closed' | t | escape }}" data-setup="{{ 'group_delivery.setup' | t | escape }}"
- data-almost="{{ 'group_delivery.almost' | t | escape }}" data-reached="{{ 'group_delivery.reached' | t | escape }}" data-waiting="{{ 'group_delivery.waiting' | t | escape }}" data-share-text="{{ 'group_delivery.share_text' | t: area: '__AREA__', amount: '__AMOUNT__', target: '__TARGET__' | escape }}" data-count-one="{{ 'group_delivery.participant_one' | t | escape }}" data-estimate="{{ 'group_delivery.verified_cart' | t | escape }}" data-pledge-label="{{ 'group_delivery.your_pledge' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}" data-locale="{{ request.locale.iso_code }}">
+ data-almost="{{ 'group_delivery.almost' | t | escape }}" data-reached="{{ 'group_delivery.reached' | t | escape }}" data-waiting="{{ 'group_delivery.waiting' | t | escape }}" data-share-text="{{ 'group_delivery.share_text' | t: area: '__AREA__', amount: '__AMOUNT__', target: '__TARGET__' | escape }}" data-count-one="{{ 'group_delivery.participant_one' | t | escape }}" data-estimate="{{ 'group_delivery.verified_cart' | t | escape }}" data-pledge-label="{{ 'group_delivery.your_pledge' | t | escape }}" data-standard="{{ 'group_delivery.standard' | t | escape }}" data-cart-add-url="{{ routes.cart_add_url }}.js"
+ data-current-pledge="{{ 'group_delivery.current_pledge' | t: amount: '__AMOUNT__' | escape }}" data-current-cart-total="{{ 'group_delivery.current_cart_total' | t: amount: '__AMOUNT__' | escape }}" data-cart-differs="{{ 'group_delivery.cart_differs' | t | escape }}" data-update-current="{{ 'group_delivery.update_current' | t | escape }}" data-update-restored="{{ 'group_delivery.update_restored' | t | escape }}" data-pledge-items="{{ 'group_delivery.pledge_items' | t | escape }}" data-restore-review="{{ 'group_delivery.restore_review' | t | escape }}" data-restore-unchanged="{{ 'group_delivery.restore_unchanged' | t | escape }}" data-restore-price="{{ 'group_delivery.restore_price' | t: old_price: '__OLD__', new_price: '__NEW__' | escape }}" data-restore-quantity="{{ 'group_delivery.restore_quantity' | t: old_quantity: '__OLD__', new_quantity: '__NEW__' | escape }}" data-restore-unavailable="{{ 'group_delivery.restore_unavailable' | t | escape }}" data-restore-item="{{ 'group_delivery.restore_item' | t | escape }}" data-restore-quantity-label="{{ 'group_delivery.restore_quantity_label' | t: quantity: '__QUANTITY__' | escape }}" data-restore-none="{{ 'group_delivery.restore_none' | t | escape }}" data-restore-check-unavailable="{{ 'group_delivery.restore_check_unavailable' | t | escape }}" data-restored="{{ 'group_delivery.restored' | t | escape }}" data-withdrawn="{{ 'group_delivery.withdrawn' | t | escape }}" data-withdrawn-state="{{ 'group_delivery.withdrawn_state' | t | escape }}" data-locale="{{ request.locale.iso_code }}">
  <header><p class="group-delivery__eyebrow">{{ 'group_delivery.heading' | t }}</p><h1>{{ 'group_delivery.intro' | t }}</h1><h2>{{ 'group_delivery.promise' | t }}</h2><p>{{ 'group_delivery.description' | t }}</p></header>
  <p class="group-delivery__notice">{{ 'group_delivery.notice' | t }}</p>
  <form data-find-group>
@@ -34,6 +35,19 @@
   <div class="group-delivery__stats"><p class="group-delivery__people"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6m3 11v-3a6 6 0 0 0-3-5"/></svg> <span data-participants></span></p>
   <p class="group-delivery__hint">{{ 'group_delivery.expires' | t }} <time data-expiry></time></p></div>
   <p class="group-delivery__pledge" data-validated-pledge hidden><span data-pledge-label>{{ 'group_delivery.verified_cart' | t }}</span> <bdi></bdi></p>
+  {%- comment -%} Returning member (receipt in this browser): the pledge never changes without an explicit action. {%- endcomment -%}
+  <div class="group-delivery__member" data-member hidden><p data-member-pledge></p><p data-member-cart hidden></p><p class="group-delivery__hint" data-member-note hidden></p></div>
+  <div class="group-delivery__recovery" data-recovery hidden role="region" aria-labelledby="GroupRecovery-{{ section.id }}">
+   <h3 id="GroupRecovery-{{ section.id }}">{{ 'group_delivery.member_found_heading' | t }}</h3>
+   <p>{{ 'group_delivery.member_found_text' | t }}</p>
+   <div class="group-delivery__actions"><button type="button" class="theme-btn" data-restore aria-controls="GroupReview-{{ section.id }}">{{ 'group_delivery.restore' | t }}</button><button type="button" class="group-delivery__secondary" data-show-pledge aria-controls="GroupReview-{{ section.id }}">{{ 'group_delivery.show_pledge' | t }}</button></div>
+  </div>
+  <div class="group-delivery__review" id="GroupReview-{{ section.id }}" data-review hidden>
+   <h3 tabindex="-1" data-review-title></h3>
+   <p class="group-delivery__hint" data-review-note hidden></p>
+   <ul data-review-list></ul>
+   <div class="group-delivery__actions" data-review-actions hidden><button type="button" class="theme-btn" data-restore-confirm>{{ 'group_delivery.restore_confirm' | t }}</button><button type="button" class="group-delivery__secondary" data-restore-cancel>{{ 'group_delivery.restore_cancel' | t }}</button></div>
+  </div>
   <form data-join-group>
    <fieldset data-contact-fields><legend>{{ 'group_delivery.contact' | t }}</legend>
     <label for="GroupEmail-{{ section.id }}">{{ 'group_delivery.email' | t }}</label><input id="GroupEmail-{{ section.id }}" type="email" name="email" required maxlength="254" autocomplete="email">
@@ -41,17 +55,23 @@
    </fieldset>
    <button class="theme-btn" type="submit" data-join-button disabled>{{ 'group_delivery.join' | t }}</button>
   </form>
-  <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-refresh>{{ 'group_delivery.refresh' | t }}</button><button type="button" class="group-delivery__secondary" data-share disabled>{{ 'group_delivery.share' | t }}</button></div>
+  <div class="group-delivery__actions"><button type="button" class="group-delivery__secondary" data-refresh>{{ 'group_delivery.refresh' | t }}</button><button type="button" class="group-delivery__secondary" data-share disabled>{{ 'group_delivery.share' | t }}</button><button type="button" class="group-delivery__danger" data-withdraw hidden aria-haspopup="dialog">{{ 'group_delivery.withdraw' | t }}</button></div>
+  {%- comment -%} Explicit withdrawal only: a cart update never withdraws (the service rejects an empty cart). {%- endcomment -%}
+  <dialog class="group-delivery__dialog" data-withdraw-dialog aria-labelledby="GroupWithdrawTitle-{{ section.id }}" aria-describedby="GroupWithdrawText-{{ section.id }}">
+   <h2 id="GroupWithdrawTitle-{{ section.id }}">{{ 'group_delivery.withdraw_title' | t }}</h2>
+   <p id="GroupWithdrawText-{{ section.id }}">{{ 'group_delivery.withdraw_text' | t }}</p>
+   <div class="group-delivery__actions"><button type="button" class="group-delivery__danger" data-withdraw-confirm>{{ 'group_delivery.withdraw_confirm' | t }}</button><button type="button" class="group-delivery__secondary" data-withdraw-cancel autofocus>{{ 'group_delivery.withdraw_cancel' | t }}</button></div>
+  </dialog>
  </section>
  <p data-group-message role="status" aria-live="polite" aria-atomic="true"></p>
  <noscript><p>{{ 'group_delivery.javascript' | t }}</p></noscript>
  <script type="application/json" data-group-labels>{% assign group_states = 'OPEN,THRESHOLD_REACHED,APPROVED,PAYMENT_OPEN,CONFIRMED,SCHEDULED,COMPLETED,EXPIRED,CANCELLED' | split: ',' %}{ {% for state in group_states %}{% assign state_key = state | downcase | prepend: 'group_delivery.status.' %}{{ state | json }}:{{ state_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
  {% comment %}
    Single error contract: CODE:group_delivery locale key. Server codes come from PUBLIC_ERROR_CODES in
-   tools/group-delivery/src/domain.ts; CART_EMPTY..INVALID_RESPONSE, AREA_REQUIRED and AREAS_EMPTY are browser-side. DEFAULT is the fallback.
+   tools/group-delivery/src/domain.ts; CART_EMPTY..INVALID_RESPONSE, AREA_REQUIRED, AREAS_EMPTY and RESTORE_FAILED are browser-side. DEFAULT is the fallback.
    tools/group-delivery/tests/contract.test.ts fails when either side drifts.
  {% endcomment %}
- <script type="application/json" data-group-errors>{% assign group_errors = 'INVALID_INPUT:error,INVALID_LOCATION:error_location,INVALID_CART:invalid_cart,INVALID_CONTACT:error_contact,INVALID_PRICE:error,INVALID_CART_TOTAL:error_cart_total,CART_UNAVAILABLE:cart_unavailable,SHOPIFY_UNAVAILABLE:shopify_error,GROUP_NOT_FOUND:error_not_found,GROUP_CLOSED:closed,GROUP_FULL:error_full,GROUP_LIMIT:error_group_limit,LOCATION_OUTSIDE_GROUP:error_outside,ALREADY_JOINED:duplicate,MEMBER_AUTH_REQUIRED:error_receipt,RATE_LIMITED:error_rate_limited,INVALID_HOST:error_unavailable,INVALID_ORIGIN:error_unavailable,NOT_FOUND:error_unavailable,BODY_TOO_LARGE:error,SERVICE_UNAVAILABLE:error_unavailable,CART_EMPTY:empty_cart,CART_READ_FAILED:error_cart_read,CART_CURRENCY:error_currency,REQUEST_TIMEOUT:error_timeout,NETWORK_ERROR:error_network,INVALID_RESPONSE:error,INVALID_AREA:error_area,INVALID_COORDINATES:geo_error,AREA_REQUIRED:area_required,AREAS_EMPTY:areas_none,DEFAULT:error' | split: ',' %}{ {% for group_error in group_errors %}{% assign group_error_pair = group_error | split: ':' %}{% assign group_error_key = group_error_pair.last | prepend: 'group_delivery.' %}{{ group_error_pair.first | json }}:{{ group_error_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
+ <script type="application/json" data-group-errors>{% assign group_errors = 'INVALID_INPUT:error,INVALID_LOCATION:error_location,INVALID_CART:invalid_cart,INVALID_CONTACT:error_contact,INVALID_PRICE:error,INVALID_CART_TOTAL:error_cart_total,CART_UNAVAILABLE:cart_unavailable,SHOPIFY_UNAVAILABLE:shopify_error,GROUP_NOT_FOUND:error_not_found,GROUP_CLOSED:closed,GROUP_FULL:error_full,GROUP_LIMIT:error_group_limit,LOCATION_OUTSIDE_GROUP:error_outside,ALREADY_JOINED:duplicate,MEMBER_AUTH_REQUIRED:error_receipt,EMPTY_CART_CANNOT_UPDATE_PLEDGE:error_empty_update,WITHDRAW_CONFIRMATION_REQUIRED:error_withdraw_confirm,RESTORE_FAILED:error_restore,RATE_LIMITED:error_rate_limited,INVALID_HOST:error_unavailable,INVALID_ORIGIN:error_unavailable,NOT_FOUND:error_unavailable,BODY_TOO_LARGE:error,SERVICE_UNAVAILABLE:error_unavailable,CART_EMPTY:empty_cart,CART_READ_FAILED:error_cart_read,CART_CURRENCY:error_currency,REQUEST_TIMEOUT:error_timeout,NETWORK_ERROR:error_network,INVALID_RESPONSE:error,INVALID_AREA:error_area,INVALID_COORDINATES:geo_error,AREA_REQUIRED:area_required,AREAS_EMPTY:areas_none,DEFAULT:error' | split: ',' %}{ {% for group_error in group_errors %}{% assign group_error_pair = group_error | split: ':' %}{% assign group_error_key = group_error_pair.last | prepend: 'group_delivery.' %}{{ group_error_pair.first | json }}:{{ group_error_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
 </fankee-group-delivery>
 <script src="{{ 'group-delivery.js' | asset_url }}" defer></script>
 {% stylesheet %}
@@ -199,6 +219,31 @@ body:has(.a11y-launcher:not([hidden])) .group-delivery {padding-inline-end:max(1
 @media(prefers-reduced-motion:reduce) {.group-delivery__progress span::after {display:none;}}
 html[data-a11y-paused] .group-delivery__progress span::after {display:none;}
 .group-delivery__pledge[data-joined=true] {background:#e5f5f0;border-inline-start-color:#087d68;}
+/* Returning member: pledge vs cart, recovery when the cart is gone, restore review, explicit withdrawal. */
+.group-delivery__member {margin-block:12px;font-size:15px;}
+.group-delivery__member p {margin:4px 0;}
+.group-delivery__member [data-member-pledge] {font-weight:700;color:var(--fk-teal-900,#0a3f47);}
+.group-delivery__recovery,.group-delivery__review {margin-block:14px;padding:14px 16px;border:1px solid var(--fk-border,#cfe4e8);border-radius:var(--fk-radius-lg,14px);background:linear-gradient(160deg,var(--fk-cyan-50,#edf8fa),#fff);}
+.group-delivery__recovery h3,.group-delivery__review h3 {margin:0 0 6px;font-size:18px;}
+.group-delivery__recovery p {margin:0 0 4px;line-height:1.7;}
+.group-delivery__review ul {margin:8px 0 0;padding:0;list-style:none;}
+.group-delivery__review li {padding:10px 0;border-block-start:1px solid var(--fk-border,#cfe4e8);overflow-wrap:anywhere;}
+.group-delivery__review li strong {display:block;}
+.group-delivery__review li span {display:block;font-size:14px;color:#536975;}
+.group-delivery__review li[data-state=changed] span {color:#7a4d00;}
+.group-delivery__review li[data-state=unavailable] {color:#536975;}
+.group-delivery__review li[data-state=unavailable] span {color:#a1271b;}
+.group-delivery__review h3:focus {outline:none;}
+.group-delivery__review h3:focus-visible {outline:2px solid var(--storefront-accent,#086b7b);outline-offset:3px;}
+.group-delivery__danger {padding:9px 14px;border:1px solid #c9473a;border-radius:var(--fk-radius-md,10px);background:#fff;color:#a1271b;font-weight:600;}
+.group-delivery__danger:not(:disabled):hover {background:#fdf0ee;}
+.group-delivery__danger:focus-visible {outline:2px solid #a1271b;outline-offset:3px;}
+.group-delivery__dialog {inline-size:min(440px,calc(100vw - 32px));padding:20px;border:1px solid var(--fk-border,#cfe4e8);border-radius:var(--fk-radius-xl,18px);background:#fff;color:var(--storefront-ink);box-shadow:var(--fk-shadow-lg);text-align:start;}
+.group-delivery__dialog::backdrop {background:rgb(10 40 48 / 45%);}
+.group-delivery__dialog h2 {margin:0 0 8px;font-size:20px;}
+.group-delivery__dialog p {margin:0;line-height:1.7;}
+.group-delivery__dialog .group-delivery__actions {margin-block-end:0;}
+@media(max-width:599px) {.group-delivery__review li span {font-size:13px;}}
 {% endstylesheet %}
 {% schema %}
 {"name":"t:storefront_editor.group_delivery","settings":[{"type":"url","id":"service_url","label":"t:storefront_editor.group_delivery_url"}],"presets":[{"name":"t:storefront_editor.group_delivery"}]}

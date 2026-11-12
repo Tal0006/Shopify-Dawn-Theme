@@ -38,6 +38,8 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
  const writes=()=>state.log!.filter(entry=>/^(INSERT|UPDATE|DELETE|TRUNCATE)/i.test(entry.sql)).map(entry=>entry.sql);
  const cfg=config({PORT:'4330',DATABASE_URL:'postgresql://test',ADMIN_USERNAME:'merchant',ADMIN_PASSWORD:'testing-password-long-only',SESSION_SECRET:'testing-session-secret-not-real-00000000',SHOPIFY_STORE_DOMAIN:'example.myshopify.com',SHOPIFY_STOREFRONT_PRIVATE_TOKEN:'test-private-shopify-token',APP_ORIGIN:'http://127.0.0.1:4330'});
  let mode='ok';
+ // Per-variant Shopify overrides (keyed by numeric variant id) for restore/revalidation scenarios.
+ let overrides:Record<string,any>={};
  // Barrier: both callers finish pre-lock Shopify validation before either may continue into the lock.
  let barrier:{waiting:number;gate:Promise<void>;release:()=>void}|null=null;
  const arm=()=>{let release!:()=>void;const gate=new Promise<void>(r=>release=r);barrier={waiting:0,gate,release};};
@@ -47,7 +49,7 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
   assert.match(body.query,/@inContext\(country:IL\)/);
   if(mode==='network')throw Error('upstream-secret-should-never-escape');
   if(barrier){const b=barrier;if(++b.waiting<2)await b.gate;else{barrier=null;b.release();}}
-  return new Response(JSON.stringify({data:{nodes:body.variables.ids.map((id:string)=>id.endsWith('/999')?null:{id,availableForSale:mode!=='sold',requiresComponents:false,quantityAvailable:100,price:{amount:mode==='wrong-currency'?'2.00':'125.00',currencyCode:mode==='wrong-currency'?'USD':'ILS'},quantityRule:{minimum:1,increment:1,maximum:null},product:{requiresSellingPlan:false}})}}));
+  return new Response(JSON.stringify({data:{nodes:body.variables.ids.map((id:string)=>id.endsWith('/999')||overrides[id.split('/').pop()!]===null?null:{...{id,availableForSale:mode!=='sold',requiresComponents:false,quantityAvailable:100,price:{amount:mode==='wrong-currency'?'2.00':'125.00',currencyCode:mode==='wrong-currency'?'USD':'ILS'},quantityRule:{minimum:1,increment:1,maximum:null},product:{requiresSellingPlan:false,title:'Product '+id.split('/').pop()}},...overrides[id.split('/').pop()!]})}}));
  });
  const areas=new Areas(db,cfg),service=new Groups(db,cfg,validator,areas),app=createApp(db,cfg,validator);
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
@@ -60,7 +62,7 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
  const start=(area=AREA.ashdod,quantity=2,who=person())=>service.joinArea({...who,areaPublicId:area,lines:line(quantity)});
  const count=async(table:string)=>Number((await db.query('SELECT COUNT(*)::int AS n FROM '+table)).rows[0].n);
  const publicAreas=async()=>((await (await fetch(cfg.origin+'/api/v1/areas')).json()) as any).areas as {publicId:string;name:string}[];
- t.beforeEach(async()=>{mode='ok';state.log=null;state.failMemberInsert=false;barrier=null;await db.query('TRUNCATE group_members, delivery_groups, request_limits, admin_sessions CASCADE');});
+ t.beforeEach(async()=>{mode='ok';overrides={};state.log=null;state.failMemberInsert=false;barrier=null;await db.query('TRUNCATE group_members, delivery_groups, request_limits, admin_sessions CASCADE');});
  try{
   await migrate(db);await migrate(db);
   await t.test('seeded areas are idempotent, normalized and listed publicly without coordinates',async()=>{
@@ -243,7 +245,7 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    assert.equal(reached.group.status,'THRESHOLD_REACHED');assert.equal(reached.group.pledgedTotalAgorot,50000);
    const anchor=(await db.query('SELECT anchor_lat,center_lat FROM delivery_groups WHERE public_id=$1',[coordinate])).rows[0];
    assert.equal(anchor.anchor_lat,31.8,'fixed anchor kept');assert.equal(anchor.center_lat,31.81,'center from the existing member');
-   const withdrawn=await service.update(text,textToken,{lines:[]});
+   const withdrawn=await service.withdraw(text,textToken,{confirm:true});
    assert.equal(withdrawn.group.participantCount,0);assert.equal(withdrawn.group.pledgedTotalAgorot,0);
    assert.equal(await count('delivery_groups'),2,'no group rows created or deleted');
   });
@@ -259,8 +261,75 @@ test('Durable PostgreSQL group service',{timeout:180000},async t=>{
    const reached=await service.update(group.publicId,member.memberToken,{lines:line(4)});
    assert.equal(reached.group.status,'THRESHOLD_REACHED');assert.equal(reached.group.pledgedTotalAgorot,50000);assert.equal(reached.group.remainingAmountAgorot,0);
    const down=await service.update(group.publicId,member.memberToken,{lines:line(1)});assert.equal(down.group.status,'OPEN');assert.equal(down.group.remainingAmountAgorot,37500);
-   const withdrawn=await service.update(group.publicId,member.memberToken,{lines:[]});assert.equal(withdrawn.group.pledgedTotalAgorot,0);assert.equal(withdrawn.group.participantCount,0);
+   const withdrawn=await service.withdraw(group.publicId,member.memberToken,{confirm:true});assert.equal(withdrawn.group.pledgedTotalAgorot,0);assert.equal(withdrawn.group.participantCount,0);
    assert.equal(String((await db.query('SELECT paid_total_agorot FROM delivery_groups')).rows[0].paid_total_agorot),'0');
+  });
+  await t.test('an empty cart never withdraws: update rejects it and the pledge stays as it was',async()=>{
+   const member=await start(AREA.ashdod,2),group=member.group;
+   await assert.rejects(()=>service.update(group.publicId,member.memberToken,{lines:[]}),(e:any)=>e.status===422&&e.code==='EMPTY_CART_CANNOT_UPDATE_PLEDGE');
+   const response=await post('/api/v1/groups/'+group.publicId+'/update-pledge',{lines:[]},{Authorization:'Bearer '+member.memberToken});
+   assert.equal(response.status,422);assert.equal(((await response.json()) as any).code,'EMPTY_CART_CANNOT_UPDATE_PLEDGE');
+   const row=(await db.query('SELECT status,pledged_total_agorot,cart_snapshot FROM group_members')).rows[0];
+   assert.equal(row.status,'PLEDGED');assert.equal(String(row.pledged_total_agorot),'25000');assert.equal(row.cart_snapshot.length,1);
+   assert.equal((await service.get(group.publicId)).pledgedTotalAgorot,25000);
+   // Authentication still comes first: a bad token gets 401, not the cart error.
+   await assert.rejects(()=>service.update(group.publicId,'0'.repeat(64),{lines:[]}),(e:any)=>e.status===401);
+  });
+  await t.test('withdrawal is explicit: member token plus confirmation; a withdrawn member can pledge again',async()=>{
+   const member=await start(AREA.ashdod,2),group=member.group;
+   await assert.rejects(()=>service.withdraw(group.publicId,'0'.repeat(64),{confirm:true}),(e:any)=>e.status===401&&e.code==='MEMBER_AUTH_REQUIRED');
+   for(const body of [{},{confirm:'true'},{confirm:1},null])
+    await assert.rejects(()=>service.withdraw(group.publicId,member.memberToken,body),(e:any)=>e.status===400&&e.code==='WITHDRAW_CONFIRMATION_REQUIRED');
+   assert.equal((await service.get(group.publicId)).pledgedTotalAgorot,25000,'nothing changed without confirmation');
+   const unauthenticated=await post('/api/v1/groups/'+group.publicId+'/withdraw',{confirm:true});assert.equal(unauthenticated.status,401);
+   const response=await post('/api/v1/groups/'+group.publicId+'/withdraw',{confirm:true},{Authorization:'Bearer '+member.memberToken});
+   assert.equal(response.status,200);
+   const body=await response.json() as any;
+   assert.deepEqual(body.member,{status:'WITHDRAWN',pledgedTotalAgorot:0});assert.equal(body.group.pledgedTotalAgorot,0);assert.equal(body.group.participantCount,0);
+   assert.equal((await service.withdraw(group.publicId,member.memberToken,{confirm:true})).member.status,'WITHDRAWN','idempotent');
+   const again=await service.update(group.publicId,member.memberToken,{lines:line(3)});
+   assert.equal(again.group.pledgedTotalAgorot,37500);assert.equal(again.group.participantCount,1);
+   assert.equal((await db.query('SELECT status FROM group_members')).rows[0].status,'PLEDGED');
+   await db.query("UPDATE delivery_groups SET status='APPROVED'");
+   await assert.rejects(()=>service.withdraw(group.publicId,member.memberToken,{confirm:true}),(e:any)=>e.code==='GROUP_CLOSED');
+  });
+  await t.test('member read: authenticated, safe fields only, stored cart re-checked against Shopify now',async()=>{
+   const who=person();
+   const member=await service.joinArea({...who,areaPublicId:AREA.ashdod,lines:[{variantId:'1',quantity:2},{variantId:'2',quantity:4},{variantId:'3',quantity:3},{variantId:'4',quantity:5},{variantId:'5',quantity:1},{variantId:'6',quantity:1}]});
+   const id=member.group.publicId;
+   await assert.rejects(()=>service.memberState(id,'0'.repeat(64)),(e:any)=>e.status===401);
+   assert.equal((await post('/api/v1/groups/'+id+'/member',{})).status,401);
+   overrides={
+    '2':{price:{amount:'140.00',currencyCode:'ILS'}},                                   // price went up
+    '3':{quantityAvailable:2},                                                           // only 2 left
+    '4':{quantityRule:{minimum:2,increment:2,maximum:null}},                            // now sold in pairs
+    '5':{availableForSale:false},                                                        // sold out
+    '6':null                                                                             // deleted variant
+   };
+   const response=await post('/api/v1/groups/'+id+'/member',{},{Authorization:'Bearer '+member.memberToken});
+   assert.equal(response.status,200);
+   const text=await response.text(),body=JSON.parse(text);
+   for(const secret of [who.email,who.phone,member.memberToken,hash(member.memberToken),'gid://'])assert.ok(!text.includes(secret),'leaks '+secret);
+   assert.deepEqual(Object.keys(body),['member']);
+   assert.deepEqual(Object.keys(body.member).sort(),['cart','cartCheck','pledgedTotalAgorot','status']);
+   assert.equal(body.member.status,'PLEDGED');assert.equal(body.member.cartCheck,'OK');
+   assert.equal(body.member.pledgedTotalAgorot,125*100*(2+4+3+5+1+1),'the stored pledge, not a recomputed one');
+   const by=Object.fromEntries(body.member.cart.map((line:any)=>[line.variantId,line]));
+   assert.deepEqual(by['1'],{variantId:'1',title:'Product 1',quantity:2,storedUnitAgorot:12500,currentUnitAgorot:12500,available:true,restorableQuantity:2,maxAvailableQuantity:100,priceChanged:false,reason:'AVAILABLE'});
+   assert.deepEqual([by['2'].priceChanged,by['2'].storedUnitAgorot,by['2'].currentUnitAgorot,by['2'].restorableQuantity,by['2'].reason],[true,12500,14000,4,'AVAILABLE']);
+   assert.deepEqual([by['3'].restorableQuantity,by['3'].maxAvailableQuantity,by['3'].reason],[2,2,'QUANTITY_REDUCED']);
+   assert.deepEqual([by['4'].restorableQuantity,by['4'].reason],[4,'QUANTITY_REDUCED'],'largest quantity the new rule accepts');
+   assert.deepEqual([by['5'].available,by['5'].restorableQuantity,by['5'].reason],[false,0,'UNAVAILABLE']);
+   assert.deepEqual([by['6'].available,by['6'].currentUnitAgorot,by['6'].title,by['6'].reason],[false,null,null,'UNAVAILABLE']);
+   // Reading never writes the membership or the group.
+   assert.equal((await service.get(id)).pledgedTotalAgorot,125*100*16);
+   // Shopify down: membership still readable, cart check reported as unavailable (no stale prices offered).
+   mode='network';
+   const down=await service.memberState(id,member.memberToken);
+   assert.deepEqual(down.member,{status:'PLEDGED',pledgedTotalAgorot:200000,cartCheck:'UNAVAILABLE',cart:null});
+   // A withdrawn member has no stored cart to restore.
+   mode='ok';await service.withdraw(id,member.memberToken,{confirm:true});
+   assert.deepEqual((await service.memberState(id,member.memberToken)).member,{status:'WITHDRAWN',pledgedTotalAgorot:0,cartCheck:'OK',cart:[]});
   });
   await t.test('expiration prevents joins, updates and approval',async()=>{
    const member=await start(AREA.ashdod,4),group=member.group;

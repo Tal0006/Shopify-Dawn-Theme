@@ -10,6 +10,15 @@
  const storage=name=>{try{return window[name]||null;}catch{return null;}};
  // Filtering only; the server resolves areas by publicId and never trusts a typed name.
  const areaKey=name=>String(name).normalize('NFKC').toLocaleLowerCase().replace(/[\s'"״׳.()-]+/g,' ').trim();
+ const REASONS=new Set(['AVAILABLE','QUANTITY_REDUCED','UNAVAILABLE']),VARIANT=/^[1-9]\d{0,19}$/;
+ const count=value=>Number.isSafeInteger(value)&&value>=0;
+ // The member read (POST /groups/:id/member) as the service documents it; anything else is ignored.
+ const memberShape=member=>{
+  if(!member||!['PLEDGED','WITHDRAWN'].includes(member.status)||!count(member.pledgedTotalAgorot)||!['OK','UNAVAILABLE'].includes(member.cartCheck))return null;
+  if(member.cart!==null&&!(Array.isArray(member.cart)&&member.cart.every(line=>line&&VARIANT.test(line.variantId)&&count(line.quantity)&&line.quantity>0&&count(line.restorableQuantity)&&line.restorableQuantity<=line.quantity&&
+   count(line.storedUnitAgorot)&&(line.currentUnitAgorot===null||count(line.currentUnitAgorot))&&typeof line.available==='boolean'&&typeof line.priceChanged==='boolean'&&REASONS.has(line.reason)&&(line.title===null||typeof line.title==='string'))))return null;
+  return {status:member.status,pledgedTotalAgorot:member.pledgedTotalAgorot,cartCheck:member.cartCheck,cart:member.cart};
+ };
  class GroupDelivery extends HTMLElement {
   // Render cold starts can take close to a minute: announce the wait, then fail at a finite limit.
   static wakeDelay=12000;
@@ -37,6 +46,14 @@
    this.querySelector('[data-join-group]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.join(),event.submitter);},options);
    this.querySelector('[data-share]').addEventListener('click',()=>this.share(),options);
    this.querySelector('[data-refresh]').addEventListener('click',event=>{void this.perform(()=>this.refresh(),event.currentTarget);},options);
+   // Returning member: review before restoring the cart, and withdrawal only through its confirmation dialog.
+   this.querySelector('[data-restore]').addEventListener('click',event=>{void this.perform(()=>this.review('restore'),event.currentTarget);},options);
+   this.querySelector('[data-show-pledge]').addEventListener('click',event=>{void this.perform(()=>this.review('pledge'),event.currentTarget);},options);
+   this.querySelector('[data-restore-confirm]').addEventListener('click',event=>{void this.perform(()=>this.restore(),event.currentTarget);},options);
+   this.querySelector('[data-restore-cancel]').addEventListener('click',()=>this.closeReview(),options);
+   this.querySelector('[data-withdraw]').addEventListener('click',()=>{const dialog=this.querySelector('[data-withdraw-dialog]');if(!dialog.open&&!this.busy)dialog.showModal();},options);
+   this.querySelector('[data-withdraw-cancel]').addEventListener('click',()=>this.querySelector('[data-withdraw-dialog]').close(),options);
+   this.querySelector('[data-withdraw-confirm]').addEventListener('click',event=>{void this.perform(()=>this.withdraw(),event.currentTarget);},options);
    this.areaInput.addEventListener('input',()=>this.onAreaInput(),options);
    this.areaInput.addEventListener('keydown',event=>this.onAreaKeydown(event),options);
    this.areaInput.addEventListener('click',()=>this.openAreas(),options);
@@ -53,7 +70,10 @@
    void this.perform(async()=>{
     const results=await Promise.allSettled([this.loadAreas(),this.cart()]);
     const receipt=this.latestReceipt();
-    if(receipt)this.show((await this.withReceipt(receipt.publicId,()=>this.api('/groups/'+receipt.publicId))).group);
+    if(receipt){
+     this.show((await this.withReceipt(receipt.publicId,()=>this.api('/groups/'+receipt.publicId))).group);
+     await this.loadMember(receipt.publicId);
+    }
     const failed=results.find(result=>result.status==='rejected');if(failed)throw failed.reason;
    });
   }
@@ -145,7 +165,7 @@
     this.selectArea(area);this.message.textContent=this.dataset.geoSelected.replace('__AREA__',area.name);
    },this.querySelector('[data-geolocate]'));
   }
-  disconnectedCallback(){this.lifecycle?.abort();this.requests?.forEach(request=>request.abort());this.lifecycle=null;}
+  disconnectedCallback(){const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog?.open)dialog.close();this.lifecycle?.abort();this.requests?.forEach(request=>request.abort());this.lifecycle=null;}
   // Receipts: {publicId, memberToken, savedAt}. No contact details, cart, coordinates or payment data are stored.
   readReceipt(store,key){
    try{
@@ -206,7 +226,7 @@
   async perform(action,trigger){
    if(this.busy)return;const lifecycle=this.lifecycle,focus=document.activeElement;this.busy=true;const loading=trigger||(focus?.matches('button')&&this.contains(focus)?focus:null);loading?.setAttribute('aria-busy','true');this.setAttribute('aria-busy','true');this.querySelectorAll('form').forEach(form=>form.inert=true);this.message.textContent='';
    try{await action();}catch(error){if(this.lifecycle===lifecycle&&this.isConnected&&error.name!=='AbortError')this.message.textContent=this.errorMessage(error);}
-   finally{if(this.lifecycle!==lifecycle)return;this.busy=false;loading?.removeAttribute('aria-busy');this.removeAttribute('aria-busy');this.querySelectorAll('form').forEach(form=>form.inert=false);this.controls();if(focus?.isConnected&&this.contains(focus)&&!focus.disabled&&document.activeElement===document.body)focus.focus({preventScroll:true});}
+   finally{if(this.lifecycle!==lifecycle)return;this.busy=false;loading?.removeAttribute('aria-busy');this.removeAttribute('aria-busy');this.querySelectorAll('form').forEach(form=>form.inert=false);this.controls();const next=this.focusAfter;this.focusAfter=null;if(next?.isConnected&&!next.hidden&&!next.disabled){next.focus();return;}if(focus?.isConnected&&this.contains(focus)&&!focus.disabled&&document.activeElement===document.body)focus.focus({preventScroll:true});}
   }
   errorMessage(error){const code=typeof error?.code==='string'&&Object.hasOwn(this.errors,error.code)?error.code:'DEFAULT';return this.errors[code]||'';}
   invalidateSearch(){
@@ -227,8 +247,130 @@
    this.querySelector('[data-pledge-label]').textContent=joined?this.dataset.pledgeLabel:this.dataset.estimate;
    this.querySelector('[data-share]').disabled=!this.group;
    const button=this.querySelector('[data-join-button]');
-   button.textContent=joined?this.dataset.updateLabel:this.pending?this.dataset.startLabel:this.dataset.joinLabel;
+   button.textContent=joined?(this.restored?this.dataset.updateRestored:this.cartDiffers()?this.dataset.updateCurrent:this.dataset.updateLabel):this.pending?this.dataset.startLabel:this.dataset.joinLabel;
    button.disabled=this.pending?!this.foundPlace:!this.group||!['OPEN','THRESHOLD_REACHED'].includes(this.group.status);
+   this.renderMember(joined,button);
+  }
+  // The member read for this browser's receipt, or null. Temporary failures keep the page and the receipt as they are;
+  // only the definitive receipt rejections (via withReceipt) remove it. strict callers get every error.
+  async loadMember(publicId,strict=false){
+   const receipt=this.receiptFor(publicId);if(!receipt)return null;
+   try{
+    const member=memberShape((await this.withReceipt(publicId,()=>this.api('/groups/'+publicId+'/member',{},receipt.memberToken)))?.member);
+    if(!member)throw failure('INVALID_RESPONSE');
+    this.member={publicId,...member};
+    return this.member;
+   }catch(error){if(strict||RECEIPT_INVALIDATING_CODES.has(error?.code))throw error;return null;}
+  }
+  currentMember(){return this.member&&this.member.publicId===this.group?.publicId&&this.receiptFor(this.member.publicId)?this.member:null;}
+  // Same variants and quantities as the stored pledge (prices are compared by the service, not here).
+  cartDiffers(){
+   const member=this.currentMember();
+   if(!member||member.status!=='PLEDGED'||!Array.isArray(member.cart)||!Array.isArray(this.lines)||!this.lines.length)return false;
+   const stored=new Map(member.cart.map(line=>[String(line.variantId),line.quantity]));
+   return stored.size!==this.lines.length||this.lines.some(line=>stored.get(String(line.variantId))!==line.quantity);
+  }
+  renderMember(joined,button){
+   const member=joined?this.currentMember():null,lines=Array.isArray(this.lines)?this.lines:null;
+   const empty=joined&&lines!==null&&lines.length===0,pledged=member?.status==='PLEDGED';
+   const open=!!this.group&&['OPEN','THRESHOLD_REACHED'].includes(this.group.status);
+   const box=this.querySelector('[data-member]'),differs=this.cartDiffers();
+   box.hidden=!member;
+   if(member){
+    this.querySelector('[data-member-pledge]').textContent=pledged?this.dataset.currentPledge.replace('__AMOUNT__',this.currency.format(member.pledgedTotalAgorot/100)):this.dataset.withdrawnState;
+    const cartLine=this.querySelector('[data-member-cart]'),note=this.querySelector('[data-member-note]');
+    cartLine.hidden=note.hidden=!differs;
+    if(differs){cartLine.textContent=this.dataset.currentCartTotal.replace('__AMOUNT__',this.currency.format((this.cartTotal||0)/100));note.textContent=this.dataset.cartDiffers;}
+   }
+   // Receipt here but Shopify's cart is empty (expired, cleared or never in this browser) while the group is open:
+   // recovery instead of an update. Closed groups keep their normal state (nothing can be updated there).
+   const recovering=empty&&open&&(!member||pledged);
+   this.querySelector('[data-recovery]').hidden=!recovering;
+   if(lines)this.querySelector('[data-empty-cart]').hidden=lines.length>0||recovering;
+   if(!recovering&&this.reviewMode==='restore')this.closeReview(false);
+   // An empty cart never offers the update action in an open group: it must never read as a withdrawal.
+   button.hidden=empty&&open;
+   this.querySelector('[data-withdraw]').hidden=!(pledged&&open);
+  }
+  // Fresh member read (Shopify re-checked now), listed before anything changes. 'restore' explains every change and
+  // offers to add only the available lines; 'pledge' lists the stored pledge.
+  async review(mode){
+   const id=this.group?.publicId;if(!this.receiptFor(id))return;
+   const member=await this.loadMember(id,true);
+   const list=this.querySelector('[data-review-list]'),note=this.querySelector('[data-review-note]'),actions=this.querySelector('[data-review-actions]');
+   const money=agorot=>this.currency.format(agorot/100);
+   const lines=Array.isArray(member.cart)?member.cart:[];
+   this.querySelector('[data-review-title]').textContent=mode==='restore'?this.dataset.restoreReview:this.dataset.pledgeItems;
+   list.replaceChildren(...lines.map(line=>{
+    const item=document.createElement('li'),name=document.createElement('strong');
+    name.textContent=line.title||this.dataset.restoreItem;item.append(name);
+    const detail=text=>{const span=document.createElement('span');span.textContent=text;item.append(span);};
+    detail(this.dataset.restoreQuantityLabel.replace('__QUANTITY__',String(mode==='restore'&&line.restorableQuantity>0?line.restorableQuantity:line.quantity)));
+    if(mode==='restore'){
+     item.dataset.state=line.reason==='UNAVAILABLE'?'unavailable':line.reason==='QUANTITY_REDUCED'||line.priceChanged?'changed':'unchanged';
+     if(line.reason==='UNAVAILABLE')detail(this.dataset.restoreUnavailable);
+     else{
+      if(line.reason==='QUANTITY_REDUCED')detail(this.dataset.restoreQuantity.replace('__OLD__',String(line.quantity)).replace('__NEW__',String(line.restorableQuantity)));
+      if(line.priceChanged&&line.currentUnitAgorot!==null)detail(this.dataset.restorePrice.replace('__OLD__',money(line.storedUnitAgorot)).replace('__NEW__',money(line.currentUnitAgorot)));
+      if(item.dataset.state==='unchanged')detail(this.dataset.restoreUnchanged);
+     }
+    }
+    return item;
+   }));
+   let text='';
+   if(mode==='pledge')text=member.status==='PLEDGED'?this.dataset.currentPledge.replace('__AMOUNT__',money(member.pledgedTotalAgorot)):this.dataset.withdrawnState;
+   else if(member.cartCheck!=='OK'||!Array.isArray(member.cart))text=this.dataset.restoreCheckUnavailable;
+   else if(!lines.some(line=>line.restorableQuantity>0))text=this.dataset.restoreNone;
+   note.hidden=!text;note.textContent=text;
+   actions.hidden=mode!=='restore'||!!text;
+   this.reviewMode=mode;
+   this.querySelector('[data-review]').hidden=false;
+   this.querySelector('[data-review-title]').focus();
+  }
+  closeReview(returnFocus=true){
+   const review=this.querySelector('[data-review]'),wasOpen=!review.hidden;
+   review.hidden=true;this.reviewMode=null;
+   if(returnFocus&&wasOpen)this.querySelector('[data-restore]:not([hidden])')?.focus();
+  }
+  // Adds only the lines Shopify accepts now, through Shopify's cart API (Shopify prices them; stored prices are only
+  // shown for comparison). The pledge is not touched: the shopper updates it explicitly afterwards.
+  async restore(){
+   const member=this.currentMember();
+   const items=(Array.isArray(member?.cart)?member.cart:[]).filter(line=>line.restorableQuantity>0).map(line=>({id:line.variantId,quantity:line.restorableQuantity}));
+   if(!items.length)return;
+   const url=new URL(this.dataset.cartAddUrl,location.origin);if(url.origin!==location.origin)throw failure('RESTORE_FAILED');
+   const controller=new AbortController();this.requests.add(controller);
+   const timer=setTimeout(()=>controller.abort(),GroupDelivery.cartTimeout);
+   try{
+    let response;
+    try{response=await fetch(url,{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({items})});}
+    catch{throw failure('RESTORE_FAILED');}
+    if(!response.ok)throw failure('RESTORE_FAILED');
+   }finally{clearTimeout(timer);this.requests.delete(controller);}
+   this.restored=true;
+   this.closeReview(false);
+   await this.cart();
+   // The header badge and cart drawer refresh through storefront.js's own cart helpers.
+   document.dispatchEvent(new CustomEvent('storefront:cart:changed'));
+   this.message.textContent=this.dataset.restored;
+   this.controls();
+   // Forms are inert while busy; perform() moves focus here once they are interactive again.
+   this.focusAfter=this.querySelector('[data-join-button]');
+  }
+  // Explicit withdrawal after the confirmation dialog; the receipt stays so the member can pledge again later.
+  async withdraw(){
+   const id=this.group?.publicId,receipt=this.receiptFor(id),dialog=this.querySelector('[data-withdraw-dialog]');
+   if(!receipt){dialog.close();return;}
+   let result;
+   try{result=await this.withReceipt(id,()=>this.api('/groups/'+id+'/withdraw',{confirm:true},receipt.memberToken));}
+   finally{dialog.close();}
+   this.show(result.group);
+   this.member={publicId:id,status:'WITHDRAWN',pledgedTotalAgorot:0,cartCheck:'OK',cart:[]};
+   this.restored=false;this.closeReview(false);
+   this.querySelector('[data-validated-pledge]').hidden=true;
+   this.message.textContent=this.dataset.withdrawn;
+   this.controls();
+   this.focusAfter=this.querySelector('[data-join-button]:not([hidden])')||this.querySelector('[data-refresh]');
   }
   async api(path,body,token){
    // One controller per request: lifecycle aborts (disconnect) stay silent; the finite timeout reports REQUEST_TIMEOUT.
@@ -264,7 +406,7 @@
     if(!Number.isSafeInteger(cart?.total_price)||!Array.isArray(cart?.items))throw failure('CART_READ_FAILED');
     if(cart.currency!=='ILS')throw failure('CART_CURRENCY');
     this.querySelector('[data-empty-cart]').hidden=cart.items.length>0;
-    this.querySelector('[data-current-cart]').textContent=this.currency.format(cart.total_price/100);
+    this.querySelector('[data-current-cart]').textContent=this.currency.format(cart.total_price/100);this.cartTotal=cart.total_price;
     if(cart.items.some(item=>item.selling_plan_allocation||Object.keys(item.properties||{}).length))throw failure('CART_UNAVAILABLE');
     this.lines=cart.items.map(item=>({variantId:String(item.variant_id||item.id),quantity:item.quantity}));
     return this.lines;
@@ -285,12 +427,15 @@
   async join(){
    const lines=await this.cart();
    const receipt=this.receiptFor(this.group?.publicId);
+   // An empty cart is never a withdrawal (the service rejects it too); withdrawing has its own confirmed action.
+   if(!lines.length&&receipt)throw failure('EMPTY_CART_CANNOT_UPDATE_PLEDGE');
    if(!lines.length&&!receipt)throw failure('CART_EMPTY');
    if(receipt){
     const id=receipt.publicId;
     try{
      const result=await this.withReceipt(id,()=>this.api('/groups/'+id+'/update-pledge',{lines},receipt.memberToken));
      this.show(result.group);this.pledge(result);this.message.textContent=this.dataset.updated;
+     this.restored=false;await this.loadMember(id);
     }catch(error){
      // Closed groups keep the receipt; show their current state instead of leaving a stale panel.
      if(error?.code==='GROUP_CLOSED')try{this.show((await this.api('/groups/'+id)).group);}catch{}
@@ -307,6 +452,7 @@
    if(!TOKEN.test(result.memberToken)||!UUID.test(result.group?.publicId))throw failure('INVALID_RESPONSE');
    const saved={publicId:result.group.publicId,memberToken:result.memberToken,savedAt:Date.now()};
    this.receipts.set(saved.publicId,saved);this.persist(saved);
+   this.member={publicId:saved.publicId,status:'PLEDGED',pledgedTotalAgorot:Number.isSafeInteger(result.validatedPledgeAgorot)?result.validatedPledgeAgorot:0,cartCheck:'OK',cart:lines.map(line=>({variantId:line.variantId,quantity:line.quantity}))};
    form.reset();this.show(result.group);this.pledge(result);this.message.textContent=result.created===true?this.dataset.started:this.dataset.joined;
   }
   pledge(result){if(Number.isSafeInteger(result.validatedPledgeAgorot)&&result.validatedPledgeAgorot>=0){const pledge=this.querySelector('[data-validated-pledge]');pledge.hidden=false;pledge.querySelector('bdi').textContent=this.currency.format(result.validatedPledgeAgorot/100);}}

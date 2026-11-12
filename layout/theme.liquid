@@ -4,6 +4,13 @@
   {% if settings.sticky_header %}data-sticky-header{% endif %}
   lang="{{ request.locale.iso_code }}"
   dir="{% if request.locale.iso_code == 'he' or request.locale.iso_code == 'ar' %}rtl{% else %}ltr{% endif %}"
+  {%- comment -%}
+    Diagnostics only (never displayed, no personal data): which theme revision rendered this page and when. Together with
+    Shopify.theme.id / Shopify.theme.role in the console, this tells an old tab snapshot or a preview theme apart from
+    the live theme. Update the revision with: node tests/helpers/theme-revision.cjs --write
+  {%- endcomment %}
+  data-theme-revision="{%- render 'theme-revision' -%}"
+  data-rendered-at="{{ 'now' | date: '%Y-%m-%dT%H:%M:%S%z' }}"
 >
   <head>
     <meta name="google-site-verification" content="JkrR2_njxj9bpVvv9wEM1ox8tUfhSNK6E8guHQt3jqQ" />

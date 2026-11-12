@@ -429,6 +429,15 @@
     });
     cardCartQueue = operation.catch(() => {});
   }, true);
+  // Other theme modules that change the cart through Shopify's AJAX API (Group Delivery cart restore) announce it with
+  // storefront:cart:changed; the header badge, drawer and stock limits then refresh from Shopify in the same queue.
+  document.addEventListener('storefront:cart:changed', () => {
+    const operation = cardCartQueue.then(async () => {
+      await refreshCardCart(null, document.querySelector('.storefront-header')?.dataset.cartSection);
+      document.dispatchEvent(new CustomEvent('storefront:cart:updated'));
+    });
+    cardCartQueue = operation.catch(() => {});
+  });
   // Back/forward cache restores a frozen DOM, so its badge and limits may predate cart changes made elsewhere.
   // Normal loads are already server-rendered from the current cart and are skipped.
   window.addEventListener('pageshow', event => {

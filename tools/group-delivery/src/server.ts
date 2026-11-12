@@ -31,7 +31,9 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   if(req.method==='OPTIONS'){res.set({'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600'});res.status(204).end();return;}
   if(!['GET','HEAD'].includes(req.method)&&(!origin||!allowed.includes(origin)||!req.is('application/json')))throw new ApiError(403,'INVALID_ORIGIN');
   // Nearest-area lookups get their own small bucket so location attempts cannot use up the join budget (or vice versa).
-  const read=['GET','HEAD'].includes(req.method),nearest=req.method==='POST'&&req.path==='/areas/nearest';
+  // The member read is a POST only to carry the bearer token; it changes nothing, so it shares the read budget.
+  const memberRead=req.method==='POST'&&/^\/groups\/[^/]+\/member$/.test(req.path);
+  const read=['GET','HEAD'].includes(req.method)||memberRead,nearest=req.method==='POST'&&req.path==='/areas/nearest';
   await auth.limit(req,nearest?'area-nearest':read?'public-read':'public-write',nearest?10:read?120:20,600);
   next();
  });
@@ -65,10 +67,12 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.post('/api/v1/groups/join',async(req,res)=>res.status(201).json(await groups.joinArea(req.body)));
  app.get('/api/v1/groups/:publicId',async(req,res)=>res.json({group:await groups.get(req.params.publicId)}));
  app.post('/api/v1/groups/:publicId/join',async(req,res)=>res.status(201).json(await groups.join(req.params.publicId,req.body)));
- app.post('/api/v1/groups/:publicId/update-pledge',async(req,res)=>{
-  const token=req.get('Authorization')?.replace(/^Bearer /,'')||'';
-  res.json(await groups.update(req.params.publicId,token,req.body));
- });
+ const bearer=(req:express.Request)=>req.get('Authorization')?.replace(/^Bearer /,'')||'';
+ app.post('/api/v1/groups/:publicId/update-pledge',async(req,res)=>res.json(await groups.update(req.params.publicId,bearer(req),req.body)));
+ // Member-only: the receipt holder's pledge and stored cart re-checked against Shopify (no contact details or token).
+ app.post('/api/v1/groups/:publicId/member',async(req,res)=>res.json(await groups.memberState(req.params.publicId,bearer(req))));
+ // Explicit withdrawal; needs the member token and {"confirm":true}. A cart update never withdraws.
+ app.post('/api/v1/groups/:publicId/withdraw',async(req,res)=>res.json(await groups.withdraw(req.params.publicId,bearer(req),req.body)));
  app.use((_req,res)=>res.status(404).json({error:'העמוד לא נמצא',code:'NOT_FOUND' satisfies ErrorCode}));
  app.use((error:any,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{
   const status=error instanceof ApiError?error.status:error?.status===413?413:error?.status===400?400:500;

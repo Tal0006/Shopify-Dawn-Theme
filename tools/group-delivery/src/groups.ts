@@ -4,7 +4,7 @@ import type {Config} from './config.js';
 import type {Database,Queryable} from './db.js';
 import {transaction} from './db.js';
 import {ApiError,hash,contact,lines,publicId,distance,center,areaReference,type AreaPlace} from './domain.js';
-import type {CartValidator,ValidatedCart} from './shopify.js';
+import type {CartValidator,ValidatedCart,InspectedLine} from './shopify.js';
 import {Areas,type AreaRow} from './areas.js';
 export class Groups {
  constructor(private db:Database,private config:Pick<Config,'threshold'|'expiryDays'|'standardRadius'|'storeLocation'|'areaSuggestionRadius'>,private shopify:CartValidator,private areas:Areas=new Areas(db,config)){}
@@ -97,18 +97,49 @@ export class Groups {
    return {...await this.enroll(db,group,place,person,cart),created:!existing};
   });
  }
- async update(id:string,token:string,body:any){
+ // The member behind a receipt (group public id + bearer token). Runs before any Shopify request or lock.
+ private async member(id:string,token:string){
   publicId(id);if(!/^[a-f0-9]{64}$/.test(token))throw new ApiError(401,'MEMBER_AUTH_REQUIRED');
-  // Authenticate before spending a Shopify request.
-  const proof=(await this.db.query('SELECT m.id FROM group_members m JOIN delivery_groups g ON m.group_id=g.id WHERE g.public_id=$1 AND m.token_hash=$2',[id,hash(token)])).rows[0];
-  if(!proof)throw new ApiError(401,'MEMBER_AUTH_REQUIRED');
-  const cart=Array.isArray(body?.lines)&&body.lines.length===0?{total:0n,snapshot:[]}:await this.shopify.validate(lines(body?.lines));
+  const row=(await this.db.query('SELECT m.id,m.status,m.pledged_total_agorot,m.cart_snapshot FROM group_members m JOIN delivery_groups g ON m.group_id=g.id WHERE g.public_id=$1 AND m.token_hash=$2',[id,hash(token)])).rows[0];
+  if(!row)throw new ApiError(401,'MEMBER_AUTH_REQUIRED');
+  return row;
+ }
+ // Replaces the pledge with a validated, non-empty cart. An empty cart is never a withdrawal: an expired or cleared
+ // Shopify cart reads as empty, so it is rejected and the pledge stays as it was (see withdraw()).
+ async update(id:string,token:string,body:any){
+  const proof=await this.member(id,token);
+  if(Array.isArray(body?.lines)&&body.lines.length===0)throw new ApiError(422,'EMPTY_CART_CANNOT_UPDATE_PLEDGE','הסל ריק, ולכן ההתחייבות לא שונתה.');
+  const cart=await this.shopify.validate(lines(body?.lines));
   return this.locked(async db=>{
    const group=await this.group(db,id);
    if(!['OPEN','THRESHOLD_REACHED'].includes(group.status))throw new ApiError(409,'GROUP_CLOSED');
-   await db.query('UPDATE group_members SET cart_snapshot=$1::jsonb,pledged_total_agorot=$2,status=$5,updated_at=NOW() WHERE id=$3 AND group_id=$4',[JSON.stringify(cart.snapshot),cart.total.toString(),proof.id,group.id,cart.total===0n?'WITHDRAWN':'PLEDGED']);
+   await db.query("UPDATE group_members SET cart_snapshot=$1::jsonb,pledged_total_agorot=$2,status='PLEDGED',updated_at=NOW() WHERE id=$3 AND group_id=$4",[JSON.stringify(cart.snapshot),cart.total.toString(),proof.id,group.id]);
    return {group:await this.recalculate(db,group),validatedPledgeAgorot:Number(cart.total)};
   });
+ }
+ // Explicit withdrawal: member token plus {confirm:true} from the confirmation step. Idempotent for a withdrawn member.
+ async withdraw(id:string,token:string,body:any){
+  const proof=await this.member(id,token);
+  if(body?.confirm!==true)throw new ApiError(400,'WITHDRAW_CONFIRMATION_REQUIRED');
+  return this.locked(async db=>{
+   const group=await this.group(db,id);
+   if(!['OPEN','THRESHOLD_REACHED'].includes(group.status))throw new ApiError(409,'GROUP_CLOSED');
+   await db.query("UPDATE group_members SET cart_snapshot='[]'::jsonb,pledged_total_agorot=0,status='WITHDRAWN',updated_at=NOW() WHERE id=$1 AND group_id=$2",[proof.id,group.id]);
+   return {group:await this.recalculate(db,group),member:{status:'WITHDRAWN' as const,pledgedTotalAgorot:0}};
+  });
+ }
+ // The member's own pledge and stored cart, re-checked against Shopify now. Never returns contact details, the token,
+ // its hash or database ids. If Shopify cannot be reached the membership is still returned with cartCheck UNAVAILABLE.
+ async memberState(id:string,token:string){
+  const row=await this.member(id,token);
+  const snapshot=Array.isArray(row.cart_snapshot)?row.cart_snapshot:[];
+  let cart:InspectedLine[]|null=[],cartCheck:'OK'|'UNAVAILABLE'='OK';
+  if(snapshot.length){
+   if(!this.shopify.inspect){cart=null;cartCheck='UNAVAILABLE';}
+   else try{cart=await this.shopify.inspect(snapshot);}
+   catch(error){if((error as any)?.code!=='SHOPIFY_UNAVAILABLE')throw error;cart=null;cartCheck='UNAVAILABLE';}
+  }
+  return {member:{status:row.status as 'PLEDGED'|'WITHDRAWN',pledgedTotalAgorot:Number(row.pledged_total_agorot),cartCheck,cart}};
  }
  async list(){
   return this.locked(async db=>{
