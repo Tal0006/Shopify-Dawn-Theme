@@ -13,8 +13,12 @@ import {AdminData,csv} from './admin-data.js';
 import {audit,actorOf,auditPage} from './audit.js';
 import {safeNext} from './auth.js';
 import {ApiError,type ErrorCode} from './domain.js';
-export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg)){
+import {SystemHealth,systemsView,type HealthOptions} from './system.js';
+import {systemPage} from './system-page.js';
+// deps: test seams for the operations page (outbound fetch and health-check timings).
+export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>}={}){
  const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator);
+ const systemHealth=new SystemHealth(db,cfg.ops,()=>cfg.origin,deps.fetch,deps.health);
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
  app.use((_req,res,next)=>{
   res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
@@ -99,6 +103,10 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   res.type('html').send(memberPage({...data,csrf:csrfOf(res),error,confirming:req.query.confirm==='withdraw'}));
  });
  app.get('/admin/areas',async(req,res)=>res.type('html').send(areasPage({areas:await areas.adminList(),csrf:csrfOf(res),notice:noticeOf(req.query.notice)})));
+ // Operations overview (מערכות האתר): safe configuration plus on-demand health checks; ?refresh=1 re-checks (rate floor).
+ const systemData=async(req:express.Request)=>systemsView(cfg.ops,await systemHealth.results(req.query.refresh==='1'),cfg.origin);
+ app.get('/admin/system',async(req,res)=>res.type('html').send(systemPage({...await systemData(req),csrf:csrfOf(res)})));
+ app.get('/admin/api/system',async(req,res)=>res.json(await systemData(req)));
  app.get('/admin/audit',async(req,res)=>res.type('html').send(auditView({...await auditPage(db,req.query),csrf:csrfOf(res)})));
  // CSV exports (members, or one row per stored cart line). UTF-8 with BOM; formula-like cells neutralised in csv().
  const dateText=(iso:string)=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Jerusalem',dateStyle:'short',timeStyle:'medium'}).format(new Date(iso));

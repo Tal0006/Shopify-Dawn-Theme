@@ -11,7 +11,10 @@ const CHROME=process.env.CHROME_PATH||['C:\\Program Files\\Google\\Chrome\\Appli
 const sleep=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 
 test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (set CHROME_PATH)',timeout:240000},async t=>{
- const f=await adminFixture(),ids=await f.seed();
+ // Operations page: a few configured links and costs; the storefront HEAD is answered locally (no internet).
+ const f=await adminFixture({env:{OPS_SHOPIFY_ADMIN_URL:'https://admin.shopify.com/store/example-store',OPS_NEON_CONSOLE_URL:'https://console.neon.tech/app/projects/example',
+  OPS_THEME_REVISION:'2026-11-12+ab875ef',OPS_COSTS:JSON.stringify([{service:'Render Group Delivery',amount:7,currency:'USD',system:'render-group-delivery'},{service:'Neon',amount:0,currency:'USD',system:'neon'},{service:'Domain',amount:60,currency:'ILS',frequency:'YEARLY'}])},
+  external:async url=>{if(new URL(url).host==='fanakee.com')return new Response(null,{status:200});throw new TypeError('blocked');}}),ids=await f.seed();
  const profile=mkdtempSync(join(tmpdir(),'fankee-admin-chrome-'));
  const shots=process.env.ADMIN_SCREENSHOTS;if(shots)mkdirSync(shots,{recursive:true});
  let chrome:ChildProcess|undefined,ws:WebSocket|undefined;
@@ -266,6 +269,40 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    await size(1440);
   });
 
+  await t.test('systems page: navigation, RTL, status chips, quick links, refresh, costs, postponed, desktop and mobile',async()=>{
+   await size(1440);await go('/admin');
+   await ev('[...document.querySelectorAll(".topbar__nav a")].find(a=>a.textContent==="מערכות האתר").click()');
+   await wait('location.pathname==="/admin/system"&&!!document.querySelector(".sys-grid")');
+   assert.deepEqual(await ev('[document.querySelector("h1").textContent,document.documentElement.dir,document.querySelector(".topbar__nav a[aria-current=page]").textContent,document.title]'),['מערכות האתר','rtl','מערכות האתר','מערכות האתר · ניהול משלוחים קבוצתיים']);
+   const chip=(id:string)=>ev('document.querySelector("[data-system=\\"'+id+'\\"] .chip--sys").textContent');
+   assert.deepEqual(await Promise.all(['render-group-delivery','neon','domain','group-delivery-admin','shopify','github','merchant-center','dynamic-google-reviews','group-delivery-payments'].map(chip)),
+    ['פעיל','פעיל','פעיל','פעיל','בדיקה ידנית','בדיקה ידנית','בדיקה ידנית','נדחה','בפיתוח / לא בפרודקשן']);
+   assert.match(await ev('document.querySelector("[data-system=merchant-center]").textContent'),/לא הוגדר קישור ניהול/);
+   assert.equal(await ev('document.querySelector(".sys-summary").textContent.includes("אין תקלות שזוהו")'),true);
+   // Quick links: external ones open in a new tab without opener; internal ones stay in the admin.
+   const quick=await ev('[...document.querySelectorAll(".sys-quick a")].map(a=>[a.textContent.replace(" (נפתח בכרטיסייה חדשה)",""),a.target,a.rel])');
+   assert.deepEqual(quick.map((q:string[])=>q[0]),['פתיחת Shopify','פתיחת GitHub','פתיחת Render','פתיחת Neon','פתיחת האתר','ניהול משלוחים קבוצתיים','יומן פעולות']);
+   assert.ok(quick.every((q:string[])=>q[0].startsWith('פתיחת')?q[1]==='_blank'&&q[2]==='noopener noreferrer':q[1]===''));
+   assert.equal(await ev('[...document.querySelectorAll("main a[target=_blank]")].every(a=>a.rel==="noopener noreferrer")'),true);
+   // Costs and postponed section.
+   assert.match(await ev('document.querySelector(".cost-total").textContent'),/סה"כ עלות חודשית משוערת:.*7\.00.*\$ לחודש.*5\.00.*₪ לחודש/);
+   assert.equal(await ev('document.querySelectorAll(".table--costs tbody tr").length'),3);
+   assert.equal(await ev('document.querySelectorAll("#postponed-title ~ .sys-grid .sys--postponed").length'),2);
+   for(const width of [1280,1440,1920]){await size(width);assert.equal(await ev(overflow),false,'overflow at '+width);}
+   await size(1440);await shot('admin-system');
+   // Refresh with the keyboard: Tab to the button, Enter submits the GET form.
+   await ev('document.querySelector(".sys-refresh button").focus()');
+   for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key:'Enter',code:'Enter',windowsVirtualKeyCode:13,...(type==='keyDown'?{text:String.fromCharCode(13)}:{})});
+   await wait('location.search==="?refresh=1"&&!!document.querySelector(".sys-grid")');
+   // Mobile: cards stack, no overflow, 44px controls.
+   await size(390,844);await go('/admin/system');
+   assert.equal(await ev(overflow),false);
+   assert.equal(await ev('getComputedStyle(document.querySelector(".sys-grid")).gridTemplateColumns.split(" ").length'),1);
+   assert.deepEqual(await ev('[...document.querySelectorAll("main .btn,.topbar a,.topbar button")].filter(e=>e.offsetParent&&e.getBoundingClientRect().height<43.5).map(e=>e.outerHTML.slice(0,60))'),[]);
+   await shot('admin-mobile-system');
+   await size(1440);
+  });
+
   await t.test('mobile: stacked cards, no horizontal overflow, 44px targets',async()=>{
    await size(390,844);
    for(const path of ['/admin','/admin/groups/'+ids.ashdod]){
@@ -290,6 +327,10 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    assert.match(await ev('document.querySelector(".notice").textContent'),/פג תוקף ההתחברות/);
    assert.equal(await ev('document.querySelector("input[name=next]").value'),'/admin/groups/'+ids.ashdod);
    assert.doesNotMatch(await ev('document.body.innerText'),/@example\.test/);
+   // The systems page sends an expired session to the login form and back to itself.
+   await go('/admin/system');
+   assert.equal(await ev('location.pathname+location.search'),'/admin?expired=1&next='+encodeURIComponent('/admin/system'));
+   assert.doesNotMatch(await ev('document.body.innerText'),/Neon PostgreSQL|fanakee/);
   });
  }finally{
   ws?.close();chrome?.kill();await f.close();await sleep(200);

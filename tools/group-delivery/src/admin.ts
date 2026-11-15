@@ -6,7 +6,7 @@ export const escape=(value:unknown)=>String(value??'').replace(/[&<>"']/g,char=>
 const TZ='Asia/Jerusalem';
 const money=(agorot:number)=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS'}).format(agorot/100);
 const dateTime=(iso:string)=>new Intl.DateTimeFormat('he-IL',{timeZone:TZ,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(iso));
-const time=(iso:string)=>'<time datetime="'+escape(iso)+'">'+escape(dateTime(iso))+'</time>';
+export const time=(iso:string)=>'<time datetime="'+escape(iso)+'">'+escape(dateTime(iso))+'</time>';
 export const GROUP_LABELS:Record<string,string>={OPEN:'פתוחה',THRESHOLD_REACHED:'הגיעה ליעד',APPROVED:'אושרה',EXPIRED:'פג תוקף',PAYMENT_OPEN:'תשלום פתוח',CONFIRMED:'אושרה סופית',SCHEDULED:'מתוזמנת',COMPLETED:'הושלמה',CANCELLED:'בוטלה'};
 export const MEMBER_LABELS:Record<string,string>={PLEDGED:'התחייבות פעילה',WITHDRAWN:'הוסר מהקבוצה'};
 // Operational delivery workflow (admin only; enums stay English in the backend).
@@ -32,8 +32,8 @@ const pager=(base:string,params:Record<string,string|number|undefined>,page:Page
  return '<nav class="pager" aria-label="דפדוף">'+link(page.page-1,'הקודם','prev')+'<span>עמוד '+page.page+' מתוך '+page.pageCount+' · '+page.total+' '+escape(label)+'</span>'+link(page.page+1,'הבא','next')+'</nav>';
 };
 
-function layout(title:string,body:string,options:{csrf?:string;active?:string}={}){
- const nav=options.csrf?'<nav class="topbar__nav" aria-label="ניווט ניהול">'+[['/admin','לוח בקרה','dashboard'],['/admin/areas','אזורי משלוח','areas'],['/admin/audit','יומן פעולות','audit']]
+export function layout(title:string,body:string,options:{csrf?:string;active?:string}={}){
+ const nav=options.csrf?'<nav class="topbar__nav" aria-label="ניווט ניהול">'+[['/admin','לוח בקרה','dashboard'],['/admin/areas','אזורי משלוח','areas'],['/admin/audit','יומן פעולות','audit'],['/admin/system','מערכות האתר','system']]
   .map(([href,text,key])=>'<a href="'+href+'"'+(options.active===key?' aria-current="page"':'')+'>'+text+'</a>').join('')+'</nav>'+
   '<form method="post" action="/admin/logout" class="topbar__logout"><input type="hidden" name="csrf" value="'+escape(options.csrf)+'"><button class="btn btn--quiet">יציאה</button></form>':'';
  return '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'+
@@ -42,7 +42,7 @@ function layout(title:string,body:string,options:{csrf?:string;active?:string}={
   '<header class="topbar"><a class="topbar__brand" href="/admin"><span class="topbar__dot" aria-hidden="true"></span>פאנקי · משלוחים קבוצתיים</a>'+nav+'</header>'+
   '<main id="main" tabindex="-1">'+body+'</main><p class="sr-only" role="status" aria-live="polite" id="admin-live"></p></body></html>';
 }
-const notice=(kind:'ok'|'error'|'info',text:string)=>'<p class="notice notice--'+kind+'" role="'+(kind==='error'?'alert':'status')+'">'+escape(text)+'</p>';
+export const notice=(kind:'ok'|'error'|'info',text:string)=>'<p class="notice notice--'+kind+'" role="'+(kind==='error'?'alert':'status')+'">'+escape(text)+'</p>';
 
 export function loginPage(state:{failed?:boolean;limited?:boolean;expired?:boolean;next?:string}={}){
  const message=state.failed?notice('error','שם המשתמש או הסיסמה אינם נכונים.'):state.limited?notice('error','יותר מדי ניסיונות התחברות. נסו שוב מאוחר יותר.'):state.expired?notice('info','פג תוקף ההתחברות או שנדרשת התחברות. יש להתחבר שוב.'):'';
@@ -401,6 +401,24 @@ input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd
 .ops-history__title{font-size:14px;margin:16px 0 6px}.ops-history{margin:0;padding-inline-start:20px;font-size:13px;color:var(--muted)}.ops-history li{margin:4px 0}
 .completed-summary{padding:12px 14px;border-radius:10px;background:var(--ok-soft);border:1px solid #b8dfc9;color:var(--ok)}.completed-summary span{color:var(--ink)}
 @media (max-width:560px){.steps{grid-template-columns:1fr;gap:4px}.step{flex-direction:row;text-align:start;gap:10px}.step::before{display:none}.ops-form,.ops-form .field,.ops-actions .btn{width:100%}}
+.sys-summary{margin:8px 0 12px}.sys-summary strong{color:var(--bad)}
+.sys-quick{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+.sys-section-title{margin:24px 0 10px}
+.sys-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:12px}
+.sys{display:flex;flex-direction:column;gap:8px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:0 1px 2px rgb(20 50 58 / 4%)}
+.sys--postponed{background:#fafbfb;border-style:dashed;box-shadow:none}
+.sys__head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.sys__head h3{margin:0;font-size:16px;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.sys__mark{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;background:var(--cyan-soft);color:var(--teal-strong);font-weight:800;font-size:13px}
+.sys--postponed .sys__mark{background:#eef2f3;color:var(--muted)}
+.sys__purpose{display:flex;flex-wrap:wrap;gap:4px;list-style:none;margin:0;padding:0}.sys__purpose li{padding:1px 8px;border-radius:999px;background:#eef4f5;color:var(--muted);font-size:12px}
+.sys__check{margin:0;font-size:13px}.sys__check--offline{color:var(--bad)}.sys__check--degraded{color:var(--warn)}
+.sys__details{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px 14px;margin:0}.sys__details div{min-width:0}.sys__details dt{font-size:12px;font-weight:700;color:var(--muted)}.sys__details dd{margin:0;overflow-wrap:anywhere;font-size:13px}
+.sys__cost,.sys__note{margin:0;font-size:13px}.sys__note{padding:8px 10px;border-radius:8px;background:#f6fafb}
+.sys__links{display:flex;flex-wrap:wrap;gap:6px;margin:auto 0 0}
+.chip--sys-operational{background:var(--ok-soft);color:var(--ok)}.chip--sys-degraded{background:var(--warn-soft);color:var(--warn)}.chip--sys-offline{background:var(--bad-soft);color:var(--bad)}
+.chip--sys-manual{background:#eef2f3;color:#4b5e64}.chip--sys-postponed{background:#f1f1f1;color:#666}.chip--sys-manual::before,.chip--sys-postponed::before{background:transparent;border:1.5px solid currentColor;box-sizing:border-box}
+.cost-total{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;margin:12px 0 4px;font-size:15px}
+.sys-warnings,.sys-missing{margin:6px 0 0;padding-inline-start:20px}.sys-missing{display:flex;flex-wrap:wrap;gap:6px 18px}
 .audit__desc{display:block;margin-top:2px;font-size:13px;color:var(--muted)}
 @media (max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.field--wide{grid-column:1/-1}.filters__actions{grid-column:1/-1}}
 @media (max-width:760px){

@@ -10,15 +10,22 @@ import {Areas} from '../src/areas.js';
 import {Shopify} from '../src/shopify.js';
 import {config} from '../src/config.js';
 import {migrate,type Database,type Connection} from '../src/db.js';
+import type {HealthOptions} from '../src/system.js';
 export const AREA={beerSheva:'6f1a2c00-0001-4a00-8000-0000000000a1',ashdod:'6f1a2c00-0002-4a00-8000-0000000000a2',ashkelon:'6f1a2c00-0003-4a00-8000-0000000000a3',sderot:'6f1a2c00-0007-4a00-8000-0000000000a7'};
-export async function adminFixture(){
+// options: OPS_* settings, a handler for outbound requests outside the local service (default: refused, so no test
+// ever reaches the internet) and health-check timings. faults.selectOne simulates the ops database check failing.
+export async function adminFixture(options:{env?:Record<string,string>;external?:(url:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>}={}){
  const dir=await mkdtemp(join(tmpdir(),'fankee-admin-db-'));
  const engine=new PGlite(dir);
  let tail=Promise.resolve();
  async function acquire(){let release!:()=>void;const wait=tail;tail=new Promise<void>(r=>release=r);await wait;return release;}
  const query=async(sql:string,values?:any[]):Promise<any>=>values?engine.query(sql,values):(await engine.exec(sql)).at(-1)||{rows:[]};
- const db:Database={async query(sql,values){const release=await acquire();try{return await query(sql,values);}finally{release();}},async connect(){const release=await acquire();return {query,release} as Connection;}};
- const cfg=config({PORT:'4330',DATABASE_URL:'postgresql://test',ADMIN_USERNAME:'merchant',ADMIN_PASSWORD:'testing-password-long-only',SESSION_SECRET:'testing-session-secret-not-real-00000000',SHOPIFY_STORE_DOMAIN:'example.myshopify.com',SHOPIFY_STOREFRONT_PRIVATE_TOKEN:'test-private-shopify-token',APP_ORIGIN:'http://127.0.0.1:4330'});
+ const faults={selectOne:'ok' as 'ok'|'fail'|'hang'};
+ const db:Database={async query(sql,values){
+  if(sql==='SELECT 1 AS ok'&&faults.selectOne==='fail')throw Error('connection refused');
+  if(sql==='SELECT 1 AS ok'&&faults.selectOne==='hang')return new Promise(()=>{});
+  const release=await acquire();try{return await query(sql,values);}finally{release();}},async connect(){const release=await acquire();return {query,release} as Connection;}};
+ const cfg=config({PORT:'4330',DATABASE_URL:'postgresql://test',ADMIN_USERNAME:'merchant',ADMIN_PASSWORD:'testing-password-long-only',SESSION_SECRET:'testing-session-secret-not-real-00000000',SHOPIFY_STORE_DOMAIN:'example.myshopify.com',SHOPIFY_STOREFRONT_PRIVATE_TOKEN:'test-private-shopify-token',APP_ORIGIN:'http://127.0.0.1:4330',...options.env});
  const shopify={mode:'ok' as 'ok'|'down',requests:0,prices:{} as Record<string,string>};
  const validator=new Shopify(cfg,async(_input,options)=>{
   shopify.requests++;
@@ -27,7 +34,13 @@ export async function adminFixture(){
   return new Response(JSON.stringify({data:{nodes:body.variables.ids.map((id:string)=>{const n=id.split('/').pop()!;return {id,title:'Default Title',availableForSale:true,requiresComponents:false,quantityAvailable:100,price:{amount:shopify.prices[n]||'125.00',currencyCode:'ILS'},quantityRule:{minimum:1,increment:1,maximum:null},product:{title:'מוצר '+n,requiresSellingPlan:false}};})}}));
  });
  await migrate(db);
- const areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),app=createApp(db,cfg,validator);
+ const areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),outbound:{url:string;method:string}[]=[];
+ const app=createApp(db,cfg,validator,{health:options.health,fetch:async(url,init)=>{
+  outbound.push({url,method:init?.method||'GET'});
+  if(url.startsWith(cfg.origin+'/'))return fetch(url,init);
+  if(options.external)return options.external(url,init);
+  throw new TypeError('outbound requests are blocked in tests');
+ }});
  const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
  cfg.origin='http://127.0.0.1:'+(server.address() as any).port;
  let n=0;
@@ -62,5 +75,5 @@ export async function adminFixture(){
   await new Promise<void>(r=>server.close(()=>r()));await engine.close();
   if(resolve(dir).startsWith(join(resolve(tmpdir()),'fankee-admin-db-')))await rm(dir,{recursive:true,force:true,maxRetries:3,retryDelay:100});
  };
- return {db,cfg,groups,shopify,seed,login,close,person};
+ return {db,cfg,groups,shopify,seed,login,close,person,faults,outbound};
 }

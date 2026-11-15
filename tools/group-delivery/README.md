@@ -172,6 +172,23 @@ JSON equivalents (same session): `GET /admin/api/dashboard`, `GET /admin/api/gro
 
 Completing a delivery never deletes, copies, moves or zeroes anything: the row keeps its id, public id, members, withdrawn members, carts, pledges, totals and timestamps, and gains `completed_at` / `completed_by` (anonymous session reference). From then on the group is history: it is not matched by find/join, refuses joins, pledge updates, withdrawals and approval (GROUP_CLOSED / APPROVAL_NOT_ALLOWED), is skipped by expiry, and the public aggregate reports `status: "COMPLETED"` (the storefront shows "המשלוח הקבוצתי הזה כבר הושלם."). Receipts stay tied to their own group and never authorize another one. The area's next first join creates a brand-new group (new public id, threshold from config, 0 pledged, NEW) through the normal join under the same lock, so concurrent first joins still produce one group. Inactive areas stay inactive; legacy groups without an area complete without any replacement. Existing groups are backfilled as NEW (none is assumed delivered).
 
+**Website systems page** (`/admin/system`, "מערכות האתר"; JSON `GET /admin/api/system`, `?refresh=1` re-checks). Admin session only, no-store. Lists Shopify, the theme editor, the theme (CLI) release, GitHub, Render services, Neon, the Group Delivery admin, Google Business Profile, Google Merchant Center and the domain, plus the postponed systems (dynamic Google reviews, Group Delivery payments) and manually configured monthly costs. Statuses: OPERATIONAL/DEGRADED/OFFLINE only from a real check, MANUAL for systems that are not checked, POSTPONED for postponed ones. Checks run only when the page is opened (60 s in-memory cache, re-check at most every 10 s, 3 s timeout, no retries): the service's own `/health` (APP_ORIGIN, or OPS_RENDER_GROUP_DELIVERY_URL), `SELECT 1` on the database, a `HEAD` on the storefront, and `/health` of extra services listed in OPS_RENDER_SERVICES. No Google, GitHub, Render or Neon API is called; nothing is stored.
+
+Optional, non-secret settings (Render environment; invalid values are ignored with a warning naming only the variable; URLs must be https without credentials):
+
+| Variable | Meaning |
+|---|---|
+| OPS_SHOPIFY_ADMIN_URL | Store admin, e.g. https://admin.shopify.com/store/<store> (the theme editor link defaults to <admin>/themes) |
+| OPS_SHOPIFY_THEME_EDITOR_URL | Direct theme editor link (optional) |
+| OPS_THEME_NAME, OPS_THEME_ID, OPS_THEME_REVISION | Live theme name, numeric id, revision label from snippets/theme-revision.liquid (e.g. 2026-11-12+ab875ef) |
+| OPS_GITHUB_REPO_URL, OPS_GITHUB_BRANCH | Default https://github.com/Tal0006/Shopify-Dawn-Theme and main. The deployed backend commit comes from Render's RENDER_GIT_COMMIT |
+| OPS_RENDER_DASHBOARD_URL, OPS_RENDER_GROUP_DELIVERY_URL, OPS_RENDER_GROUP_DELIVERY_DASHBOARD_URL | Render links; the service URL defaults to APP_ORIGIN |
+| OPS_RENDER_SERVICES | JSON array of extra services: [{"name","url","healthPath","dashboardUrl","purpose","note"}] |
+| OPS_NEON_CONSOLE_URL, OPS_GOOGLE_BUSINESS_URL, OPS_MERCHANT_CENTER_URL | Management links |
+| OPS_STOREFRONT_URL, OPS_STOREFRONT_CHECK | Default https://fanakee.com/ and on; set the check to off to skip the HEAD request |
+| OPS_COSTS | JSON array: [{"service","amount","currency":"USD"|"ILS","frequency":"MONTHLY"|"YEARLY","note","system"}]. Totals per currency, never converted; yearly amounts are divided by 12 |
+| OPS_NOTES | JSON object of system id to a short note (never secrets) |
+
 Intentionally not available: deleting or editing groups or members (removal above is a withdrawal, never a delete), changing pledges, cancelling, marking delivered, payments, refunds or messaging. The domain has no safe transitions for these yet.
 - Rate limits in PostgreSQL: 20 public writes / 10 minutes / IP, 120 public reads / 10 minutes / IP, 10 admin login attempts / 15 minutes / IP.
 - Parameterized SQL, validated inputs, fixed safe error messages, canonical host/TLS checks, narrow proxy trust and bounded request/variant counts.
