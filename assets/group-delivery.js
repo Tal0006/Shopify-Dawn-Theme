@@ -30,6 +30,8 @@
    this.areas=[];this.area=null;this.options=[];this.active=-1;
    this.areaInput=this.querySelector('[data-area-input]');this.areaList=this.querySelector('[data-area-list]');this.areaStatus=this.querySelector('[data-area-selected]');
    this.message=this.querySelector('[data-group-message]');this.group=null;this.querySelector('[data-validated-pledge]').hidden=true;
+   // A (re)connected section starts from the area search; a group appears only through resume() or a new search.
+   this.querySelector('[data-group-panel]').hidden=true;this.querySelector('[data-resume]').hidden=true;
    this.currency=new Intl.NumberFormat(this.dataset.locale||'he',{style:'currency',currency:'ILS'});
    this.labels=JSON.parse(this.querySelector('[data-group-labels]').textContent);
    try{this.errors=JSON.parse(this.querySelector('[data-group-errors]')?.textContent||'{}');}catch{this.errors={};}
@@ -67,13 +69,14 @@
    document.addEventListener('pointerdown',event=>{if(!this.querySelector('[data-area-picker]')?.contains(event.target))this.closeAreas();},options);
    // The only geolocation request; it needs this explicit click.
    this.querySelector('[data-geolocate]').addEventListener('click',()=>{void this.locate();},options);
+   this.querySelector('[data-resume-primary]').addEventListener('click',()=>this.resumeActions?.primary?.(),options);
+   this.querySelector('[data-resume-secondary]').addEventListener('click',()=>this.resumeActions?.secondary?.(),options);
+   this.querySelector('[data-resume-list]').addEventListener('click',event=>{const button=event.target.closest('button[data-resume-group]');if(button)this.resumeActions?.pick?.(button.dataset.resumeGroup);},options);
+   // Back/forward cache: the restored snapshot is never trusted (see resync()).
+   window.addEventListener('pageshow',event=>{if(event.persisted)this.resync();},options);
    void this.perform(async()=>{
     const results=await Promise.allSettled([this.loadAreas(),this.cart()]);
-    const receipt=this.latestReceipt();
-    if(receipt){
-     this.show((await this.withReceipt(receipt.publicId,()=>this.api('/groups/'+receipt.publicId))).group);
-     await this.loadMember(receipt.publicId);
-    }
+    await this.resume();
     const failed=results.find(result=>result.status==='rejected');if(failed)throw failed.reason;
    });
   }
@@ -214,7 +217,6 @@
    if(session&&this.readReceipt(session,this.storageKey)?.publicId===publicId)try{session.removeItem(this.storageKey);}catch{}
   }
   receiptFor(publicId){return typeof publicId==='string'?this.receipts.get(publicId):undefined;}
-  latestReceipt(){let latest;for(const receipt of this.receipts.values())if(!latest||receipt.savedAt>latest.savedAt)latest=receipt;return latest;}
   // Runs a request on behalf of a stored receipt and deletes the receipt only on a definitive rejection.
   async withReceipt(publicId,request){
    try{return await request();}
@@ -226,7 +228,7 @@
   async perform(action,trigger){
    if(this.busy)return;const lifecycle=this.lifecycle,focus=document.activeElement;this.busy=true;const loading=trigger||(focus?.matches('button')&&this.contains(focus)?focus:null);loading?.setAttribute('aria-busy','true');this.setAttribute('aria-busy','true');this.querySelectorAll('form').forEach(form=>form.inert=true);this.message.textContent='';
    try{await action();}catch(error){if(this.lifecycle===lifecycle&&this.isConnected&&error.name!=='AbortError')this.message.textContent=this.errorMessage(error);}
-   finally{if(this.lifecycle!==lifecycle)return;this.busy=false;loading?.removeAttribute('aria-busy');this.removeAttribute('aria-busy');this.querySelectorAll('form').forEach(form=>form.inert=false);this.controls();const next=this.focusAfter;this.focusAfter=null;if(next?.isConnected&&!next.hidden&&!next.disabled){next.focus();return;}if(focus?.isConnected&&this.contains(focus)&&!focus.disabled&&document.activeElement===document.body)focus.focus({preventScroll:true});}
+   finally{if(this.lifecycle!==lifecycle)return;this.busy=false;if(this.resyncQueued){this.resyncQueued=false;queueMicrotask(()=>this.resync());}loading?.removeAttribute('aria-busy');this.removeAttribute('aria-busy');this.querySelectorAll('form').forEach(form=>form.inert=false);this.controls();const next=this.focusAfter;this.focusAfter=null;if(next?.isConnected&&!next.hidden&&!next.disabled){next.focus();return;}if(focus?.isConnected&&this.contains(focus)&&!focus.disabled&&document.activeElement===document.body)focus.focus({preventScroll:true});}
   }
   errorMessage(error){const code=typeof error?.code==='string'&&Object.hasOwn(this.errors,error.code)?error.code:'DEFAULT';return this.errors[code]||'';}
   invalidateSearch(){
@@ -250,6 +252,102 @@
    button.textContent=joined?(this.restored?this.dataset.updateRestored:this.cartDiffers()?this.dataset.updateCurrent:this.dataset.updateLabel):this.pending?this.dataset.startLabel:this.dataset.joinLabel;
    button.disabled=this.pending?!this.foundPlace:!this.group||!['OPEN','THRESHOLD_REACHED'].includes(this.group.status);
    this.renderMember(joined,button);
+  }
+  // Returning device. Only membership receipts are durable (one per joined group); an area, a search result or a
+  // geolocation suggestion is never stored, so it can never be restored. Each receipt (newest first, at most 6) is
+  // checked with the service; a receipt the service rejects is dropped (withReceipt), temporary failures keep it.
+  //  - confirmed PLEDGED member of a current group (OPEN, THRESHOLD_REACHED or APPROVED) -> "my delivery" panel;
+  //    other confirmed active memberships are listed, newest receipt first (a shopper can hold one per group);
+  //  - WITHDRAWN member of a group that still takes pledges -> inactive-membership notice with an explicit renew;
+  //  - current group but the member read failed temporarily -> the group with the recovery path, not labelled as mine;
+  //  - the group itself could not be loaded now -> notice with a retry, nothing presented as current;
+  //  - COMPLETED, EXPIRED or otherwise closed group -> short history notice; the area search stays the main flow.
+  // Nobody is ever moved to another group automatically.
+  async resume(){
+   this.clearResume();
+   const receipts=[...this.receipts.values()].sort((a,b)=>b.savedAt-a.savedAt).slice(0,6);
+   if(!receipts.length)return;
+   const current=['OPEN','THRESHOLD_REACHED','APPROVED'],items=[];let rejected=null;
+   for(const receipt of receipts){
+    const id=receipt.publicId;let group=null,member=null,failed=false;
+    try{group=this.checkGroup((await this.withReceipt(id,()=>this.api('/groups/'+id))).group);if(group.publicId!==id)throw failure('INVALID_RESPONSE');}
+    catch(error){if(error?.name==='AbortError')throw error;failed=!!this.receiptFor(id);if(!failed&&RECEIPT_INVALIDATING_CODES.has(error?.code))rejected??=error;}
+    if(group&&current.includes(group.status)){
+     // A rejected token removes only this receipt (withReceipt); the other receipts are still evaluated.
+     try{member=await this.loadMember(id);}catch(error){if(error?.name==='AbortError')throw error;if(RECEIPT_INVALIDATING_CODES.has(error?.code))rejected??=error;}
+     if(!this.receiptFor(id))continue;
+     if(!member)failed=true;
+    }
+    if(group||failed)items.push({id,group,member:member&&{...member},failed});
+   }
+   // A receipt the service rejected is reported as before (unless the shopper's own delivery is shown instead).
+   if(!this.decide(items)&&rejected)this.message.textContent=this.errorMessage(rejected);
+  }
+  // Startup decision from the checked receipts (see resume()); true when the shopper's own delivery is shown.
+  decide(items){
+   const current=['OPEN','THRESHOLD_REACHED','APPROVED'],open=['OPEN','THRESHOLD_REACHED'];
+   const mine=items.filter(item=>item.group&&current.includes(item.group.status)&&item.member?.status==='PLEDGED');
+   if(mine.length){this.showMine(mine,mine[0].id);return true;}
+   this.member=null;
+   const withdrawn=items.find(item=>item.group&&open.includes(item.group.status)&&item.member?.status==='WITHDRAWN');
+   if(withdrawn){
+    this.renderResume({text:this.dataset.membershipInactive,detail:this.dataset.area.replace('__AREA__',withdrawn.group.areaName),
+     primary:{label:this.dataset.searchNew,action:()=>this.searchNew()},
+     secondary:{label:this.dataset.renewHere,action:()=>{this.clearResume();this.member=withdrawn.member;this.show(withdrawn.group);this.focusPanel();}}});
+    return false;
+   }
+   // Current group, membership not confirmable right now (temporary member-read failure): the group stays visible with
+   // the existing recovery path, but it is not labelled as the shopper's delivery until the service confirms it.
+   const unconfirmed=items.find(item=>item.failed&&item.group&&current.includes(item.group.status));
+   if(unconfirmed){this.clearResume();this.show(unconfirmed.group);return false;}
+   if(items.some(item=>item.failed)){
+    this.renderResume({text:this.dataset.membershipUnverified,primary:{label:this.dataset.retry,action:()=>{void this.perform(()=>this.resume());}}});
+    return false;
+   }
+   const past=items.find(item=>item.group&&!current.includes(item.group.status));
+   if(past)this.renderResume({text:past.group.status==='COMPLETED'?this.dataset.previousCompleted:this.dataset.previousClosed,detail:this.dataset.area.replace('__AREA__',past.group.areaName),
+    primary:{label:this.dataset.searchNew,action:()=>this.searchNew()},
+    secondary:{label:this.dataset.viewPrevious,action:()=>{this.member=null;this.show(past.group);this.focusPanel();}}});
+   return false;
+  }
+  showMine(mine,id){
+   const chosen=mine.find(item=>item.id===id)||mine[0];
+   this.member=chosen.member;this.show(chosen.group);
+   const others=mine.filter(item=>item!==chosen);
+   if(!others.length){this.clearResume();return;}
+   this.renderResume({text:this.dataset.otherMemberships.replace('__COUNT__',String(others.length)),list:others.map(item=>({id:item.id,label:this.dataset.showMembership.replace('__AREA__',item.group.areaName)})),
+    pick:pick=>{this.showMine(mine,pick);this.focusPanel();}});
+  }
+  renderResume({text,detail='',primary=null,secondary=null,list=[],pick=null}){
+   const box=this.querySelector('[data-resume]');
+   this.resumeActions={primary:primary?.action,secondary:secondary?.action,pick};
+   this.querySelector('[data-resume-text]').textContent=text;
+   const extra=this.querySelector('[data-resume-detail]');extra.textContent=detail;extra.hidden=!detail;
+   const first=this.querySelector('[data-resume-primary]'),second=this.querySelector('[data-resume-secondary]');
+   first.textContent=primary?.label||'';first.hidden=!primary;second.textContent=secondary?.label||'';second.hidden=!secondary;
+   const listBox=this.querySelector('[data-resume-list]');listBox.replaceChildren(...list.map(item=>{const li=document.createElement('li'),button=document.createElement('button');button.type='button';button.className='group-delivery__secondary';button.dataset.resumeGroup=item.id;button.textContent=item.label;li.append(button);return li;}));listBox.hidden=!list.length;
+   box.hidden=false;
+  }
+  clearResume(){this.resumeActions=null;const box=this.querySelector('[data-resume]');if(box)box.hidden=true;}
+  searchNew(){
+   if(this.group&&!this.currentMember()?.status){const panel=this.querySelector('[data-group-panel]');panel.hidden=true;this.group=null;this.controls();}
+   this.areaInput.focus();
+  }
+  focusPanel(){const title=this.querySelector('[data-group-title]');title.tabIndex=-1;title.focus({preventScroll:false});}
+  // Back/forward cache restore (mostly mobile): the page snapshot may show an old search or a group that has since
+  // changed. Search state is dropped, receipts are re-read (another tab may have joined or withdrawn) and re-checked,
+  // and the cart is read again. No reload, and nothing in storage is removed here.
+  resync(){
+   if(!this.origin||!this.receipts)return;
+   if(this.busy){this.resyncQueued=true;return;}
+   const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog.open)dialog.close();
+   this.closeReview(false);this.closeAreas();
+   this.loadReceipts();this.member=null;this.restored=false;this.foundPlace=null;this.group=null;this.pending=false;
+   this.clearArea();this.areaInput.value='';
+   const panel=this.querySelector('[data-group-panel]');panel.hidden=true;panel.removeAttribute('data-group-pending');
+   this.querySelector('[data-validated-pledge]').hidden=true;this.clearResume();this.message.textContent='';
+   this.controls();
+   void this.perform(async()=>{await Promise.allSettled([this.cart()]);await this.resume();});
   }
   // The member read for this browser's receipt, or null. Temporary failures keep the page and the receipt as they are;
   // only the definitive receipt rejections (via withReceipt) remove it. strict callers get every error.
@@ -276,6 +374,8 @@
    const open=!!this.group&&['OPEN','THRESHOLD_REACHED'].includes(this.group.status);
    const box=this.querySelector('[data-member]'),differs=this.cartDiffers();
    box.hidden=!member;
+   // Shown only for a confirmed active membership, so the group never looks like a remembered search.
+   this.querySelector('[data-mine]').hidden=!pledged;
    if(member){
     this.querySelector('[data-member-pledge]').textContent=pledged?this.dataset.currentPledge.replace('__AMOUNT__',this.currency.format(member.pledgedTotalAgorot/100)):this.dataset.withdrawnState;
     const cartLine=this.querySelector('[data-member-cart]'),note=this.querySelector('[data-member-note]');
@@ -473,8 +573,12 @@
    this.querySelector('[data-milestone-message]').hidden=true;
    this.controls();
   }
-  show(group){
+  checkGroup(group){
    if(!group||!Object.hasOwn(this.labels,group.status)||typeof group.publicId!=='string'||!UUID.test(group.publicId)||typeof group.areaName!=='string'||!['thresholdAgorot','pledgedTotalAgorot','remainingAmountAgorot','progressPercent','participantCount'].every(key=>Number.isSafeInteger(group[key])&&group[key]>=0)||group.thresholdAgorot===0||!Number.isFinite(Date.parse(group.expiresAt)))throw failure('INVALID_RESPONSE');
+   return group;
+  }
+  show(group){
+   this.checkGroup(group);
    this.group=group;this.pending=false;
    const panel=this.querySelector('[data-group-panel]');panel.hidden=false;panel.removeAttribute('data-group-pending');
    this.querySelector('[data-group-title]').textContent=this.dataset.area.replace('__AREA__',group.areaName);

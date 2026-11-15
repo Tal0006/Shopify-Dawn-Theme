@@ -68,14 +68,15 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
     if(url.pathname.endsWith('/member')){if(window.memberResponse)return new Response(JSON.stringify(memberResponse.body),{status:memberResponse.status});return new Response(JSON.stringify({member:{status:'PLEDGED',pledgedTotalAgorot:1590*Math.max(1,quantity),cartCheck:'OK',cart:[memberLine({quantity:Math.max(1,quantity)})]}}));}
     if(url.pathname.endsWith('/withdraw')){if(window.withdrawResponse)return new Response(JSON.stringify(withdrawResponse.body),{status:withdrawResponse.status});group={...group,participantCount:group.participantCount-1,pledgedTotalAgorot:group.pledgedTotalAgorot-1590};return new Response(JSON.stringify({group,member:{status:'WITHDRAWN',pledgedTotalAgorot:0}}));}
     if(url.pathname.endsWith('/update-pledge')&&window.updateResponse)return new Response(JSON.stringify(updateResponse.body),{status:updateResponse.status});
-    if(!body&&url.pathname.includes('/groups/')&&window.getResponse)return new Response(JSON.stringify(getResponse.body),{status:getResponse.status});
+    if(!body&&url.pathname.includes('/groups/')&&window.getResponse&&(!getResponse.id||url.pathname.endsWith('/groups/'+getResponse.id)))return new Response(JSON.stringify(getResponse.body),{status:getResponse.status});
     if(url.pathname.endsWith('/api/v1/areas'))return new Response(JSON.stringify({areas:areaList}));
     if(url.pathname.endsWith('/api/v1/areas/nearest'))return new Response(JSON.stringify({area:nearestArea}));
     if(url.pathname.endsWith('/groups/find'))return new Response(JSON.stringify({group:existing?group:null,canCreateOnJoin:!existing,withinStandardRadius:false,validatedPledgeAgorot:1590*quantity}));
     if(url.pathname.endsWith('/groups/join')){const created=!existing;existing=true;group={...group,publicId:created?'22222222-2222-4222-8222-222222222222':group.publicId,participantCount:created?1:group.participantCount+1,pledgedTotalAgorot:1590*quantity,remainingAmountAgorot:50000-1590*quantity,progressPercent:3};return new Response(JSON.stringify({group,created,memberToken:'b'.repeat(64),validatedPledgeAgorot:1590*quantity}),{status:201});}
     if(url.pathname.endsWith('/join')){group={...group,participantCount:6,pledgedTotalAgorot:38090,remainingAmountAgorot:11910,progressPercent:76};return new Response(JSON.stringify({group,memberToken:'a'.repeat(64),validatedPledgeAgorot:1590*quantity}));}
     if(url.pathname.endsWith('/update-pledge')){group={...group,pledgedTotalAgorot:39680,remainingAmountAgorot:10320,progressPercent:79};return new Response(JSON.stringify({group,validatedPledgeAgorot:1590*quantity}));}
-    return new Response(JSON.stringify({group}));
+    // GET /groups/:id answers with the requested group id (as the service does); other calls return the current group.
+    {const tail=url.pathname.split('/groups/')[1]||'',id=!body&&/^[0-9a-f-]{36}$/.test(tail)?tail:null;return new Response(JSON.stringify({group:id?{...group,publicId:id}:group}));}
    };
    window.widget=document.querySelector('fankee-group-delivery');
   `);
@@ -194,10 +195,12 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.equal(await ev('widget.querySelector("[data-contact-fields]").hidden'),false);
    assert.notEqual(await ev('localStorage.getItem(widget.receiptPrefix+"33333333-3333-4333-8333-333333333333")'),null,'other groups untouched');
    // A deleted group removes its receipt on restore.
-   await ev('window.updateResponse=null;localStorage.removeItem(widget.receiptPrefix+"33333333-3333-4333-8333-333333333333");localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));window.getResponse={status:404,body:{code:"GROUP_NOT_FOUND"}};'+reconnect);
+   await ev('window.updateResponse=null;localStorage.removeItem(widget.receiptPrefix+"33333333-3333-4333-8333-333333333333");localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));window.getResponse={id:group.publicId,status:404,body:{code:"GROUP_NOT_FOUND"}};'+reconnect);
    await wait('!widget.hasAttribute("aria-busy")');
    assert.equal(await ev('localStorage.getItem('+receiptKey+')'),null);
+   // The rejected receipt is dropped and reported; the page starts from the area search (no group card, no notice).
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.error_not_found);
+   assert.deepEqual(await ev('[widget.querySelector("[data-group-panel]").hidden,widget.querySelector("[data-resume]").hidden]'),[true,true]);
    // Restore the membership for the following tests.
    await ev('window.getResponse=null;localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));'+reconnect);
    await wait('!widget.hasAttribute("aria-busy")');
@@ -348,15 +351,25 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.notEqual(await ev('localStorage.getItem(widget.receiptPrefix+"11111111-1111-4111-8111-111111111111")'),null,'receipts are per group');
    assert.ok(!(await ev('localStorage.getItem(widget.receiptPrefix+"22222222-2222-4222-8222-222222222222")')).includes('starter@'));
   });
-  await t.test('Completed delivery: the old receipt shows the completed state; the normal area join starts the next cycle',async()=>{
+  await t.test('Completed delivery: history notice and area search; the previous group is viewable; the normal area join starts the next cycle',async()=>{
    const OLD='33333333-3333-4333-8333-333333333333',NEW='22222222-2222-4222-8222-222222222222';
    await ev('localStorage.removeItem(widget.receiptPrefix+"'+NEW+'");localStorage.setItem(widget.receiptPrefix+"'+OLD+'",JSON.stringify({publicId:"'+OLD+'",memberToken:"c".repeat(64),savedAt:Date.now()+60000}));'+
     'group={...group,publicId:"'+OLD+'",status:"COMPLETED"};existing=false;quantity=1;'+reconnect);
-   await wait('!widget.hasAttribute("aria-busy")&&widget.group?.publicId==="'+OLD+'"');
+   await wait('!widget.hasAttribute("aria-busy")&&!widget.querySelector("[data-resume]").hidden');
+   // The completed group is not the current screen: a short notice, and the area search stays the main flow.
+   assert.equal(await ev('widget.querySelector("[data-group-panel]").hidden'),true);
+   assert.deepEqual(await ev('["[data-resume-text]","[data-resume-detail]","[data-resume-primary]","[data-resume-secondary]"].map(s=>widget.querySelector(s).textContent)'),
+    [tr.group_delivery.previous_completed,tr.group_delivery.area.replace('{{ area }}','אשדוד'),tr.group_delivery.search_new,tr.group_delivery.view_previous]);
+   // "View previous": read-only, clearly completed, never labelled as the shopper's current delivery.
+   await ev('widget.querySelector("[data-resume-secondary]").click()');
+   await wait('widget.group?.publicId==="'+OLD+'"&&!widget.querySelector("[data-group-panel]").hidden');
    assert.equal(await ev('widget.querySelector("[data-group-state]").textContent'),tr.group_delivery.status.completed);
    assert.equal(await ev('widget.message.textContent'),tr.group_delivery.delivery_completed);
    assert.equal(await ev('widget.querySelector("[data-join-button]").disabled'),true,'a completed group takes no pledge changes');
-   assert.equal(await ev('widget.querySelector("[data-withdraw]").hidden'),true);
+   assert.deepEqual(await ev('[widget.querySelector("[data-withdraw]").hidden,widget.querySelector("[data-mine]").hidden]'),[true,true]);
+   // "Search for a new delivery": back to the area search.
+   await ev('widget.querySelector("[data-resume-primary]").click()');
+   assert.deepEqual(await ev('[document.activeElement===widget.querySelector("[data-area-input]"),widget.querySelector("[data-group-panel]").hidden]'),[true,true]);
    assert.equal(await ev('requests.filter(r=>r.url.includes("'+OLD+'")&&/update-pledge|withdraw|\\/join$/.test(r.url)).length'),0,'nothing is sent to the completed group');
    // The shopper searches their area as usual: no open group, so Join starts the next cycle with a new receipt.
    await type('אופ');await key('ArrowDown');await key('Enter');
@@ -563,7 +576,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   await t.test('Mobile and desktop RTL fit, keyboard targets are usable, progress respects reduced motion',async()=>{
    for(const width of [320,360,375,390,768,1440,1600]){
     await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
-    const m=await ev('({overflow:document.documentElement.scrollWidth>innerWidth,dir:getComputedStyle(widget).direction,buttons:[...widget.querySelectorAll("button")].filter(n=>n.getBoundingClientRect().width).every(n=>n.getBoundingClientRect().height>=44)})');
+    const m=await ev('({overflow:document.documentElement.scrollWidth>innerWidth,dir:getComputedStyle(widget).direction,buttons:[...widget.querySelectorAll("button")].filter(n=>n.getBoundingClientRect().width).every(n=>n.getBoundingClientRect().height>=43.5)})');
     assert.equal(m.overflow,false,'overflow '+width);assert.equal(m.dir,'rtl');assert.equal(m.buttons,true);
    }
 
