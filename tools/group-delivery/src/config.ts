@@ -1,7 +1,8 @@
 
 import {agorot} from './domain.js';
 import {opsConfig,type OpsConfig} from './system.js';
-export interface Config {ops:OpsConfig;port:number;production:boolean;origin:string;storefrontOrigins:string[];databaseUrl:string;username:string;password:string;secret:string;domain:string;version:string;token:string;standardRadius:number;threshold:bigint;expiryDays:number;proxyHops:number;areaSuggestionRadius:number;storeLocation?:{lat:number;lng:number}}
+import {recoveryConfig,type RecoveryConfig} from './email.js';
+export interface Config {ops:OpsConfig;recovery:RecoveryConfig;port:number;production:boolean;origin:string;storefrontOrigins:string[];databaseUrl:string;username:string;password:string;secret:string;domain:string;version:string;token:string;standardRadius:number;threshold:bigint;expiryDays:number;proxyHops:number;areaSuggestionRadius:number;storeLocation?:{lat:number;lng:number}}
 export function config(env:NodeJS.ProcessEnv=process.env):Config{
  const required=(key:string)=>{const value=env[key]?.trim();if(!value)throw Error('Configure '+key);return value;};
  const integer=(key:string,fallback:number,min:number,max:number)=>{const value=Number(env[key]?.trim()||fallback);if(!Number.isInteger(value)||value<min||value>max)throw Error('Invalid '+key);return value;};
@@ -17,5 +18,8 @@ export function config(env:NodeJS.ProcessEnv=process.env):Config{
  if(env.STORE_LATITUDE||env.STORE_LONGITUDE){const lat=Number(required('STORE_LATITUDE')),lng=Number(required('STORE_LONGITUDE'));if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)throw Error('Invalid store coordinates');storeLocation={lat,lng};}
  return {port,production,origin:appOrigin,storefrontOrigins:(env.STOREFRONT_ORIGINS||'').split(',').map(v=>v.trim()).filter(Boolean).map(origin),databaseUrl:required('DATABASE_URL'),username:required('ADMIN_USERNAME'),password,secret,domain,version,token:required('SHOPIFY_STOREFRONT_PRIVATE_TOKEN'),standardRadius:integer('STANDARD_DELIVERY_RADIUS_KM',20,1,200),threshold,expiryDays:integer('GROUP_EXPIRY_DAYS',7,1,30),areaSuggestionRadius:integer('AREA_SUGGESTION_RADIUS_KM',25,1,100),proxyHops:integer('TRUST_PROXY_HOPS',production?1:0,0,2),storeLocation,
   // Optional, non-secret operations-page settings (OPS_*); invalid values are ignored with a warning, never fatal.
-  ops:opsConfig(env)};
+  ops:opsConfig(env),
+  // Email OTP membership recovery (RECOVERY_EMAIL_PROVIDER, RESEND_API_KEY, RECOVERY_EMAIL_FROM, RECOVERY_EMAIL_REPLY_TO).
+  // A problem disables recovery only (fails closed); the rest of the service still starts.
+  recovery:recoveryConfig(env,production)};
 }

@@ -313,15 +313,20 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   });
   await t.test('Already joined without a receipt in this browser: no "original tab", no access from contact details alone',async()=>{
    for(const file of ['he.default.json','en.json']){
-    const text=JSON.parse(fs.readFileSync(path.join(root,'locales',file),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,'')).group_delivery.duplicate;
-    assert.doesNotMatch(text,/טאב|כרטיסייה|\btab\b/i,file);
+    const strings=JSON.parse(fs.readFileSync(path.join(root,'locales',file),'utf8').replace(/^\s*\/\*[\s\S]*?\*\//,'')).group_delivery;
+    for(const key of ['duplicate','recovery_title','recovery_text','recovery_sent','recovery_enter'])assert.doesNotMatch(strings[key],/טאב|כרטיסייה|לשונית|\btab\b/i,file+' '+key);
    }
    await ev('localStorage.removeItem('+receiptKey+');'+restart);await settle();
    await ev('widget.foundPlace=widget.areas[1];widget.show({...group,status:"OPEN"});quantity=1');
    await ev('widget.querySelector("[name=email]").value="member@example.test";widget.querySelector("[name=phone]").value="0501234567";window.apiResponse={status:409,body:{code:"ALREADY_JOINED"}};widget.querySelector("[data-join-group]").requestSubmit()');await settle();
-   assert.equal(await ev('widget.message.textContent'),tr.group_delivery.duplicate);
+   // The only way back in is the emailed code (tests/group-delivery-recovery.browser.cjs covers the whole flow).
+   assert.equal(await ev('widget.querySelector("[data-otp]").hidden'),false,'recovery is offered');
+   assert.equal(await ev('widget.querySelector("[data-otp-title]").textContent'),tr.group_delivery.recovery_title);
+   assert.equal(await ev('widget.message.textContent'),'');
    assert.equal(await ev('localStorage.getItem('+receiptKey+')'),null,'no receipt from email/phone');
    assert.equal(await ev('widget.querySelector("[data-member]").hidden'),true);
+   await ev('widget.querySelector("[data-otp-back]").click()');
+   assert.equal(await ev('widget.querySelector("[data-otp]").hidden'),true);
    await ev('window.apiResponse=null;localStorage.setItem('+receiptKey+',JSON.stringify({publicId:group.publicId,memberToken:"a".repeat(64),savedAt:Date.now()}));'+restart);await settle();
   });
   await t.test('No group yet: searching creates nothing and the join starts the group',async()=>{

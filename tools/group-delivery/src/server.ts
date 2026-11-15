@@ -15,10 +15,15 @@ import {safeNext} from './auth.js';
 import {ApiError,type ErrorCode} from './domain.js';
 import {SystemHealth,systemsView,type HealthOptions} from './system.js';
 import {systemPage} from './system-page.js';
-// deps: test seams for the operations page (outbound fetch and health-check timings).
-export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>}={}){
+import {Recovery,RECOVERY_LIMITS,type RecoveryLimits} from './recovery.js';
+import {emailProvider,type EmailProvider} from './email.js';
+// deps: test seams for the operations page (outbound fetch and health-check timings) and for recovery email
+// (provider and limits; the default provider comes from cfg.recovery and is null when recovery is disabled).
+export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>}={}){
  const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator);
  const systemHealth=new SystemHealth(db,cfg.ops,()=>cfg.origin,deps.fetch,deps.health);
+ const recovery=new Recovery(db,cfg.secret,deps.email!==undefined?deps.email:emailProvider(cfg.recovery),groups,{...RECOVERY_LIMITS,...deps.recoveryLimits});
+ app.locals.recovery=recovery;
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
  app.use((_req,res,next)=>{
   res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
@@ -104,7 +109,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  });
  app.get('/admin/areas',async(req,res)=>res.type('html').send(areasPage({areas:await areas.adminList(),csrf:csrfOf(res),notice:noticeOf(req.query.notice)})));
  // Operations overview (מערכות האתר): safe configuration plus on-demand health checks; ?refresh=1 re-checks (rate floor).
- const systemData=async(req:express.Request)=>systemsView(cfg.ops,await systemHealth.results(req.query.refresh==='1'),cfg.origin);
+ const systemData=async(req:express.Request)=>systemsView(cfg.ops,await systemHealth.results(req.query.refresh==='1'),cfg.origin,
+  {state:deps.email!==undefined?(deps.email?'ENABLED':'DISABLED'):cfg.recovery.state,provider:deps.email?deps.email.name:cfg.recovery.provider,senderDomain:cfg.recovery.senderDomain});
  app.get('/admin/system',async(req,res)=>res.type('html').send(systemPage({...await systemData(req),csrf:csrfOf(res)})));
  app.get('/admin/api/system',async(req,res)=>res.json(await systemData(req)));
  app.get('/admin/audit',async(req,res)=>res.type('html').send(auditView({...await auditPage(db,req.query),csrf:csrfOf(res)})));
@@ -230,6 +236,18 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.post('/api/v1/groups/:publicId/member',async(req,res)=>res.json(await groups.memberState(req.params.publicId,bearer(req))));
  // Explicit withdrawal; needs the member token and {"confirm":true}. A cart update never withdraws.
  app.post('/api/v1/groups/:publicId/withdraw',async(req,res)=>res.json(await groups.withdraw(req.params.publicId,bearer(req),req.body)));
+ // Email OTP recovery for a browser without the receipt (see src/recovery.ts). Besides the shared public-write budget,
+ // each step has its own per-IP hourly bucket; per-details, per-group and per-challenge limits live in Recovery.
+ app.post('/api/v1/groups/:publicId/recovery/start',async(req,res)=>{
+  if(!recovery.enabled)throw new ApiError(503,'RECOVERY_UNAVAILABLE','שחזור ההצטרפות אינו זמין כרגע.');
+  await auth.limit(req,'recovery-start',10,3600);
+  res.json(await recovery.start(req.params.publicId,req.body,req.ip||'unknown'));
+ });
+ app.post('/api/v1/groups/:publicId/recovery/verify',async(req,res)=>{
+  if(!recovery.enabled)throw new ApiError(503,'RECOVERY_UNAVAILABLE','שחזור ההצטרפות אינו זמין כרגע.');
+  await auth.limit(req,'recovery-verify',30,3600);
+  res.json(await recovery.verify(req.params.publicId,req.body));
+ });
  app.use((_req,res)=>res.status(404).json({error:'העמוד לא נמצא',code:'NOT_FOUND' satisfies ErrorCode}));
  app.use((error:any,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{
   const status=error instanceof ApiError?error.status:error?.status===413?413:error?.status===400?400:500;
@@ -249,8 +267,11 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  let db:ReturnType<typeof database>|undefined;
  try{
   const cfg=config();db=database(cfg.databaseUrl);await migrate(db);
-  const server=createApp(db,cfg).listen(cfg.port,'0.0.0.0',()=>console.info('Group delivery listening on port '+cfg.port));
-  const stop=()=>{server.close(()=>{void db!.end().then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
+  // Names variables only, never values.
+  if(cfg.recovery.state==='MISCONFIGURED')console.warn('Group delivery recovery email is disabled until configured: '+cfg.recovery.problems.join(' '));
+  const app=createApp(db,cfg),server=app.listen(cfg.port,'0.0.0.0',()=>console.info('Group delivery listening on port '+cfg.port));
+  // Recovery emails still being sent finish before the pool closes.
+  const stop=()=>{server.close(()=>{void (app.locals.recovery as Recovery).idle().then(()=>db!.end()).then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
  }catch{console.error('Group delivery startup failed. Check configuration and database connectivity.');await db?.end().catch(()=>{});process.exitCode=1;}
 }

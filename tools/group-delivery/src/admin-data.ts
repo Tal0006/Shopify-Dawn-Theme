@@ -194,8 +194,12 @@ export class AdminData{
    return {variantId,quantity:Number(line.quantity),storedUnitAgorot:unit,storedLineAgorot:unit*Number(line.quantity),
     title:now?.title??null,currentUnitAgorot:now?.currentUnitAgorot??null,availableNow:now?now.available:null};
   });
+  // Device access: how many receipts can act for this membership, and recent recovery events (no contact, code,
+  // token or IP is stored for them).
+  const access=(await this.db.query("SELECT COUNT(*) FILTER (WHERE revoked_at IS NULL)::int AS receipts,COUNT(*) FILTER (WHERE source='RECOVERY' AND revoked_at IS NULL)::int AS recovered FROM member_tokens WHERE member_id=$1",[row.id])).rows[0];
+  const events=(await this.db.query('SELECT at,event FROM security_events WHERE member_id=$1 ORDER BY at DESC,id LIMIT 20',[row.id])).rows.map((e:any)=>({at:new Date(e.at).toISOString(),event:String(e.event)}));
   const {_id,...publicGroup}=group;
-  return {group:publicGroup,member:{...memberRow(row),
+  return {group:publicGroup,member:{...memberRow(row),access:{receipts:Number(access?.receipts??0),recoveredReceipts:Number(access?.recovered??0),events},
    // HISTORICAL: the last cart kept after a withdrawal; never counted, restored or used for checkout.
    snapshotKind:row.status===ACTIVE_MEMBER_STATUS?'ACTIVE' as const:'HISTORICAL' as const,historicalLines:row.status===ACTIVE_MEMBER_STATUS?0:Number(row.cart_lines),snapshotTotalAgorot:lines.reduce((sum,line)=>sum+line.storedLineAgorot,0),lines,productLookup}};
  }

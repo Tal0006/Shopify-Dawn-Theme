@@ -120,6 +120,18 @@ const ERRORS:Record<string,string>={confirm:'יש לסמן את תיבת האי�
  COMPLETION_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להשלמת המשלוח. לא בוצע שינוי.'};
 // Withdrawn members are labelled by who withdrew them (migration 004 backfills older rows as MEMBER).
 const WITHDRAWN_BY:Record<string,string>={ADMIN:'הוסר על ידי מנהל',MEMBER:'פרש מהקבוצה'};
+// Customer recovery events (security_events). Codes, tokens and contact details are never stored, so none are shown.
+const RECOVERY_EVENTS:Record<string,string>={RECOVERY_REQUESTED:'בקשת קוד לשחזור גישה',RECOVERY_SENT:'קוד אימות נשלח במייל',RECOVERY_DELIVERY_FAILED:'שליחת קוד האימות נכשלה',
+ RECOVERY_SUCCEEDED:'הגישה שוחזרה במכשיר נוסף',RECOVERY_FAILED:'קוד אימות שגוי',RECOVERY_LOCKED:'הקוד ננעל אחרי יותר מדי ניסיונות'};
+const accessCard=(access:any)=>{
+ if(!access)return '';
+ const events=Array.isArray(access.events)?access.events:[];
+ return '<section class="card" aria-labelledby="access-title"><div class="section-head"><h2 id="access-title">גישה מהמכשירים של הלקוח</h2></div>'+
+  '<dl class="facts"><div><dt>אישורי הצטרפות פעילים</dt><dd>'+Number(access.receipts)+'</dd></div><div><dt>מתוכם משחזור באימות מייל</dt><dd>'+Number(access.recoveredReceipts)+'</dd></div></dl>'+
+  (events.length?'<div class="table-wrap"><table class="table"><caption class="sr-only">אירועי שחזור גישה אחרונים</caption><thead><tr><th scope="col">מועד</th><th scope="col">אירוע</th></tr></thead><tbody>'+
+   events.map((e:any)=>'<tr><td data-label="מועד">'+time(e.at)+'</td><td data-label="אירוע">'+escape(RECOVERY_EVENTS[e.event]??e.event)+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">לא היו בקשות לשחזור גישה.</p>')+
+  '<p class="muted">קודי אימות, אישורי הצטרפות וכתובות IP אינם נשמרים ואינם מוצגים.</p></section>';
+};
 const memberChip=(m:{status:string;withdrawnBy?:string|null})=>m.status==='WITHDRAWN'
  ?'<span class="chip chip--'+(m.withdrawnBy==='ADMIN'?'removed':'withdrawn')+'">'+escape(WITHDRAWN_BY[m.withdrawnBy==='ADMIN'?'ADMIN':'MEMBER'])+'</span>'
  :chip('member',m.status);
@@ -261,7 +273,7 @@ export function memberPage(data:{group:any;member:any;csrf:string;error?:string;
     '<tfoot><tr><th scope="row" colspan="3">'+(past?'סכום הסל לפני ההסרה (היסטורי)':'סכום התחייבות שנשמר')+'</th><td class="num" colspan="2"><strong>'+escape(money(past?m.snapshotTotalAgorot:m.pledgedTotalAgorot))+'</strong></td></tr></tfoot></table></div>'+
     '<p class="muted">'+(past?'המחירים ההיסטוריים הם המחירים שאומתו מול שופיפיי בזמן ההתחייבות האחרונה. המחיר הנוכחי מוצג להשוואה בלבד.':'המחירים השמורים הם המחירים שאומתו מול שופיפיי בזמן ההתחייבות; הם אינם משתנים. המחיר הנוכחי מוצג להשוואה בלבד.')+'</p>':
     '<div class="empty"><strong>'+(past?'אין סל שמור מלפני ההסרה.':'אין שורות סל שמורות.')+'</strong>'+(past?'<span>יציאות שקדמו לשמירת הסל ההיסטורי אינן כוללות סל. סכום ההתחייבות שהוסר בידי מנהל מופיע ביומן הפעולות.</span>':'')+'</div>')+
-  '</section>'+removal(g,m,data.csrf,!!data.confirming),{csrf:data.csrf,active:'dashboard'});
+  '</section>'+accessCard(m.access)+removal(g,m,data.csrf,!!data.confirming),{csrf:data.csrf,active:'dashboard'});
 }
 
 const areaFields=(csrf:string,area?:any)=>'<input type="hidden" name="csrf" value="'+escape(csrf)+'">'+

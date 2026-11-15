@@ -12,6 +12,8 @@
  const areaKey=name=>String(name).normalize('NFKC').toLocaleLowerCase().replace(/[\s'"״׳.()-]+/g,' ').trim();
  const REASONS=new Set(['AVAILABLE','QUANTITY_REDUCED','UNAVAILABLE']),VARIANT=/^[1-9]\d{0,19}$/;
  const count=value=>Number.isSafeInteger(value)&&value>=0;
+ // One-time code input: typed or pasted text ("123 456", full-width or Arabic-Indic digits) becomes at most 6 ASCII digits.
+ const digits=value=>String(value).normalize('NFKC').replace(/[٠-٩۰-۹]/g,d=>String(d.charCodeAt(0)&15)).replace(/\D/g,'').slice(0,6);
  // The member read (POST /groups/:id/member) as the service documents it; anything else is ignored.
  const memberShape=member=>{
   if(!member||!['PLEDGED','WITHDRAWN'].includes(member.status)||!count(member.pledgedTotalAgorot)||!['OK','UNAVAILABLE'].includes(member.cartCheck))return null;
@@ -31,7 +33,7 @@
    this.areaInput=this.querySelector('[data-area-input]');this.areaList=this.querySelector('[data-area-list]');this.areaStatus=this.querySelector('[data-area-selected]');
    this.message=this.querySelector('[data-group-message]');this.group=null;this.querySelector('[data-validated-pledge]').hidden=true;
    // A (re)connected section starts from the area search; a group appears only through resume() or a new search.
-   this.querySelector('[data-group-panel]').hidden=true;this.querySelector('[data-resume]').hidden=true;
+   this.querySelector('[data-group-panel]').hidden=true;this.querySelector('[data-resume]').hidden=true;this.recovery=null;this.querySelector('[data-otp]').hidden=true;this.querySelector('[data-join-group]').hidden=false;
    this.currency=new Intl.NumberFormat(this.dataset.locale||'he',{style:'currency',currency:'ILS'});
    this.labels=JSON.parse(this.querySelector('[data-group-labels]').textContent);
    try{this.errors=JSON.parse(this.querySelector('[data-group-errors]')?.textContent||'{}');}catch{this.errors={};}
@@ -72,6 +74,12 @@
    this.querySelector('[data-resume-primary]').addEventListener('click',()=>this.resumeActions?.primary?.(),options);
    this.querySelector('[data-resume-secondary]').addEventListener('click',()=>this.resumeActions?.secondary?.(),options);
    this.querySelector('[data-resume-list]').addEventListener('click',event=>{const button=event.target.closest('button[data-resume-group]');if(button)this.resumeActions?.pick?.(button.dataset.resumeGroup);},options);
+   // Membership recovery by emailed code (offered after ALREADY_JOINED without a receipt here).
+   this.querySelector('[data-otp-start]').addEventListener('click',event=>{void this.perform(()=>this.recoveryStart(),event.currentTarget);},options);
+   for(const selector of ['[data-otp-back]','[data-otp-cancel]'])this.querySelector(selector).addEventListener('click',()=>{if(!this.busy)this.hideOtp(true);},options);
+   this.querySelector('[data-otp-form]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.recoveryVerify(),event.submitter);},options);
+   this.querySelector('[data-otp-resend]').addEventListener('click',event=>{if(event.currentTarget.getAttribute('aria-disabled')==='true')return;void this.perform(()=>this.recoveryStart(true),event.currentTarget);},options);
+   this.querySelector('[data-otp-input]').addEventListener('input',event=>{const input=event.currentTarget,clean=digits(input.value);if(input.value!==clean)input.value=clean;this.otpError('');},options);
    // Back/forward cache: the restored snapshot is never trusted (see resync()).
    window.addEventListener('pageshow',event=>{if(event.persisted)this.resync();},options);
    void this.perform(async()=>{
@@ -168,7 +176,7 @@
     this.selectArea(area);this.message.textContent=this.dataset.geoSelected.replace('__AREA__',area.name);
    },this.querySelector('[data-geolocate]'));
   }
-  disconnectedCallback(){const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog?.open)dialog.close();this.lifecycle?.abort();this.requests?.forEach(request=>request.abort());this.lifecycle=null;}
+  disconnectedCallback(){const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog?.open)dialog.close();clearInterval(this.otpTimer);this.recovery=null;this.lifecycle?.abort();this.requests?.forEach(request=>request.abort());this.lifecycle=null;}
   // Receipts: {publicId, memberToken, savedAt}. No contact details, cart, coordinates or payment data are stored.
   readReceipt(store,key){
    try{
@@ -232,7 +240,7 @@
   }
   errorMessage(error){const code=typeof error?.code==='string'&&Object.hasOwn(this.errors,error.code)?error.code:'DEFAULT';return this.errors[code]||'';}
   invalidateSearch(){
-   this.foundPlace=null;
+   this.foundPlace=null;this.hideOtp();
    if(!this.receiptFor(this.group?.publicId)){
     this.group=null;this.pending=false;
     const panel=this.querySelector('[data-group-panel]');panel.hidden=true;panel.removeAttribute('data-group-pending');
@@ -341,7 +349,7 @@
    if(!this.origin||!this.receipts)return;
    if(this.busy){this.resyncQueued=true;return;}
    const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog.open)dialog.close();
-   this.closeReview(false);this.closeAreas();
+   this.closeReview(false);this.closeAreas();this.hideOtp();
    this.loadReceipts();this.member=null;this.restored=false;this.foundPlace=null;this.group=null;this.pending=false;
    this.clearArea();this.areaInput.value='';
    const panel=this.querySelector('[data-group-panel]');panel.hidden=true;panel.removeAttribute('data-group-pending');
@@ -548,12 +556,112 @@
    const body={areaPublicId:this.foundPlace.publicId,lines,email:form.querySelector('[name=email]').value,phone:form.querySelector('[name=phone]').value};
    // A shown group is joined directly; with no group yet, the service re-checks the same area under its lock and
    // creates the group only now, with this shopper as its first member.
-   const result=await this.api(this.group?'/groups/'+this.group.publicId+'/join':'/groups/join',body);
+   let result;
+   try{result=await this.api(this.group?'/groups/'+this.group.publicId+'/join':'/groups/join',body);}
+   catch(error){if(error?.code==='ALREADY_JOINED'&&await this.offerRecovery(body))return;throw error;}
    if(!TOKEN.test(result.memberToken)||!UUID.test(result.group?.publicId))throw failure('INVALID_RESPONSE');
    const saved={publicId:result.group.publicId,memberToken:result.memberToken,savedAt:Date.now()};
    this.receipts.set(saved.publicId,saved);this.persist(saved);
    this.member={publicId:saved.publicId,status:'PLEDGED',pledgedTotalAgorot:Number.isSafeInteger(result.validatedPledgeAgorot)?result.validatedPledgeAgorot:0,cartCheck:'OK',cart:lines.map(line=>({variantId:line.variantId,quantity:line.quantity}))};
    form.reset();this.show(result.group);this.pledge(result);this.message.textContent=result.created===true?this.dataset.started:this.dataset.joined;
+  }
+  // ALREADY_JOINED without this browser's receipt: offer recovery by emailed code for the group being joined. The
+  // details just typed are kept in memory for the request only (never stored). False when no group can be named.
+  async offerRecovery(body){
+   if(!this.group){
+    // The area's group was created by someone else since the search; read it (read-only) to name the membership.
+    let found=null;try{found=(await this.api('/groups/find',{areaPublicId:body.areaPublicId})).group;}catch{}
+    if(!found)return false;this.show(found);
+   }
+   if(this.receiptFor(this.group.publicId))return false;
+   this.recovery={publicId:this.group.publicId,email:body.email,phone:body.phone,challengeId:null,expiresAt:0,resendAt:0,locked:false};
+   this.showOtp('offer');
+   this.focusAfter=this.querySelector('[data-otp-title]');
+   return true;
+  }
+  showOtp(step){
+   this.querySelector('[data-otp]').hidden=false;this.querySelector('[data-join-group]').hidden=true;
+   this.querySelector('[data-otp-offer]').hidden=step!=='offer';this.querySelector('[data-otp-form]').hidden=step!=='code';
+  }
+  // Leaves recovery (Back, a new search, a back/forward restore, success). Back returns to the filled-in join form.
+  hideOtp(returnFocus=false){
+   const box=this.querySelector('[data-otp]');if(!box)return;
+   clearInterval(this.otpTimer);this.otpTimer=null;this.recovery=null;
+   const input=this.querySelector('[data-otp-input]');input.value='';this.otpError('');
+   if(box.hidden)return;
+   box.hidden=true;this.querySelector('[data-join-group]').hidden=false;
+   if(returnFocus)this.querySelector('[data-join-button]')?.focus();
+  }
+  otpError(text){
+   const error=this.querySelector('[data-otp-error]'),input=this.querySelector('[data-otp-input]');if(!error)return;
+   if(error.textContent!==text)error.textContent=text;
+   if(text)input.setAttribute('aria-invalid','true');else input.removeAttribute('aria-invalid');
+  }
+  // Resend availability. The wait text is read with the button (aria-describedby) but is not a live region, so it is
+  // not announced every second; the button stays focusable and inert (aria-disabled) until the cooldown ends.
+  otpTick(){
+   const r=this.recovery,button=this.querySelector('[data-otp-resend]'),wait=this.querySelector('[data-otp-wait]');
+   const left=r?Math.max(0,Math.ceil((r.resendAt-Date.now())/1000)):0;
+   button.setAttribute('aria-disabled',String(left>0));
+   wait.textContent=left>0?this.dataset.recoveryWait.replace('__SECONDS__',String(left)):'';
+   if(!left){clearInterval(this.otpTimer);this.otpTimer=null;}
+  }
+  // Asks the service to email a code to the membership's stored address. The answer is the same whether or not the
+  // details match, so this step always continues to the code form.
+  async recoveryStart(resend=false){
+   const r=this.recovery;if(!r)return;
+   this.otpError('');
+   let result;
+   try{result=await this.api('/groups/'+r.publicId+'/recovery/start',{email:r.email,phone:r.phone});}
+   catch(error){
+    if(this.recovery!==r||error?.name==='AbortError')throw error;
+    if(!resend)throw error;
+    this.otpError(this.errorMessage(error));this.focusAfter=this.querySelector('[data-otp-input]');return;
+   }
+   if(this.recovery!==r)return;
+   if(result?.ok!==true||typeof result.challengeId!=='string'||!UUID.test(result.challengeId)||!count(result.expiresInSeconds)||!count(result.resendAfterSeconds))throw failure('INVALID_RESPONSE');
+   const now=Date.now();
+   Object.assign(r,{challengeId:result.challengeId,expiresAt:now+result.expiresInSeconds*1000,resendAt:now+result.resendAfterSeconds*1000,locked:false});
+   this.showOtp('code');
+   const input=this.querySelector('[data-otp-input]');input.value='';
+   clearInterval(this.otpTimer);this.otpTick();this.otpTimer=setInterval(()=>this.otpTick(),1000);
+   this.focusAfter=input;
+  }
+  // Errors stay inside the code form (one alert region); the code is checked locally only for format and expiry.
+  async recoveryVerify(){
+   const r=this.recovery,input=this.querySelector('[data-otp-input]');if(!r?.challengeId)return;
+   const code=digits(input.value);input.value=code;this.focusAfter=input;
+   if(code.length!==6){this.otpError(this.dataset.recoveryFormat);return;}
+   if(Date.now()>=r.expiresAt){this.otpError(this.dataset.recoveryExpired);return;}
+   if(r.locked){this.otpError(this.errors.TOO_MANY_ATTEMPTS||'');return;}
+   let result;
+   try{result=await this.api('/groups/'+r.publicId+'/recovery/verify',{challengeId:r.challengeId,code});}
+   catch(error){
+    if(this.recovery!==r||error?.name==='AbortError')throw error;
+    if(error?.code==='TOO_MANY_ATTEMPTS')r.locked=true;
+    this.otpError(this.errorMessage(error));input.select();return;
+   }
+   if(this.recovery!==r)return;
+   if(!TOKEN.test(result?.memberToken)||!['PLEDGED','WITHDRAWN'].includes(result?.member?.status))throw failure('INVALID_RESPONSE');
+   const group=this.checkGroup(result.group);if(group.publicId!==r.publicId)throw failure('INVALID_RESPONSE');
+   await this.recovered(group,result.memberToken);
+  }
+  // Success: this device's own receipt, saved exactly like a join receipt (its own key; nothing else is touched),
+  // then the membership is shown as the returning-device logic would: mine (PLEDGED), inactive (WITHDRAWN), or
+  // history (completed or closed). Recovery never changes the membership itself.
+  async recovered(group,memberToken){
+   const id=group.publicId,saved={publicId:id,memberToken,savedAt:Date.now()};
+   this.receipts.set(id,saved);this.persist(saved);
+   this.hideOtp();this.querySelector('[data-join-group]').reset();
+   this.member=null;this.restored=false;this.clearResume();
+   const current=['OPEN','THRESHOLD_REACHED','APPROVED'].includes(group.status),open=['OPEN','THRESHOLD_REACHED'].includes(group.status);
+   if(current){await Promise.allSettled([this.cart()]);await this.loadMember(id);}
+   this.show(group);
+   const area=this.dataset.area.replace('__AREA__',group.areaName);
+   if(!current)this.renderResume({text:group.status==='COMPLETED'?this.dataset.previousCompleted:this.dataset.previousClosed,detail:area,primary:{label:this.dataset.searchNew,action:()=>this.searchNew()}});
+   else if(open&&this.currentMember()?.status==='WITHDRAWN')this.renderResume({text:this.dataset.membershipInactive,detail:area});
+   this.message.textContent=this.dataset.recoverySuccess;
+   const title=this.querySelector('[data-group-title]');title.tabIndex=-1;this.focusAfter=title;
   }
   pledge(result){if(Number.isSafeInteger(result.validatedPledgeAgorot)&&result.validatedPledgeAgorot>=0){const pledge=this.querySelector('[data-validated-pledge]');pledge.hidden=false;pledge.querySelector('bdi').textContent=this.currency.format(result.validatedPledgeAgorot/100);}}
   share(){

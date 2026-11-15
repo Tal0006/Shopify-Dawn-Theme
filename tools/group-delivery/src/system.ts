@@ -178,7 +178,8 @@ const worst=(...results:(CheckResult|undefined)[]):SystemStatus=>{
  if(results.some(r=>!r||r.status==='OFFLINE'))return 'OFFLINE';
  return results.some(r=>r!.status==='DEGRADED')?'DEGRADED':'OPERATIONAL';
 };
-export function systemsView(ops:OpsConfig,health:{results:Record<string,CheckResult>;checkedAt:string;cached:boolean},appOrigin:string){
+// recovery: the recovery-email state only (provider name and sender domain); the API key never reaches this view.
+export function systemsView(ops:OpsConfig,health:{results:Record<string,CheckResult>;checkedAt:string;cached:boolean},appOrigin:string,recovery:{state:'ENABLED'|'DISABLED'|'MISCONFIGURED';provider:string|null;senderDomain:string|null}={state:'DISABLED',provider:null,senderDomain:null}){
  const r=health.results;
  const note=(id:string)=>ops.notes[id]??NOTES[id]??null;
  const external=(label:string,url:string|null):SystemLink[]=>url?[{label,url,external:true}]:[];
@@ -211,6 +212,10 @@ export function systemsView(ops:OpsConfig,health:{results:Record<string,CheckRes
    links:external('פתיחת Neon',ops.neonConsoleUrl),details:[{label:'ספק',value:'Neon PostgreSQL'}],check:r.neon??null,checkKind:'database',missing:ops.neonConsoleUrl?[]:['OPS_NEON_CONSOLE_URL']}),
   view({id:'group-delivery-admin',name:'ניהול משלוחים קבוצתיים',mark:'מ',status:worst(r['render-group-delivery'],r.neon),statusLabel:null,purpose:['קבוצות ולקוחות','סטטוס משלוח','אזורי משלוח','יומן פעולות'],
    links:[{label:'לוח בקרה',url:'/admin',external:false},{label:'אזורי משלוח',url:'/admin/areas',external:false},{label:'יומן פעולות',url:'/admin/audit',external:false}],details:[],checkKind:'derived'}),
+  view({id:'recovery-email',name:'מייל לשחזור הצטרפות (Resend)',mark:'@',status:'MANUAL',statusLabel:recovery.state==='ENABLED'?'פעיל':recovery.state==='MISCONFIGURED'?'חסרה הגדרה, השחזור כבוי':'כבוי',
+   purpose:['קודי אימות לשחזור הצטרפות ממכשיר אחר'],links:external('פתיחת Resend',recovery.provider==='resend'?'https://resend.com/emails':null),
+   details:[{label:'ספק',value:recovery.provider??''},{label:'דומיין שולח',value:recovery.senderDomain??'',mono:true}],
+   missing:recovery.state==='MISCONFIGURED'?['RECOVERY_EMAIL_PROVIDER / RESEND_API_KEY / RECOVERY_EMAIL_FROM']:[]}),
   view({id:'google-business',name:'Google Business Profile',mark:'G',status:'MANUAL',statusLabel:null,purpose:['נוכחות העסק ב־Google','ביקורות'],
    links:external('פתיחת Google Business Profile',ops.googleBusinessUrl),details:[],missing:ops.googleBusinessUrl?[]:['OPS_GOOGLE_BUSINESS_URL']}),
   view({id:'merchant-center',name:'Google Merchant Center',mark:'MC',status:'MANUAL',statusLabel:null,purpose:['מוצרים ב־Google','אבחון מוצרים'],

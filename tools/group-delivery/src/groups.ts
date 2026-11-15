@@ -24,6 +24,11 @@ export const operationalTargets=(from:string):OperationalStatus[]=>{
 };
 // Accepting pledges: business status OPEN/THRESHOLD_REACHED and the delivery not completed.
 export const acceptsPledges=(group:{status:string;operational_status?:string})=>['OPEN','THRESHOLD_REACHED'].includes(group.status)&&group.operational_status!=='COMPLETED';
+// Stores one device receipt for a membership (hash only). Shared by join and OTP recovery; never revokes another.
+export async function issueToken(db:Queryable,memberId:string,source:'JOIN'|'RECOVERY',token=randomBytes(32).toString('hex')){
+ await db.query('INSERT INTO member_tokens(id,member_id,token_hash,source) VALUES($1,$2,$3,$4)',[randomUUID(),memberId,hash(token),source]);
+ return token;
+}
 export class Groups {
  constructor(private db:Database,private config:Pick<Config,'threshold'|'expiryDays'|'standardRadius'|'storeLocation'|'areaSuggestionRadius'>,private shopify:CartValidator,private areas:Areas=new Areas(db,config)){}
  private async locked<T>(fn:(db:Queryable)=>Promise<T>):Promise<T>{
@@ -93,10 +98,12 @@ export class Groups {
   // Any existing row with this email or phone, withdrawn or not, refuses a new join. A withdrawn member returns only
   // through their receipt (update-pledge); email + phone alone never reactivate a row or issue a token (no OTP yet).
   if(members.some(member=>member.email===person.email||member.phone===person.phone))throw new ApiError(409,'ALREADY_JOINED','לא ניתן להצטרף שוב עם אותם פרטים. לעדכון הסל השתמשו באישור ההצטרפות הקיים.');
-  const token=randomBytes(32).toString('hex');
+  const token=randomBytes(32).toString('hex'),memberId=randomUUID();
   await db.query(`INSERT INTO group_members(id,group_id,email,phone,locality_key,cart_snapshot,pledged_total_agorot,token_hash)
    VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8)`,
-   [randomUUID(),group.id,person.email,person.phone,place.key,JSON.stringify(cart.snapshot),cart.total.toString(),hash(token)]);
+   [memberId,group.id,person.email,person.phone,place.key,JSON.stringify(cart.snapshot),cart.total.toString(),hash(token)]);
+  // The join receipt is this membership's first device receipt (member_tokens); a recovery adds another one.
+  await issueToken(db,memberId,'JOIN',token);
   return {group:await this.recalculate(db,group),memberToken:token,validatedPledgeAgorot:Number(cart.total)};
  }
  // Join a specific group the shopper was shown in their selected area.
@@ -120,10 +127,15 @@ export class Groups {
    return {...await this.enroll(db,group,place,person,cart),created:!existing};
   });
  }
- // The member behind a receipt (group public id + bearer token). Runs before any Shopify request or lock.
+ // The member behind a receipt (group public id + bearer token). Runs before any Shopify request or lock. A member can
+ // hold several device receipts (member_tokens: the join receipt plus one per recovery); any unrevoked one is accepted.
+ // The join receipt is also matched on group_members.token_hash, so a join written by the previous release during a
+ // rolling deploy (before member_tokens existed) still authenticates; a revoked member_tokens row always wins.
  private async member(id:string,token:string){
   publicId(id);if(!/^[a-f0-9]{64}$/.test(token))throw new ApiError(401,'MEMBER_AUTH_REQUIRED');
-  const row=(await this.db.query('SELECT m.id,m.status,m.pledged_total_agorot,m.cart_snapshot FROM group_members m JOIN delivery_groups g ON m.group_id=g.id WHERE g.public_id=$1 AND m.token_hash=$2',[id,hash(token)])).rows[0];
+  const row=(await this.db.query(`SELECT m.id,m.status,m.pledged_total_agorot,m.cart_snapshot FROM group_members m JOIN delivery_groups g ON m.group_id=g.id
+   WHERE g.public_id=$1 AND (m.token_hash=$2 OR EXISTS(SELECT 1 FROM member_tokens t WHERE t.member_id=m.id AND t.token_hash=$2))
+   AND NOT EXISTS(SELECT 1 FROM member_tokens r WHERE r.token_hash=$2 AND r.revoked_at IS NOT NULL)`,[id,hash(token)])).rows[0];
   if(!row)throw new ApiError(401,'MEMBER_AUTH_REQUIRED');
   return row;
  }
