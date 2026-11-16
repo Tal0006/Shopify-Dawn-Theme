@@ -95,7 +95,7 @@ test('factory enables UPCitemdb without key and falls back to configured authori
 });
 test('automatic UPCitemdb takes priority over authorized and manual images; repeated previews cached',async()=>{
   let lookups=0,createdImage:string|undefined;
-  const images=createProductImageProvider({PRODUCT_IMAGE_PROVIDER:'upcitemdb',
+  const images=createProductImageProvider({PRODUCT_IMAGE_PROVIDER:'upcitemdb',PRODUCT_IMAGE_APPROVED_PROVIDERS:'upcitemdb',
     PRODUCT_IMAGE_API_KEY:'test',PRODUCT_IMAGE_API_URL:'https://authorized.example/{barcode}'},async url=>{
       assert.match(String(url),/api.upcitemdb.com/);lookups++;
       return new Response(JSON.stringify(body([first])));
@@ -104,9 +104,9 @@ test('automatic UPCitemdb takes priority over authorized and manual images; repe
     currency:async()=>'ILS',findBarcode:async()=>undefined,
     create:async p=>{createdImage=p.imageUrl;return {id:'1',title:p.title,barcode:code,adminUrl:'https://example.myshopify.com/admin/products/1'};}
   },images,valid);
-  const p=await importer.preview(code,'15.90',second);
+  const p=await importer.preview(code,'15.90',second,true);
   assert.equal(p.product.imageSource,'upcitemdb');assert.equal(p.product.imageUrl,first);
-  await importer.preview(code,'15.90',second);assert.equal(lookups,1);
+  await importer.preview(code,'15.90',second,true);assert.equal(lookups,1);
   await importer.confirm(p.id);assert.equal(createdImage,first);
 });
 test('fallback skips provider exceptions and invalid content before manual fallback',async()=>{
@@ -117,7 +117,7 @@ test('fallback skips provider exceptions and invalid content before manual fallb
   const importer=new Importer({lookupByBarcode:async()=>product},{
     currency:async()=>'ILS',findBarcode:async()=>undefined,create:async()=>{throw Error('unused');}
   },images,valid);
-  const preview=await importer.preview(code,'15.90',second);
+  const preview=await importer.preview(code,'15.90',second,true);
   assert.equal(preview.product.imageSource,'manual');assert.equal(preview.product.imageUrl,second);
 });
 test('no API image and no manual URL still creates without image',async()=>{

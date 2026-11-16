@@ -2,9 +2,10 @@ import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { CheapersalProductCatalogProvider } from './catalog.js';
 import { ShopifyAdmin } from './shopify.js';
-import { createProductImageProvider } from './images.js';
+import { createProductImageProvider, PublicImageUrlValidator } from './images.js';
 import { Importer } from './importer.js';
 import { AppError } from './validation.js';
+import { UPLOAD_LIMITS } from './upload-image.js';
 import { authConfig, createAuth, loginPage, sameSecret } from './auth.js';
 
 export function createApp(importer: Importer, port:number, env:NodeJS.ProcessEnv=process.env) {
@@ -27,7 +28,7 @@ export function createApp(importer: Importer, port:number, env:NodeJS.ProcessEnv
   if(config.production)app.set('trust proxy',1); // Render's ingress terminates TLS.
   app.use((_req,res,next)=>{
     res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
-      'X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src https: http:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
+      'X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: http:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
     if(config.production)res.set('Strict-Transport-Security','max-age=31536000');
     next();
   });
@@ -72,7 +73,8 @@ export function createApp(importer: Importer, port:number, env:NodeJS.ProcessEnv
   const requireCsrf:express.RequestHandler=(req,res,next)=>{
     if(['GET','HEAD','OPTIONS'].includes(req.method))return next();
     if(req.headers.origin!==config.origin)return reject(req,res,req.headers.origin?'invalid origin':'missing origin');
-    if(!req.is('application/json'))return reject(req,res,'invalid API content type');
+    // Image bytes are the only non-JSON API body, accepted solely on the upload route.
+    if(!req.is(req.path==='/image-upload'?'application/octet-stream':'application/json'))return reject(req,res,'invalid API content type');
     if(!req.headers['x-csrf-token'])return reject(req,res,'missing CSRF token');
     if(!sameSecret(req.headers['x-csrf-token'],auth.session(req)!.csrf))return reject(req,res,'invalid CSRF token');
     next();
@@ -80,14 +82,27 @@ export function createApp(importer: Importer, port:number, env:NodeJS.ProcessEnv
   app.use('/api',requireCsrf);
   app.post('/logout',requireCsrf,auth.logout);
   app.post('/api/logout',auth.logout);
-  app.post('/api/preview',async(req,res)=>res.json(await importer.preview(req.body?.barcode,req.body?.price,req.body?.manualImageUrl)));
-  app.post('/api/image-selection',async(req,res)=>res.json(await importer.selectImage(req.body?.previewId,req.body?.candidateIndex)));
+  // Usage confirmations are only meaningful with a server-held preview in this CSRF-protected session.
+  app.post('/api/preview',async(req,res)=>res.json(await importer.preview(req.body?.barcode,req.body?.price,
+    req.body?.manualImageUrl,req.body?.manualImageApproved,{uploadPending:req.body?.uploadPending})));
+  // Raw bytes (no multipart parser, no filename); bound to the server-held preview and memory only.
+  app.post('/api/image-upload',express.raw({type:'application/octet-stream',limit:UPLOAD_LIMITS.maxBytes}),async(req,res)=>
+    res.json(await importer.attachUpload(req.get('x-preview-id'),req.body,req.get('x-usage-confirmed')==='true')));
+  app.post('/api/image-upload/choice',async(req,res)=>res.json(await importer.chooseUpload(req.body?.previewId,
+    req.body?.choice,req.body?.uploadId)));
+  app.get('/api/image-upload/:previewId/:uploadId/:variant',(req,res)=>{
+    const image=importer.uploadImage(req.params.previewId,req.params.uploadId,req.params.variant);
+    res.set({'Content-Type':image.mimeType,'Content-Disposition':'inline'}).send(image.data);
+  });
+  app.post('/api/image-selection',async(req,res)=>res.json(await importer.selectImage(req.body?.previewId,
+    req.body?.candidateIndex,req.body?.confirmUsage)));
   app.post('/api/import',async(req,res)=>res.json(await importer.confirm(req.body?.previewId)));
   app.use(express.static(fileURLToPath(new URL('../public/',import.meta.url)),{etag:false,dotfiles:'deny'}));
   app.use((_req,res)=>res.status(404).json({error:'העמוד לא נמצא'}));
   app.use((error:unknown,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{
     const status=error instanceof AppError?error.status:(error as {status?:number})?.status===400?400:(error as {status?:number})?.status===413?413:500;
-    res.status(status).json({error:error instanceof AppError?error.message:'לא ניתן להשלים את הבקשה'});
+    res.status(status).json({error:error instanceof AppError?error.message:
+      status===413?'הקובץ גדול מדי. הגודל המרבי לתמונה הוא 10MB':'לא ניתן להשלים את הבקשה'});
   });
   return app;
 }
@@ -98,7 +113,8 @@ if(process.argv[1] && fileURLToPath(import.meta.url)===process.argv[1]) {
     const app=createApp(new Importer(new CheapersalProductCatalogProvider(process.env.CHEAPERSAL_API_KEY || ''),
       new ShopifyAdmin({domain:process.env.SHOPIFY_STORE_DOMAIN || '',token:process.env.SHOPIFY_ADMIN_ACCESS_TOKEN,
         clientId:process.env.SHOPIFY_CLIENT_ID,clientSecret:process.env.SHOPIFY_CLIENT_SECRET,
-        trackInventory:process.env.SHOPIFY_TRACK_INVENTORY==='true'}),createProductImageProvider(process.env)),PORT);
+        trackInventory:process.env.SHOPIFY_TRACK_INVENTORY==='true'}),createProductImageProvider(process.env),
+      new PublicImageUrlValidator(),{log:line=>console.info(line)}),PORT);
     const server=app.listen(PORT,'0.0.0.0',()=>console.log('Product importer listening on port '+PORT));
     server.on('error',()=>{console.error('Importer failed to listen');process.exitCode=1;});
     process.on('SIGTERM',()=>server.close(()=>process.exit(0)));

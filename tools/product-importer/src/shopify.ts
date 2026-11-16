@@ -1,10 +1,13 @@
 import { AppError, escapeHtml } from './validation.js';
 import type { ProductCatalogProduct } from './catalog.js';
 export interface ImportedProduct { id: string; title: string; barcode: string; adminUrl: string }
+export interface ImageUploadFile { data: Buffer; mimeType: string; filename: string }
 export interface ShopifyGateway {
   currency(): Promise<string>;
   findBarcode(code: string): Promise<ImportedProduct | undefined>;
   create(product: ProductCatalogProduct, price: string): Promise<ImportedProduct>;
+  /** Stages local image bytes with Shopify and returns a resourceUrl usable as files.originalSource. */
+  uploadImage?(file: ImageUploadFile): Promise<string>;
 }
 export class ShopifyAdmin implements ShopifyGateway {
   private token = '';
@@ -90,6 +93,36 @@ export class ShopifyAdmin implements ShopifyGateway {
         throw new AppError(409, 'הגדרת מטא-שדה קיימת דורשת התאמה ידנית: custom.' + key);
       return {namespace:'custom', key, type, value};
     });
+  }
+  /**
+   * Official staged upload: stagedUploadsCreate returns a short-lived signed target; the bytes are
+   * POSTed there as multipart form data (no Shopify token is sent to the target), and the returned
+   * resourceUrl is then passed to productSet files.originalSource like any other image source.
+   */
+  async uploadImage(file: ImageUploadFile): Promise<string> {
+    const data = await this.graphql(`mutation StageProductImage($input:[StagedUploadInput!]!) {
+      stagedUploadsCreate(input:$input) {
+        stagedTargets { url resourceUrl parameters { name value } }
+        userErrors { field message }
+      }
+    }`, {input:[{resource:'IMAGE', filename:file.filename, mimeType:file.mimeType, httpMethod:'POST',
+      fileSize:String(file.data.length)}]});
+    const target = data.stagedUploadsCreate?.stagedTargets?.[0];
+    let url: URL | undefined;
+    try { url = new URL(target?.url); } catch { url = undefined; }
+    if (data.stagedUploadsCreate?.userErrors?.length || !url || url.protocol !== 'https:' || !target.resourceUrl ||
+        !Array.isArray(target.parameters))
+      throw new AppError(502, 'Shopify לא אישר את העלאת התמונה');
+    const form = new FormData();
+    for (const p of target.parameters) form.append(String(p.name), String(p.value));
+    form.append('file', new Blob([new Uint8Array(file.data)], {type:file.mimeType}), file.filename);
+    let response: Response;
+    try {
+      response = await this.http(url.href, {method:'POST', body:form, redirect:'error', signal:AbortSignal.timeout(60000)});
+    } catch { throw new AppError(502, 'העלאת התמונה ל-Shopify נכשלה. אפשר לנסות שוב או ליצור ללא תמונה'); }
+    await response.body?.cancel();
+    if (!response.ok) throw new AppError(502, 'העלאת התמונה ל-Shopify נכשלה. אפשר לנסות שוב או ליצור ללא תמונה');
+    return String(target.resourceUrl);
   }
   async create(p: ProductCatalogProduct, sellingPrice: string): Promise<ImportedProduct> {
     const input = {title:p.title, vendor:p.manufacturer, status:'DRAFT',

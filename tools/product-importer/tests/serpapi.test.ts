@@ -132,7 +132,7 @@ test('only selected original is sent to Shopify, never the preview thumbnail',as
   },provider,valid);
   const p=await service.preview(code,'15.90');assert.equal(p.product.imageUrl,undefined);
   assert.equal(p.candidates[0].thumbnailUrl,thumbnail);
-  await service.selectImage(p.id,0);await service.confirm(p.id);assert.equal(importedImage,original);
+  await service.selectImage(p.id,0,true);await service.confirm(p.id);assert.equal(importedImage,original);
 });
 test('development diagnostics contain queries, locale and counts but never the API key',async()=>{
   const entries:SerpApiDiagnostic[]=[];

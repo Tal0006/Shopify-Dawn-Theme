@@ -5,11 +5,14 @@ import { MemoryCatalogCache,type ProductCatalogProduct } from './catalog.js';
 import { AppError,barcode,safeImage } from './validation.js';
 import { PublicImageUrlValidator } from './image-validation.js';
 import type { ProductImageProvider,ProductImageResult,ProductImageCandidate,ProductImageDiscovery,ImageUrlValidator } from './image-types.js';
+import { DEFAULT_IMAGE_SOURCE_POLICY,imageSourcePolicyFromEnv,type ImageSourcePolicy } from './image-policy.js';
 export * from './image-types.js';
+export * from './image-policy.js';
 export { PublicImageUrlValidator,isPublicAddress,imageDimensions } from './image-validation.js';
 export { BarcodeLookupImageProvider,GoUpcImageProvider,OpenProductsFactsImageProvider,SerpApiProductImageProvider } from './image-providers.js';
 
 export class NoProductImageProvider implements ProductImageProvider {
+  constructor(readonly policy:ImageSourcePolicy=DEFAULT_IMAGE_SOURCE_POLICY){}
   async findByBarcode():Promise<null>{return null;}
 }
 export class AuthorizedApiProductImageProvider implements ProductImageProvider {
@@ -28,12 +31,21 @@ export class AuthorizedApiProductImageProvider implements ProductImageProvider {
   }
 }
 const confidence:Record<string,number>={'barcodelookup':0.95,'go-upc':0.95,'open-products-facts':0.90,'upcitemdb':0.90,'authorized-api':0.90};
-/** Search candidates are collected, never promoted to automatic image results. */
+function resultFrom(candidate:ProductImageCandidate):ProductImageResult{
+  const {imageUrl,source,sourcePageUrl,sourceDomain,confidence,warning,usagePolicy,autoAttachAllowed,reason}=candidate;
+  return {imageUrl,source,sourcePageUrl,sourceDomain,confidence,warning,usagePolicy,autoAttachAllowed,reason};
+}
+/**
+ * Runs the provider chain in order. A found image is not a safe-to-attach image: only candidates
+ * the ImageSourcePolicy approves can become the automatic image. Everything else stays a candidate
+ * for admin review and the chain continues.
+ */
 export class CompositeProductImageProvider implements ProductImageProvider {
   private cache=new MemoryCatalogCache<ProductImageDiscovery>();
   private emptyCache=new MemoryCatalogCache<ProductImageDiscovery>(60_000);
   private pending=new Map<string,Promise<ProductImageDiscovery>>();
-  constructor(private providers:ProductImageProvider[],private validator:ImageUrlValidator=new PublicImageUrlValidator()){}
+  constructor(private providers:ProductImageProvider[],private validator:ImageUrlValidator=new PublicImageUrlValidator(),
+    readonly policy:ImageSourcePolicy=DEFAULT_IMAGE_SOURCE_POLICY){}
   async findByBarcode(code:string,product:ProductCatalogProduct){return (await this.discoverByBarcode(code,product)).image;}
   async discoverByBarcode(input:string,product:ProductCatalogProduct):Promise<ProductImageDiscovery>{
     const code=barcode(input);
@@ -47,21 +59,36 @@ export class CompositeProductImageProvider implements ProductImageProvider {
     try{
       const checked=await this.validator.validate(value.imageUrl);
       const sourcePageUrl=safeImage(value.sourcePageUrl);
-      return {...value,imageUrl:checked.imageUrl,thumbnailUrl:safeImage(value.thumbnailUrl)??checked.imageUrl,sourcePageUrl,
+      const candidate={...value,imageUrl:checked.imageUrl,thumbnailUrl:safeImage(value.thumbnailUrl)??checked.imageUrl,sourcePageUrl,
         sourceDomain:new URL(sourcePageUrl??checked.imageUrl).hostname,warning:checked.warning??value.warning};
+      // Classified on the validated (post-redirect) URL; provider-supplied policy fields are replaced.
+      return {...candidate,...this.policy.classify(candidate)};
     }catch{return null;}
   }
   private async load(code:string,product:ProductCatalogProduct):Promise<ProductImageDiscovery>{
     const candidates:ProductImageCandidate[]=[];
     const add=(candidate:ProductImageCandidate)=>{if(!candidates.some(c=>c.imageUrl===candidate.imageUrl))candidates.push(candidate);};
+    // Approved candidates are listed first so the five-item limit never hides them.
+    const list=()=>[...candidates.filter(c=>c.autoAttachAllowed),...candidates.filter(c=>!c.autoAttachAllowed)].slice(0,5);
+    const finish=(image:ProductImageResult)=>{
+      const discovery={image,candidates:list()};
+      this.cache.set(code,{product:discovery,lookedUpAt:Date.now()});
+      return discovery;
+    };
     for(const provider of this.providers){
       try{
         if(provider.findCandidatesByBarcode){
           const suggestions=await provider.findCandidatesByBarcode(code,{...product});
+          let approved:ProductImageCandidate|undefined;
           for(const suggestion of suggestions.slice(0,10)){
             const checked=await this.validCandidate(suggestion);
-            if(checked)add({...checked,confidence:Math.min(0.50,checked.confidence??0.50)});
+            if(!checked)continue;
+            const candidate={...checked,confidence:Math.min(0.50,checked.confidence??0.50)};
+            add(candidate);
+            // Search relevance is heuristic; only an approved image domain allows automatic use.
+            if(!approved&&candidate.reason==='approved-domain')approved=candidate;
           }
+          if(approved)return finish(resultFrom(approved));
           continue;
         }
         const result=await provider.findByBarcode(code,{...product});
@@ -69,23 +96,25 @@ export class CompositeProductImageProvider implements ProductImageProvider {
         const checked=await this.validCandidate(result);
         if(!checked)continue;
         const score=result.confidence??confidence[result.source]??0;
-        if(result.source==='serpapi' || score<0.85 || !confidence[result.source]){
-          add({...checked,confidence:Math.min(score,0.50)});continue;
-        }
-        const trusted:ProductImageCandidate[]=[{...checked,confidence:score}];
+        const group:ProductImageCandidate[]=[{...checked,confidence:score}];
         for(const candidate of (result.candidates??[]).slice(0,10)){
-          if(trusted.some(c=>c.imageUrl===candidate.imageUrl))continue;
+          if(group.some(c=>c.imageUrl===candidate.imageUrl))continue;
           const valid=await this.validCandidate({...candidate,source:result.source,confidence:score});
-          if(valid)trusted.push(valid);
-          if(trusted.length===5)break;
+          if(valid)group.push(valid);
+          if(group.length===5)break;
         }
-        const discovery={image:{...result,imageUrl:checked.imageUrl,sourcePageUrl:checked.sourcePageUrl,confidence:score,
-          warning:checked.warning},candidates:[...trusted,...candidates].slice(0,5)};
-        this.cache.set(code,{product:discovery,lookedUpAt:Date.now()});
-        return discovery;
+        const automatic=checked.autoAttachAllowed===true&&result.source!=='serpapi'&&
+          score>=0.85&&confidence[result.source]!==undefined;
+        if(!automatic){
+          // Unapproved or low-confidence: keep for review and continue the fallback chain.
+          for(const candidate of group)add({...candidate,confidence:Math.min(score,0.50)});
+          continue;
+        }
+        candidates.unshift(...group.filter(g=>!candidates.some(c=>c.imageUrl===g.imageUrl)));
+        return finish({...resultFrom(group[0]),confidence:score});
       }catch{/* One provider failure cannot stop fallback. */}
     }
-    const discovery={image:null,candidates:candidates.slice(0,5)};
+    const discovery={image:null,candidates:list()};
     (candidates.length?this.cache:this.emptyCache).set(code,{product:discovery,lookedUpAt:Date.now()});
     return discovery;
   }
@@ -93,9 +122,10 @@ export class CompositeProductImageProvider implements ProductImageProvider {
 export class FallbackProductImageProvider extends CompositeProductImageProvider {}
 export const DEFAULT_IMAGE_PROVIDER_ORDER=['barcodelookup','go-upc','open-products-facts','upcitemdb','serpapi','authorized-api'];
 export function createProductImageProvider(env:NodeJS.ProcessEnv,http:typeof fetch=fetch,
-  validator:ImageUrlValidator=new PublicImageUrlValidator()):ProductImageProvider{
+  validator:ImageUrlValidator=new PublicImageUrlValidator(),
+  policy:ImageSourcePolicy=imageSourcePolicyFromEnv(env)):ProductImageProvider{
   const mode=env.PRODUCT_IMAGE_PROVIDER?.trim()??'auto';
-  if(mode==='none')return new NoProductImageProvider();
+  if(mode==='none')return new NoProductImageProvider(policy);
   if(!['','auto','upcitemdb','authorized-api'].includes(mode))throw new AppError(503,'ספק התמונות שהוגדר אינו נתמך');
   const order=env.PRODUCT_IMAGE_PROVIDER_ORDER?.trim()?env.PRODUCT_IMAGE_PROVIDER_ORDER.split(',').map(s=>s.trim()).filter(Boolean):
     mode==='authorized-api'?['authorized-api']:DEFAULT_IMAGE_PROVIDER_ORDER;
@@ -119,7 +149,7 @@ export function createProductImageProvider(env:NodeJS.ProcessEnv,http:typeof fet
         break;
     }
   }
-  return new CompositeProductImageProvider(providers,validator);
+  return new CompositeProductImageProvider(providers,validator,policy);
 }
 
 export type {SerpApiLocaleOptions,SerpApiDiagnostic} from './image-providers.js';

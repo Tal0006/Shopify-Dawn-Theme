@@ -5,19 +5,52 @@
 <p>הזינו ברקוד ומחיר מכירה. המוצר יישמר כטיוטה לאחר אישור.</p>
 <form id="lookup"><label for="barcode">ברקוד</label><input id="barcode" name="barcode" dir="ltr" inputmode="numeric" required autocomplete="off">
 <label for="price">מחיר</label><input id="price" name="price" dir="ltr" inputmode="decimal" required autocomplete="off" placeholder="15.90">
+<label for="product-upload">תמונת מוצר</label><input id="product-upload" name="productImage" type="file" accept="image/jpeg,image/png,image/webp" aria-describedby="upload-help">
+<small id="upload-help">אפשר לצרף תמונה של המוצר. המערכת תסיר את הרקע ותתאים אותה אוטומטית לאתר. JPEG, PNG או WebP, עד 10MB.</small>
+<label id="upload-approval" class="approval" hidden><input type="checkbox" id="upload-approved"> אני מאשר/ת שיש לנו הרשאה להשתמש בתמונה הזו</label>
 <label for="manual-image">תמונה חלופית</label><input id="manual-image" name="manualImageUrl" type="url" dir="ltr" inputmode="url" autocomplete="off" placeholder="https://..." aria-describedby="image-help">
 <small id="image-help">לא חובה. אם לא נמצאה תמונה אוטומטית, הדביקו כתובת תמונה ולחצו שוב על חיפוש מוצר. השאירו ריק כדי ליצור גם ללא תמונה.</small>
+<label id="manual-approval" class="approval" hidden><input type="checkbox" id="manual-image-approved" name="manualImageApproved"> אני מאשר/ת שיש לנו הרשאה להשתמש בתמונה הזו</label>
 <button id="search">חיפוש מוצר</button></form>
 <p id="message" role="status" aria-live="polite"></p>
 <section id="preview" hidden aria-labelledby="product-title">
 <img id="image" width="220" height="220" alt="" hidden referrerpolicy="no-referrer"><p id="missing">לא נמצאה תמונה למוצר</p>
 <h2 id="product-title"></h2><dl id="details"></dl>
+<p id="image-status" class="badge" hidden></p>
+<p id="image-origin" hidden></p>
 <p id="search-selection" hidden>תמונה נבחרה ידנית מתוצאות חיפוש</p>
+<section id="upload-area" hidden aria-labelledby="upload-title">
+<h3 id="upload-title" tabindex="-1">התמונה שצורפה</h3>
+<p id="upload-status" class="warning" hidden></p>
+<div class="upload-compare">
+<figure><div class="frame"><img id="upload-original" alt="תמונה מקורית" width="300" height="300"></div><figcaption><strong>תמונה מקורית</strong><span id="upload-original-info"></span></figcaption></figure>
+<figure id="upload-processed-figure"><div class="frame checker"><img id="upload-processed" alt="תמונה מותאמת לאתר" width="300" height="300"></div><figcaption><strong>תמונה מותאמת לאתר</strong><span id="upload-processed-info"></span></figcaption></figure>
+</div>
+<div class="upload-actions">
+<button type="button" id="use-processed" aria-pressed="false">השתמש בתמונה המותאמת</button>
+<button type="button" id="use-original" aria-pressed="false">השתמש בתמונה המקורית</button>
+<button type="button" id="pick-other" class="secondary">בחר תמונה אחרת</button>
+<button type="button" id="upload-none" class="secondary">המשך ללא תמונה</button>
+<button type="button" id="upload-remove" class="secondary">הסר תמונה וחפש במקורות</button>
+</div>
+<p class="hint">התמונה מעובדת ללא בינה מלאכותית יוצרת: רק הסרת רקע, מירכוז והתאמת גודל. המוצר, הטקסט והצבעים אינם משתנים.</p>
+</section>
 <a id="source-page" hidden target="_blank" rel="noopener noreferrer">דף מקור התמונה</a>
 <section id="candidate-area" hidden aria-labelledby="candidate-title">
 <h3 id="candidate-title">בחר תמונת מוצר</h3>
 <p>תוצאות חיפוש הן הצעות בלבד. בחרו תמונה מתאימה ובדקו את תנאי השימוש והרשאת השימוש במקור.</p>
 <div id="candidate-list" class="candidates" role="group" aria-labelledby="candidate-title"></div>
+<div id="candidate-review" class="review" hidden role="group" aria-labelledby="review-title">
+<h4 id="review-title" tabindex="-1">תמונה לבדיקה</h4>
+<p id="review-warning" class="warning"></p>
+<p>המקור אינו ברשימת המקורות המאושרים לשימוש אוטומטי.</p>
+<p>יש לוודא שיש הרשאה להשתמש בתמונה לפני שמוסיפים אותה למוצר.</p>
+<p id="review-origin"></p>
+<a id="review-source" hidden target="_blank" rel="noopener noreferrer">דף המקור</a>
+<label class="approval"><input type="checkbox" id="review-approved"> אני מאשר/ת שיש לנו הרשאה להשתמש בתמונה הזו</label>
+<button type="button" id="use-image" disabled>השתמש בתמונה</button>
+<button type="button" id="other-image">חפש תמונה אחרת</button>
+</div>
 </section>
 <button id="without-image" type="button">המשך ללא תמונה</button>
 <p>המוצר ייווצר כטיוטה ללא שיוך לאוסף. ניתן לשייך אוסף ולפרסם ב-Shopify.</p>

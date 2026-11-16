@@ -74,8 +74,9 @@ managed ingress.
 Optional provider and feature variables are documented below and listed in .env.example:
 PRODUCT_IMAGE_PROVIDER, PRODUCT_IMAGE_PROVIDER_ORDER, GOOGLE_IMAGE_PROVIDER,
 SERPAPI_API_KEY, BARCODE_LOOKUP_API_KEY, GO_UPC_API_KEY, PRODUCT_IMAGE_API_KEY,
-PRODUCT_IMAGE_API_URL, PRODUCT_IMAGE_PREFERRED_DOMAINS, SERPAPI_GL, SERPAPI_HL,
-SERPAPI_LOCATION, SHOPIFY_TRACK_INVENTORY. Blank API keys skip those optional paid providers.
+PRODUCT_IMAGE_API_URL, PRODUCT_IMAGE_PREFERRED_DOMAINS, PRODUCT_IMAGE_APPROVED_DOMAINS,
+PRODUCT_IMAGE_APPROVED_PROVIDERS, SERPAPI_GL, SERPAPI_HL, SERPAPI_LOCATION, SHOPIFY_TRACK_INVENTORY.
+Blank API keys skip those optional paid providers. See **Product image source policy**.
 
 Local login accepts the exact http://127.0.0.1:4310 origin by default; localhost is a
 different origin. Blank/whitespace APP_ORIGIN falls back to RENDER_EXTERNAL_URL or the
@@ -123,6 +124,8 @@ SERPAPI_API_KEY=
 PRODUCT_IMAGE_API_KEY=
 PRODUCT_IMAGE_API_URL=
 PRODUCT_IMAGE_PREFERRED_DOMAINS=
+PRODUCT_IMAGE_APPROVED_DOMAINS=
+PRODUCT_IMAGE_APPROVED_PROVIDERS=
 ```
 
 Blank order uses the default shown above. Keys left blank skip paid providers.
@@ -132,15 +135,16 @@ unless an explicit provider order is supplied.
 
 | Provider | Key/configuration | Lookup | Selection / heuristic confidence |
 | --- | --- | --- | --- |
-| Barcode Lookup | BARCODE_LOOKUP_API_KEY | Exact barcode, products[].images | Automatic, 0.95 |
-| Go-UPC | GO_UPC_API_KEY | Exact barcode, Bearer authentication, product.imageUrl | Automatic, 0.95 |
-| Open Products/Beauty/Food Facts | No key | Universal API v3 with product_type=all | Automatic, 0.90 |
-| UPCitemdb | No key for trial endpoint | Exact barcode, items[0].images | Automatic, 0.90 |
-| Google Images through SerpAPI | GOOGLE_IMAGE_PROVIDER=serpapi and SERPAPI_API_KEY | Localized exact barcode, then barcode/manufacturer, then manufacturer/title only while empty | Manual candidates only, 0.50 |
-| Your authorized API | PRODUCT_IMAGE_API_URL and PRODUCT_IMAGE_API_KEY | GET template with {barcode}, X-API-Key | Automatic, 0.90 |
+| Barcode Lookup | BARCODE_LOOKUP_API_KEY | Exact barcode, products[].images | Discovery-only by default; automatic only if approved, 0.95 |
+| Go-UPC | GO_UPC_API_KEY | Exact barcode, Bearer authentication, product.imageUrl | Discovery-only by default; automatic only if approved, 0.95 |
+| Open Products/Beauty/Food Facts | No key | Universal API v3 with product_type=all | Discovery-only by default; automatic only if approved, 0.90 |
+| UPCitemdb | No key for trial endpoint | Exact barcode, items[0].images | Discovery-only by default; automatic only if approved, 0.90 |
+| Google Images through SerpAPI | GOOGLE_IMAGE_PROVIDER=serpapi and SERPAPI_API_KEY | Localized exact barcode, then barcode/manufacturer, then manufacturer/title only while empty | Discovery-only; automatic only for an approved image domain, 0.50 |
+| Your authorized API | PRODUCT_IMAGE_API_URL and PRODUCT_IMAGE_API_KEY | GET template with {barcode}, X-API-Key | Approved, automatic, 0.90 |
 
 Confidence is a rough provider heuristic, not a measured probability. Low-confidence/search results
-never become automatic selections, even if only one result is returned. An exact-barcode response
+never become automatic selections, even if only one result is returned. Usage approval is a separate
+check: see **Product image source policy**. An exact-barcode response
 with an explicit conflicting identifier is rejected.
 
 Official documentation used for the adapters:
@@ -168,20 +172,118 @@ reported dimensions. Domain ranking never proves ownership or grants reuse right
 Check the source page and the provider/image licensing terms before publishing. Source page
 links, image origin and confidence are shown in the preview when available.
 
+## Product image source policy
+
+This is an application safeguard against accidentally attaching images whose usage permission is
+unknown. It is not legal advice, and an approved classification is not a statement about rights.
+
+- Product images are attached automatically only from approved sources.
+- Google/SerpAPI is discovery-only. A search result can be attached automatically only when the
+  image's own HTTPS hostname is on an approved domain; the page that shows it does not count.
+- Barcode Lookup, Go-UPC, Open Facts and UPCitemdb are discovery-only by default. Their responses
+  verify the barcode, not permission to reuse the images. Approve one only if your agreement with
+  that provider covers using its images in your store.
+- Your own authorized API (PRODUCT_IMAGE_API_URL) remains approved.
+- Unapproved results are kept as candidates and the provider chain continues, so a later approved
+  provider can still supply the image. A found image is not the same as a safe-to-attach image.
+- Using a candidate from an unapproved source, or a manual image URL, requires the admin to check
+  **אני מאשר/ת שיש לנו הרשאה להשתמש בתמונה הזו**. The confirmation is held server-side for that
+  one image in that one preview. It is never saved for a domain and never reused in a later preview.
+- Products may be created without an image. Metadata found with no approved image creates a valid
+  draft without media.
+- Before the Shopify mutation, the server checks the final validated URL again. A redirect off an
+  approved domain, or any change to a confirmed image's URL, stops the import with a message.
+  Browser-supplied approval flags are ignored.
+- Existing Shopify products and their images are never changed.
+
+Configuration (all optional; blank values never stop the importer from starting):
+
+```dotenv
+# Bare hostnames, comma-separated. Subdomains are included: officialbrand.co.il also covers
+# images.officialbrand.co.il, but never officialbrand.co.il.evil.example.
+PRODUCT_IMAGE_APPROVED_DOMAINS=officialbrand.co.il,examplemanufacturer.com
+# Providers approved as a whole. Blank means authorized-api only.
+PRODUCT_IMAGE_APPROVED_PROVIDERS=
+```
+
+Entries are trimmed and lowercased. Empty values, URLs, paths, ports, IP addresses, single labels
+and shared hosting suffixes (for example co.il, cdn.shopify.com, cloudfront.net) are ignored.
+Approving a shared CDN would approve every site on it. PRODUCT_IMAGE_PREFERRED_DOMAINS still only
+ranks search suggestions and grants no approval. serpapi and manual cannot be approved as providers.
+
+Each image decision logs one line with the action, provider, source domain (hostname only),
+policy, autoAttach and whether it was attached, for example
+`[image] action=discover provider=serpapi domain=example.com policy=DISCOVERY_ONLY autoAttach=false attached=false`.
+Full image URLs, query strings and API keys are never logged.
+
+## Uploading your own product image
+
+1. Enter the barcode and price as usual.
+2. Attach a photo under **תמונת מוצר** (JPEG, PNG or WebP, up to 10MB and 8000 pixels per side).
+3. Check **אני מאשר/ת שיש לנו הרשאה להשתמש בתמונה הזו**. Nothing is sent without it.
+4. Click **חיפוש מוצר**. Metadata is looked up as before; the image provider chain is skipped
+   because an approved upload takes priority. The photo is processed and shown side by side:
+   **תמונה מקורית** and **תמונה מותאמת לאתר** (on a checkerboard; the file itself is transparent),
+   with dimensions, format, size and background status, for example `1200×1200 · PNG · רקע שקוף`.
+5. Choose **השתמש בתמונה המותאמת** (default when background removal succeeds),
+   **השתמש בתמונה המקורית**, **בחר תמונה אחרת** (new file, new confirmation), **המשך ללא תמונה**,
+   or **הסר תמונה וחפש במקורות** to discard the upload and run the normal provider chain.
+6. Click **צור מוצר ב-Shopify** to create the draft with the chosen image.
+
+Images are processed **without generative AI**. Nothing is redrawn, regenerated, recoloured or
+completed. The pipeline only: applies EXIF orientation, removes all metadata (GPS, device, serial,
+timestamps), converts to sRGB, removes the background, trims transparent margins, scales
+proportionally (`fit: inside`; never stretched, never cropped) and centres the product on a
+transparent 1200×1200 PNG. Square items fill 80% of the canvas, tall or wide items up to 88%.
+The original choice is only re-oriented, metadata-stripped and re-encoded (JPEG quality 92, 4:4:4;
+PNG lossless; WebP quality 92), limited to 4096px on the long side.
+
+Background removal (`EdgeBackgroundRemover`, replaceable through `BackgroundRemovalService`) is
+deterministic and local: it estimates the backdrop colour from the image border, then removes only
+backdrop-coloured pixels connected to the border, stopped by product outlines. Pixel colours are
+never changed; only transparency is set, with a narrow anti-aliased edge and no erosion. Enclosed
+gaps (inside a handle) are kept rather than risking product loss. Photos on a busy or non-uniform
+background are reported as **לא הצלחנו להסיר את הרקע אוטומטית.**; the original, another photo or no
+image remain available, and product creation is never blocked. Uncertain results show a comparison
+warning. Already-transparent PNG/WebP files keep their own alpha. Best results: one product on a
+plain light background, filling most of the frame.
+
+Security and storage: the file type is detected from its content (never the filename or browser
+MIME type); SVG, GIF, PDF, HEIC, animated and corrupt files are rejected; sizes are checked from the
+header before decoding (decompression bombs are refused). Bytes are sent as a raw request body to
+`POST /api/image-upload` with the session's CSRF token, the preview id and the
+`X-Usage-Confirmed: true` confirmation. They are kept in memory only (never on Render's disk), at
+most 10 open uploads, one processed at a time with a short queue, and released after import,
+removal, replacement or the 30-minute preview expiry. The confirmation is bound to that preview,
+that upload id and the SHA-256 of each produced variant; import re-verifies all three. A new upload
+discards the previous upload and its confirmation. Previews are served only to the logged-in admin.
+
+Shopify receives uploaded bytes through the official staged upload flow (Admin GraphQL 2026-10):
+`stagedUploadsCreate` (resource `IMAGE`, `POST`) returns a signed Shopify staging target; the server
+POSTs the verified bytes there as multipart form data (the Admin token is not sent to the target);
+the returned `resourceUrl` is passed to the existing `productSet` `files.originalSource`. No local
+or Render URL is ever exposed to Shopify. The existing `write_files`/`write_products` scopes are used.
+A staging failure stops before the product mutation, so the import can be retried.
+
+No new environment variables are required.
+
 ## Preview and candidate selection
 
 1. Restart the importer after editing .env.
 2. Enter **7290108356472** and price **15.90**, then click **חיפוש מוצר**.
 3. Check Cheapersal's title, manufacturer, category, unit quantity, barcode and your price in
    the Shopify store currency. No price or description is taken from image providers.
-4. The first high-confidence exact-barcode provider may select its image automatically.
-   When alternatives are available, **בחר תמונת מוצר** shows up to five thumbnails with domains,
-   source-page links and radio controls. A selection is checked server-side and becomes the preview image.
-5. Google/SerpAPI candidates start unselected. Selecting one shows
-   **תמונה נבחרה ידנית מתוצאות חיפוש**, source and source-page URL.
-   Clicking a candidate does not upload it or create a Shopify product.
-6. If automatic lookup fails, paste an HTTP/HTTPS image URL into **תמונה חלופית** and search again.
-   A manual URL is used after automatic providers fail. **המשך ללא תמונה** explicitly clears a selection.
+4. The first high-confidence image from an approved source may be selected automatically
+   (**מקור תמונה מאושר**). **בחר תמונת מוצר** shows up to five thumbnails with
+   **תמונה נמצאה דרך** (source-page domain), provider, source-page links and radio controls.
+   A selection is checked server-side and becomes the preview image.
+5. Candidates from sources that are not approved are labelled **תמונה לבדיקה** and start unselected.
+   Choosing one opens a review panel with the source and the checkbox
+   **אני מאשר/ת שיש לנו הרשאה להשתמש בתמונה הזו**; **השתמש בתמונה** is enabled only after it is checked.
+   **חפש תמונה אחרת** returns to the list. Clicking a candidate does not upload it or create a Shopify product.
+6. If no approved image is found, paste an HTTP/HTTPS image URL into **תמונה חלופית**, check the same
+   permission checkbox and search again. The request is rejected without it. A manual URL is used
+   after automatic providers fail. **המשך ללא תמונה** explicitly clears a selection.
 7. Click **צור מוצר ב-Shopify** only when ready to create a draft. No selection is also a valid
    no-image import. The result shows the product ID, barcode, title and Shopify Admin link.
 
@@ -191,7 +293,8 @@ Other manual test examples: 7290012823626 and 7290005427107. Examples are never 
 
 Selections use a server-held preview ID and candidate index, so the browser cannot substitute
 an arbitrary candidate URL on confirmation. Selections are cached by barcode with their timestamp
-for the current local workflow. Expired, completed and busy previews reject edits.
+for the current local workflow; only approved-source selections and "no image" are restored in a
+later preview, never an earlier permission confirmation. Expired, completed and busy previews reject edits.
 Changing the lookup form invalidates its preview. The browser restores the previous server
 selection when a selection request fails.
 

@@ -2,7 +2,7 @@ import {adminEnv,loginForTest} from './auth-helpers.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {BarcodeLookupImageProvider,GoUpcImageProvider,OpenProductsFactsImageProvider,SerpApiProductImageProvider,
-  CompositeProductImageProvider,createProductImageProvider,PublicImageUrlValidator,imageDimensions} from '../src/images.js';
+  CompositeProductImageProvider,createProductImageProvider,PublicImageUrlValidator,imageDimensions,ImageSourcePolicy} from '../src/images.js';
 import {Importer} from '../src/importer.js';
 import {createApp} from '../src/server.js';
 const code='7290108356472';
@@ -10,7 +10,10 @@ const metadata={barcode:code,title:"מקסימה ג'ל כביסה מרוכז ב�
 const one='https://images.example.com/one.jpg',two='https://images.example.com/two.jpg';
 const valid={validate:async(value:unknown)=>({imageUrl:String(value)})};
 const response=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status});
-const env={PRODUCT_IMAGE_PROVIDER:'auto',BARCODE_LOOKUP_API_KEY:'barcode-test',GO_UPC_API_KEY:'go-test'};
+const approvedCatalogApis='barcodelookup,go-upc,open-products-facts,upcitemdb';
+const approved=new ImageSourcePolicy({approvedProviders:approvedCatalogApis.split(',')});
+// Chain-mechanics tests opt in explicitly; the default policy treats these APIs as discovery-only.
+const env={PRODUCT_IMAGE_PROVIDER:'auto',PRODUCT_IMAGE_APPROVED_PROVIDERS:approvedCatalogApis,BARCODE_LOOKUP_API_KEY:'barcode-test',GO_UPC_API_KEY:'go-test'};
 const off={status:1,code,product:{code,image_front_url:one}};
 const bl={products:[{barcode_number:code,images:[one,two]}]};
 const upc={code:'OK',items:[{images:[one]}]};
@@ -104,7 +107,7 @@ test('multiple exact barcode images are offered; changing selection does not cre
   let created=0;
   const images=new BarcodeLookupImageProvider('key',async()=>response(bl),valid);
   const service=new Importer({lookupByBarcode:async()=>metadata},gateway(()=>created++),
-    new CompositeProductImageProvider([images],valid),valid);
+    new CompositeProductImageProvider([images],valid,approved),valid);
   const p=await service.preview(code,'15.90');
   assert.equal(p.candidates.length,2);assert.equal(p.product.imageUrl,one);
   const selected=await service.selectImage(p.id,1);
@@ -143,12 +146,16 @@ test('Google results are not automatically imported, even one candidate needs ex
   const service=new Importer({lookupByBarcode:async()=>metadata},gateway(p=>image=p.imageUrl),provider,valid);
   const p=await service.preview(code,'15.90');
   assert.equal(p.product.imageUrl,undefined);assert.equal(p.candidates.length,1);
-  await assert.rejects(service.selectImage(p.id,9));await assert.rejects(service.selectImage('forged',0));
-  const selected=await service.selectImage(p.id,0);
+  await assert.rejects(service.selectImage(p.id,9));await assert.rejects(service.selectImage('forged',0,true));
+  await assert.rejects(service.selectImage(p.id,0),/הרשאה/);
+  const selected=await service.selectImage(p.id,0,true);
   assert.equal(selected.product.imageSource,'serpapi');assert.equal(selected.manuallySelected,true);
   assert.equal(selected.selectedImage?.sourcePageUrl,'https://brand.example/product');
+  assert.equal(selected.selectedImage?.usagePolicy,'MANUAL_APPROVED');
   await service.confirm(p.id);assert.equal(image,one);
-  const cached=await service.preview(code,'15.90');assert.equal(cached.manuallySelected,true);assert.equal(cached.product.imageUrl,one);
+  // A usage confirmation covers one product action; a later preview requires it again.
+  const cached=await service.preview(code,'15.90');assert.equal(cached.product.imageUrl,undefined);
+  assert.equal(cached.candidates[0].usagePolicy,'DISCOVERY_ONLY');
 });
 test('low confidence and search sources cannot auto-select even if they return a direct result',async()=>{
   const provider=new CompositeProductImageProvider([{findByBarcode:async()=>({imageUrl:one,source:'serpapi',confidence:.99})}],valid);
@@ -159,7 +166,7 @@ test('no provider image allows manual fallback or confirmed import without an im
   const images=new CompositeProductImageProvider([{findByBarcode:async()=>null}],valid);
   let createdImage:string|undefined;
   const service=new Importer({lookupByBarcode:async()=>metadata},gateway(p=>createdImage=p.imageUrl),images,valid);
-  const p=await service.preview(code,'15.90',two);assert.equal(p.product.imageSource,'manual');
+  const p=await service.preview(code,'15.90',two,true);assert.equal(p.product.imageSource,'manual');
   await service.confirm(p.id);assert.equal(createdImage,two);
   const empty=await service.preview(code,'15.90');assert.match(empty.imageWarning!,/לא נמצאה תמונה אוטומטית/);
   await service.confirm(empty.id);assert.equal(createdImage,undefined);
@@ -188,7 +195,7 @@ test('image validation rejects length, tracking pixels, tiny dimensions and disg
 });
 test('candidate selection HTTP endpoint enforces CSRF and server-held candidate index',async()=>{
   const service=new Importer({lookupByBarcode:async()=>metadata},gateway(),
-    new CompositeProductImageProvider([new BarcodeLookupImageProvider('key',async()=>response(bl),valid)],valid),valid);
+    new CompositeProductImageProvider([new BarcodeLookupImageProvider('key',async()=>response(bl),valid)],valid,approved),valid);
   const server=createApp(service,4314,adminEnv).listen(4314,'127.0.0.1');
   await new Promise<void>(resolve=>server.once('listening',resolve));const origin='http://127.0.0.1:4314';
   try{

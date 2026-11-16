@@ -71,15 +71,15 @@ test('manual image fallback is used after provider failure and validated before 
     assert.equal(p.imageUrl,url); assert.equal(p.imageSource,'manual');
   }),{findByBarcode:async () => { throw Error('provider unavailable'); }},
   {validate:async value => { validations++; assert.equal(value,url); return {imageUrl:url}; }});
-  const p=await importer.preview(code,'15.90',' '+url+' ');
+  const p=await importer.preview(code,'15.90',' '+url+' ',true);
   assert.equal(p.product.imageSource,'manual');
   await importer.confirm(p.id); assert.equal(validations,2);
 });
 test('invalid manual image is rejected; invalid automatic image becomes a warning',async () => {
   const validator = new PublicImageUrlValidator(addresses,async () => ({status:200,contentType:'text/html'}));
   const importer = new Importer({lookupByBarcode:async () => metadata},shop(),provider(200,{imageUrl:url}),validator);
-  await assert.rejects(importer.preview(code,'15.90','javascript:alert(1)'));
-  await assert.rejects(importer.preview(code,'15.90',url));
+  await assert.rejects(importer.preview(code,'15.90','javascript:alert(1)',true));
+  await assert.rejects(importer.preview(code,'15.90',url,true));
   const p = await importer.preview(code,'15.90');
   assert.equal(p.product.imageUrl,undefined); assert.ok(p.imageWarning);
 });

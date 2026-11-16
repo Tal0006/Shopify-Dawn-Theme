@@ -97,7 +97,10 @@ function searchTokens(value:unknown):string[]{
 function tokenPresent(tokens:string[],word:string){
   return tokens.some(t=>t===word || (word.length>=3 && /^[והבלמכש]/.test(t) && t.slice(1)===word));
 }
-/** Search images are suggestions only; Israeli localization and metadata relevance are explicit. */
+/**
+ * Search images are DISCOVERY_ONLY suggestions; Israeli localization and metadata relevance are explicit.
+ * PRODUCT_IMAGE_APPROVED_DOMAINS (applied by the composite policy) is the only way one becomes APPROVED.
+ */
 export class SerpApiProductImageProvider implements ProductImageProvider{
   private api:CachedImageApi;
   private cache=new MemoryCatalogCache<ProductImageCandidate[]>();
@@ -190,7 +193,10 @@ export class SerpApiProductImageProvider implements ProductImageProvider{
             confidence:0.50,relevanceScore:score,
             originalWidth:Number.isFinite(result.original_width)?result.original_width:undefined,
             originalHeight:Number.isFinite(result.original_height)?result.original_height:undefined,
-            isProduct:result.is_product===true,...(checked.warning?{warning:checked.warning}:{})});
+            isProduct:result.is_product===true,
+            // Search results are discovery-only; only ImageSourcePolicy can approve a specific domain.
+            usagePolicy:'DISCOVERY_ONLY',autoAttachAllowed:false,reason:'search-result',
+            ...(checked.warning?{warning:checked.warning}:{})});
           if(candidates.length===5)break;
         }catch{/* Try the next relevant original image, not a Shopping result or thumbnail. */}
       }
