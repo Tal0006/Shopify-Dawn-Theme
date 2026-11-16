@@ -13,3 +13,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Local Shopping Assistant diagnostics output (real-catalog stress runs, debug logs)
+*debug*.txt
+*stress*.txt

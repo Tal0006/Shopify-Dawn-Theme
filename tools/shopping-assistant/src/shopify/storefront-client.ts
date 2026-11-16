@@ -1,5 +1,5 @@
 import {isIP} from 'node:net';
-import type {BuyerContext,CartLine,CartResult,CatalogVariant,SearchResults,StorefrontGateway} from '../domain/types.js';
+import type {BuyerContext,CartLine,CartResult,CatalogVariant,SearchOptions,SearchResults,StorefrontGateway} from '../domain/types.js';
 import type {Config} from '../config.js';
 import {ApiError,unavailable} from '../middleware/errors.js';
 import {SEARCH,VARIANTS,CART_CREATE} from './queries.js';
@@ -18,7 +18,8 @@ function variant(raw:any,product:any):CatalogVariant {
   return {productId:product.id,variantId:raw.id,handle:product.handle,title:product.title,variantTitle:raw.title,
     vendor:product.vendor,imageUrl:typeof image==='string'&&image.startsWith('https://')?image:undefined,
     unitPrice:{amount:raw.price.amount,currencyCode:raw.price.currencyCode},availableForSale:raw.availableForSale,
-    minimum:rule.minimum,maximum:rule.maximum,increment:rule.increment,requiresSellingPlan:product.requiresSellingPlan,requiresComponents:raw.requiresComponents};
+    minimum:rule.minimum,maximum:rule.maximum,increment:rule.increment,requiresSellingPlan:product.requiresSellingPlan,requiresComponents:raw.requiresComponents,
+    ...(typeof product.productType==='string'&&product.productType.trim()?{productType:product.productType.trim()}:{})};
 }
 export class ShopifyStorefrontClient implements StorefrontGateway {
   constructor(private config:Pick<Config,'domain'|'version'|'privateToken'>,private http:typeof fetch=fetch){}
@@ -36,10 +37,11 @@ export class ShopifyStorefrontClient implements StorefrontGateway {
       return body.data;
     }catch(error){if(error instanceof ApiError)throw error;throw unavailable();}
   }
-  async search(name:string,buyer?:BuyerContext):Promise<SearchResults>{
+  async search(name:string,buyer?:BuyerContext,options:SearchOptions={}):Promise<SearchResults>{
     // Strip search operators from customer text; use GraphQL variables, never interpolation.
     const query=name.replace(/[^\p{L}\p{N}\s.]/gu,' ').trim();
-    const data=await this.graphql(SEARCH,{query},buyer),result=data.search;
+    const unavailableProducts=options.availableFirst?'LAST':'SHOW';
+    const data=await this.graphql(SEARCH,{query,unavailableProducts},buyer),result=data.search;
     if(!Array.isArray(result?.nodes)||typeof result?.pageInfo?.hasNextPage!=='boolean')throw unavailable();
     const rows:CatalogVariant[]=[],truncatedVariantProductIds:string[]=[];let truncated=result.pageInfo.hasNextPage;
     for(const product of result.nodes){

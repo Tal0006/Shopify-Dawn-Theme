@@ -67,6 +67,8 @@ test('Intent aliases, specificity, optional metadata and custom definitions',()=
  assert.equal(detectProductIntent('ריצפז מטליות לחות לרצפה'),'FLOOR_WIPES');
  assert.equal(detectProductIntent('סנו קליר'),'GLASS_CLEANER');
  assert.equal(detectProductIntent({title:'שם לא ידוע',productType:'אבקת כביסה'}),'LAUNDRY_POWDER');
- assert.equal(detectProductIntent({title:'מרכך',productType:'אבקת כביסה'}),'FABRIC_SOFTENER');
+ // An explicit title type outranks metadata; a bare context-dependent "מרכך" does not decide it.
+ assert.equal(detectProductIntent({title:'מרכך כביסה',productType:'אבקת כביסה'}),'FABRIC_SOFTENER');
+ assert.equal(detectProductIntent({title:'מרכך',productType:'אבקת כביסה'}),'LAUNDRY_POWDER');
  assert.equal(detectQueryIntent('כינוי חדש',[{intent:'BLEACH',aliases:['כינוי חדש']}]),'BLEACH');
 });

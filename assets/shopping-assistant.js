@@ -256,6 +256,9 @@
           for (const action of ['edit_item', 'remove']) {
             const button = this.element('button', this.text(action));
             button.type = 'button'; button.dataset[action === 'remove' ? 'remove' : 'editItem'] = String(index);
+            // A separator keeps the two labels distinct wherever the flex gap does not apply
+            // (copied text, reader views, unstyled rendering); flex layout ignores it.
+            if (actions.childElementCount) actions.append(' ');
             actions.append(button);
           }
           article.append(actions);

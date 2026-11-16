@@ -14,7 +14,7 @@ import {WhatsAppAdapter} from './channels/whatsapp/whatsapp-adapter.js';
 import {whatsappWebhook} from './channels/whatsapp/whatsapp-webhook.js';
 import type {WhatsAppTransport,WhatsAppSessionStore} from './channels/whatsapp/whatsapp-types.js';
 export function createApp(config:Config,shop:StorefrontGateway=new ShopifyStorefrontClient(config),whatsappDependencies:{client?:WhatsAppTransport;sessions?:WhatsAppSessionStore}={}){
- const app=express(),quotes=new QuoteService(shop,undefined,Date.now,config.debug),checkout=new CheckoutService(shop,quotes);
+ const app=express(),quotes=new QuoteService(shop,undefined,Date.now,config.debug,{rawProductTitles:config.debugRawProductTitles}),checkout=new CheckoutService(shop,quotes);
  app.disable('x-powered-by');app.set('trust proxy',config.trustProxy);
  app.use((_req,res,next)=>{res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'"});next();});
  app.get('/health',(_req,res)=>res.json({status:'ok'}));

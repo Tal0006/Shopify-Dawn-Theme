@@ -1,5 +1,5 @@
 import type {WhatsAppConfig} from './channels/whatsapp/whatsapp-types.js';
-export interface Config { domain:string; version:string; privateToken?:string; port:number; production:boolean; allowedOrigins:string[]; trustProxy:number; debug:boolean; whatsapp?:WhatsAppConfig }
+export interface Config { domain:string; version:string; privateToken?:string; port:number; production:boolean; allowedOrigins:string[]; trustProxy:number; debug:boolean; debugRawProductTitles:boolean; whatsapp?:WhatsAppConfig }
 export function configFromEnv(env:NodeJS.ProcessEnv=process.env):Config {
   const domain=env.SHOPIFY_STORE_DOMAIN?.trim() || '';
   if(!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(domain))throw Error('Configure SHOPIFY_STORE_DOMAIN');
@@ -18,5 +18,7 @@ export function configFromEnv(env:NodeJS.ProcessEnv=process.env):Config {
       verifyToken:required('WHATSAPP_VERIFY_TOKEN'),appSecret:required('META_APP_SECRET'),graphVersion:required('META_GRAPH_API_VERSION')};
     if(!/^\d{5,30}$/.test(whatsapp.phoneNumberId)||!/^v\d{1,3}\.0$/.test(whatsapp.graphVersion))throw Error('Invalid WhatsApp configuration');
   }
-  return {whatsapp,domain,version,port,production,allowedOrigins,trustProxy,privateToken:env.SHOPIFY_STOREFRONT_PRIVATE_TOKEN || undefined,debug:!production&&env.SHOPPING_ASSISTANT_DEBUG==='true'};
+  return {whatsapp,domain,version,port,production,allowedOrigins,trustProxy,privateToken:env.SHOPIFY_STOREFRONT_PRIVATE_TOKEN || undefined,debug:!production&&env.SHOPPING_ASSISTANT_DEBUG==='true',
+    // Local diagnostics only: full catalog product titles in debug logs. Never in production, never without debug.
+    debugRawProductTitles:!production&&env.SHOPPING_ASSISTANT_DEBUG==='true'&&env.SHOPPING_ASSISTANT_DEBUG_RAW_PRODUCT_TITLES==='true'};
 }

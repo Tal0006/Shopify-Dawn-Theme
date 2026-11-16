@@ -89,7 +89,16 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
   await t.test('Not-found text supports item editing and removing the final item',async()=>{
    await submit('not_found');assert.ok((await ev('app.results.textContent')).includes(strings.not_found));
    await click('[data-edit-item]');assert.equal(await ev('app.form.hidden'),false);assert.equal(await ev('document.activeElement===app.input'),true);
-   await submit('not_found');await click('[data-remove]');
+   await submit('not_found');
+   // Item actions are two separate controls: distinct text and a visible gap, no overlap.
+   const actions=await ev(`(()=>{const row=document.querySelector('.shopping-assistant__item .shopping-assistant__actions');
+    const [a,b]=[...row.querySelectorAll('button')].map(x=>x.getBoundingClientRect());
+    return {text:row.textContent,gap:Math.max(b.left-a.right,a.left-b.right),footer:document.querySelector('[data-summary] .shopping-assistant__actions').textContent,
+     confirm:[...document.querySelector('[data-confirm]').childNodes].map(n=>n.textContent).join('|')};})()`);
+   assert.equal(actions.text,strings.edit_item+' '+strings.remove);assert.ok(actions.gap>=7.5,'gap '+actions.gap);
+   assert.equal(actions.footer,strings.checkout+' '+strings.edit);
+   assert.ok(actions.confirm.includes(strings.confirm+'| |'+strings.back),actions.confirm);
+   await click('[data-remove]');
    assert.equal(await ev('app.input.value'),'');assert.equal(await ev('app.form.hidden'),false);
   });
   await t.test('Editing a complete list and resubmitting creates a fresh quote',async()=>{

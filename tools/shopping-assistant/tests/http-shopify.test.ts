@@ -78,10 +78,14 @@ test('Storefront client tokenless and private modes use correct endpoint and tru
 test('Search limits requests and flags truncated products/variants',async()=>{
  const node=raw();let variables:any;
  const client=new ShopifyStorefrontClient({domain:'example.myshopify.com',version:'2026-10'},async(_url,options)=>{
-  const body=JSON.parse(options!.body as string);variables=body.variables;assert.match(body.query,/first:8/);assert.match(body.query,/first:20/);
-  return new Response(JSON.stringify({data:{search:{pageInfo:{hasNextPage:false},nodes:[{...node.product,variants:{pageInfo:{hasNextPage:true},nodes:[node]}}]}}}));
+  const body=JSON.parse(options!.body as string);variables=body.variables;assert.match(body.query,/first:8/);assert.match(body.query,/unavailableProducts:\$unavailableProducts/);assert.match(body.query,/first:20/);
+  assert.match(body.query,/productType/);
+  return new Response(JSON.stringify({data:{search:{pageInfo:{hasNextPage:false},nodes:[{...node.product,productType:' מרכך שיער ',variants:{pageInfo:{hasNextPage:true},nodes:[node]}}]}}}));
  });
- const result=await client.search('מרכך מקסימה');assert.equal(result.truncated,true);assert.equal(result.variants.length,1);assert.deepEqual(variables,{query:'מרכך מקסימה'});
+ // Relevance order by default; unavailable-last only when explicitly requested.
+ const result=await client.search('מרכך מקסימה');assert.equal(result.truncated,true);assert.equal(result.variants.length,1);
+ assert.deepEqual(variables,{query:'מרכך מקסימה',unavailableProducts:'SHOW'});assert.equal(result.variants[0].productType,'מרכך שיער');
+ await client.search('מרכך מקסימה',undefined,{availableFirst:true});assert.deepEqual(variables,{query:'מרכך מקסימה',unavailableProducts:'LAST'});
 });
 test('Upstream network, HTTP, GraphQL and rate-limit errors are sanitized',async()=>{
  for(const response of [new Response('secret',{status:500}),new Response('secret',{status:429}),new Response(JSON.stringify({errors:[{message:'secret'}]}))]){

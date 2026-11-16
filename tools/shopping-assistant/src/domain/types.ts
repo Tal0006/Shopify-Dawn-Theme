@@ -4,7 +4,12 @@ export interface CatalogVariant {
   productId:string; variantId:string; handle:string; title:string; variantTitle:string; vendor:string;
   imageUrl?:string; unitPrice:Money; availableForSale:boolean;
   minimum:number; increment:number; maximum:number|null; requiresSellingPlan:boolean; requiresComponents:boolean;
+  // Shopify product type, when the merchant set one; used only to resolve an ambiguous title.
+  productType?:string;
 }
+// availableFirst asks Shopify to list unavailable products last. Retrieval normally keeps Shopify's
+// relevance order so availability never crowds out an unavailable exact match.
+export interface SearchOptions { availableFirst?:boolean }
 export interface SearchResults { variants:CatalogVariant[]; truncated:boolean; truncatedVariantProductIds?:string[] }
 export interface MatchedProduct extends CatalogVariant { quantity:number; lineTotal:Money }
 export interface MatchResult {
@@ -21,7 +26,7 @@ export interface CartLine { variantId:string; quantity:number }
 export interface CartResult { cartId:string; checkoutUrl:string; subtotal:Money; total:Money; warnings:string[] }
 export interface BuyerContext { ip?:string }
 export interface StorefrontGateway {
-  search(name:string,buyer?:BuyerContext):Promise<SearchResults>;
+  search(name:string,buyer?:BuyerContext,options?:SearchOptions):Promise<SearchResults>;
   variants(ids:string[],buyer?:BuyerContext):Promise<CatalogVariant[]>;
   createCart(lines:CartLine[],buyer?:BuyerContext):Promise<CartResult>;
 }

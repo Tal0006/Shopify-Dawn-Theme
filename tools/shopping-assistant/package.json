@@ -10,7 +10,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "tsx --require ./tests/block-external-http.cjs --test tests/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "stress:real-catalog": "node tests/manual/stress-real-catalog.mjs"
   },
   "dependencies": {
     "express": "^5.1.0"

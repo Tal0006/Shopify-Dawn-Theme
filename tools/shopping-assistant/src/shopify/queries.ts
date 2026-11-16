@@ -4,9 +4,9 @@ const variantFields=`
  price { amount currencyCode }
  quantityRule { minimum maximum increment }
 `;
-const productFields=`id handle title vendor requiresSellingPlan featuredImage { url }`;
-export const SEARCH=`query ShoppingSearch($query:String!){
- search(query:$query,first:8,types:[PRODUCT],unavailableProducts:SHOW){
+const productFields=`id handle title vendor productType requiresSellingPlan featuredImage { url }`;
+export const SEARCH=`query ShoppingSearch($query:String!,$unavailableProducts:SearchUnavailableProductsType!){
+ search(query:$query,first:8,types:[PRODUCT],unavailableProducts:$unavailableProducts){
   pageInfo { hasNextPage }
   nodes { ... on Product { ${productFields}
    variants(first:20) { pageInfo { hasNextPage } nodes { ${variantFields} } }
