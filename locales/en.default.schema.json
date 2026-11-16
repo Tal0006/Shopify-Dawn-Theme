@@ -3587,6 +3587,11 @@
     "button_label": "Button label",
     "default_info": "Blank uses the translated default."
   },
+  "cancellation_editor": {
+    "name": "Cancellation form",
+    "page": "Transaction cancellation page",
+    "page_info": "The page that shows the cancellation form (page.cancellation template). The \"ביטול עסקה\" link is shown in the footer."
+  },
   "group_delivery_info_editor": {
     "name": "Group Delivery guide",
     "info": "Blank fields use the translated default.",

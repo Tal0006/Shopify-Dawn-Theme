@@ -1,5 +1,7 @@
     {% assign facebook_url = section.settings.facebook | default: settings.social_facebook_link %}
     {% assign instagram_url = section.settings.instagram | default: settings.social_instagram_link %}
+    {% comment %}Transaction cancellation ("ביטול עסקה"): shown with the policies, or in the bottom bar when policies are hidden.{% endcomment %}
+    {% assign cancellation_page = section.settings.cancellation_page %}
 <footer class="footer-area storefront-footer" dir="rtl">
   <div class="container storefront-footer-inner">
     <div class="storefront-footer__top"><div class="storefront-footer__brand">
@@ -12,9 +14,9 @@
     {% if section.settings.show_footer_links %}<div class="storefront-footer-links">
   {% if section.settings.footer_link != blank %}<nav aria-label="{{ 'sections.header.menu' | t }}"><h3>{{ 'sections.header.menu' | t }}</h3><ul>{% for link in section.settings.footer_link.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}
   {% if section.settings.service_menu != blank %}<nav aria-label="{{ 'storefront.customer_service' | t }}"><h3>{{ 'storefront.customer_service' | t }}</h3><ul>{% for link in section.settings.service_menu.links %}<li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>{% endfor %}</ul></nav>{% endif %}
-  {% if section.settings.show_policies %}<nav aria-label="{{ 'storefront.policies' | t }}"><h3>{{ 'storefront.policies' | t }}</h3><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}</ul></nav>{% endif %}
+  {% if section.settings.show_policies %}<nav aria-label="{{ 'storefront.policies' | t }}"><h3>{{ 'storefront.policies' | t }}</h3><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}{% if cancellation_page != blank %}<li><a href="{{ cancellation_page.url }}"{% if request.path == cancellation_page.url %} aria-current="page"{% endif %}>{{ 'cancellation_request.link' | t }}</a></li>{% endif %}</ul></nav>{% endif %}
 </div>{% elsif section.settings.show_policies %}
-    <nav class="storefront-footer-policies" aria-label="{{ 'storefront.policies' | t }}"><h3>{{ 'storefront.policies' | t }}</h3><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}</ul></nav>
+    <nav class="storefront-footer-policies" aria-label="{{ 'storefront.policies' | t }}"><h3>{{ 'storefront.policies' | t }}</h3><ul>{% for policy in shop.policies %}{% if policy.body != blank %}<li><a href="{{ policy.url }}">{{ policy.title | escape }}</a></li>{% endif %}{% endfor %}{% if cancellation_page != blank %}<li><a href="{{ cancellation_page.url }}"{% if request.path == cancellation_page.url %} aria-current="page"{% endif %}>{{ 'cancellation_request.link' | t }}</a></li>{% endif %}</ul></nav>
     {% endif %}
     {% if section.settings.whatsapp != blank or facebook_url != blank or instagram_url != blank %}
     <div class="storefront-footer__social-group"><h3>{% if section.settings.follow_title != blank %}{{ section.settings.follow_title | escape }}{% else %}{{ 'storefront.follow' | t }}{% endif %}</h3>
@@ -48,6 +50,7 @@
     <div class="storefront-footer__bottom">
     {% if section.settings.show_payment_icons and shop.enabled_payment_types != blank %}<ul class="paymets" aria-label="{{ 'sections.footer.payment' | t }}">{% for type in shop.enabled_payment_types %}<li>{{ type | payment_type_svg_tag }}</li>{% endfor %}</ul>{% endif %}
     {% if section.settings.accessibility_statement_page != blank %}<a class="storefront-footer-statement" href="{{ section.settings.accessibility_statement_page.url }}">{{ 'accessibility_preferences.statement' | t }}</a>{% elsif request.design_mode %}<p class="storefront-footer-copyright">יש לבחור עמוד הצהרת נגישות בהגדרות התחתית.</p>{% endif %}
+    {% if cancellation_page != blank %}{% unless section.settings.show_policies %}<a class="storefront-footer-statement" href="{{ cancellation_page.url }}"{% if request.path == cancellation_page.url %} aria-current="page"{% endif %}>{{ 'cancellation_request.link' | t }}</a>{% endunless %}{% elsif request.design_mode %}<p class="storefront-footer-copyright">{{ 'cancellation_request.setup' | t }}</p>{% endif %}
     {% if section.settings.show_copyright %}<p class="storefront-footer-copyright">© {{ 'now' | date: '%Y' }} {{ shop.name | escape }}</p>{% endif %}
     </div>
   </div>
@@ -226,6 +229,12 @@ html[data-a11y-paused] .storefront-footer .storefront-footer-social a:is(:hover,
       "type": "page",
       "id": "accessibility_statement_page",
       "label": "עמוד הצהרת נגישות"
+    },
+    {
+      "type": "page",
+      "id": "cancellation_page",
+      "label": "t:cancellation_editor.page",
+      "info": "t:cancellation_editor.page_info"
     },
     {
       "type": "textarea",
