@@ -1,0 +1,62 @@
+{% doc %}
+  Delivery settlement selector placed beside a cart checkout button (cart drawer and cart page), inside the cart form.
+  Owns the approved settlement whitelist and restores the choice from the cart attribute "יישוב למשלוח". The select
+  posts that attribute with the cart form, so the checkout submission itself always records the latest choice.
+  assets/delivery-settlement.js owns the shared state, validation, AJAX saving and checkout gating.
+  Shopify Local Delivery remains the final delivery-eligibility check at checkout.
+
+  @param {string} [settlement_id] - Unique ID suffix for this instance (the owning section ID).
+  @param {boolean} [styles_only] - Render nothing but load the stylesheet, for a cart that fills after page load.
+  @example
+  {% render 'delivery-settlement', settlement_id: section.id %}
+{% enddoc %}
+{%- unless styles_only -%}
+{%- liquid
+  # Fixed business whitelist. Values are stored on the order, so they are never translated.
+  assign approved_settlements = 'אחוזם|שלווה|נועם|אבן שמואל|איתן|עוזה|קריית גת|לכיש|שדה משה|ניר חן|שדה דוד|שחר|זוהר|גת|נהורה|נגה|עוצם|תלמים|אלומה|רווחה|סגולה|זבדיאל|מנוחה|ורדון' | split: '|' | sort
+  assign settlement_attribute = 'יישוב למשלוח'
+  assign saved_settlement = cart.attributes[settlement_attribute] | strip
+  assign settlement_supported = false
+  if saved_settlement != blank and approved_settlements contains saved_settlement
+    assign settlement_supported = true
+  endif
+  assign settlement_group_page = settings.group_delivery_page | default: pages['group-delivery']
+  assign settlement_select_id = 'DeliverySettlement-' | append: settlement_id
+-%}
+<fankee-delivery-settlement class="delivery-settlement" data-state="{% if settlement_supported %}supported{% else %}neutral{% endif %}" data-supported="{{ 'delivery_settlement.supported' | t | escape }}" data-unsupported="{{ 'delivery_settlement.unsupported' | t | escape }}" data-group="{{ 'delivery_settlement.group' | t | escape }}" data-required="{{ 'delivery_settlement.required' | t | escape }}">
+  <label class="delivery-settlement__label" for="{{ settlement_select_id }}">{{ 'delivery_settlement.heading' | t }}</label>
+  <p class="delivery-settlement__hint" id="{{ settlement_select_id }}-hint">{{ 'delivery_settlement.text' | t }}</p>
+  <select class="delivery-settlement__select" id="{{ settlement_select_id }}" name="attributes[{{ settlement_attribute }}]" autocomplete="off" aria-describedby="{{ settlement_select_id }}-hint {{ settlement_select_id }}-message" data-settlement-select>
+    <option value=""{% unless settlement_supported %} selected{% endunless %}>{{ 'delivery_settlement.placeholder' | t }}</option>
+    {%- for settlement in approved_settlements %}
+    <option value="{{ settlement | escape }}" data-approved{% if settlement_supported and settlement == saved_settlement %} selected{% endif %}>{{ settlement | escape }}</option>
+    {%- endfor %}
+    {%- comment -%}Posts an empty attribute: "not listed" is never stored as a delivery settlement.{%- endcomment %}
+    <option value="" data-not-listed>{{ 'delivery_settlement.not_listed' | t }}</option>
+  </select>
+  <div class="delivery-settlement__message" id="{{ settlement_select_id }}-message" role="status" aria-live="polite" aria-atomic="true" data-settlement-message>{% if settlement_supported %}<p>{{ 'delivery_settlement.supported' | t }}</p>{% endif %}</div>
+  {%- if settlement_group_page != blank %}
+  <a class="delivery-settlement__cta" href="{{ settlement_group_page.url }}" data-settlement-cta hidden>{{ 'delivery_settlement.cta' | t }}</a>
+  {%- endif %}
+</fankee-delivery-settlement>
+{%- endunless -%}
+{% stylesheet %}
+.delivery-settlement { display: grid; gap: 6px; min-width: 0; margin-block: 0 14px; padding: 12px 14px; border: 1px solid var(--fk-border); border-radius: var(--fk-radius-md); background: #fff; color: var(--fk-text); text-align: start; }
+.delivery-settlement__label { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.4; color: var(--fk-teal-900); }
+.delivery-settlement__hint { margin: 0; font-size: 13px; line-height: 1.5; color: var(--fk-text-muted); overflow-wrap: anywhere; }
+.delivery-settlement__select { box-sizing: border-box; display: block; width: 100%; max-width: 100%; min-height: 44px; margin: 0; padding-block: 8px; padding-inline: 12px; border: 1px solid var(--fk-border-strong); border-radius: var(--fk-radius-sm); background-color: #fff; color: var(--fk-text); font: inherit; font-size: 16px; }
+.delivery-settlement__select:focus-visible { outline: 3px solid var(--fk-teal-800); outline-offset: 2px; }
+.delivery-settlement__select[aria-invalid=true] { border-color: var(--fk-danger); }
+.delivery-settlement__message:empty { display: none; }
+.delivery-settlement__message p { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.delivery-settlement[data-state=supported] .delivery-settlement__message { color: var(--fk-success); font-weight: 600; }
+.delivery-settlement[data-state=unsupported] .delivery-settlement__message { padding: 8px 10px; border-radius: var(--fk-radius-sm); background: var(--fk-warning-bg); color: var(--fk-warning); }
+.delivery-settlement[data-state=unsupported] .delivery-settlement__message p:first-child { font-weight: 700; }
+.delivery-settlement[data-state=required] .delivery-settlement__message { color: var(--fk-danger); font-weight: 600; }
+.delivery-settlement__cta { box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; padding: 8px 16px; border: 2px solid var(--fk-accent); border-radius: var(--fk-radius-md); background: #fff; color: var(--fk-accent); font-weight: 700; text-align: center; text-decoration: none; overflow-wrap: anywhere; }
+.delivery-settlement__cta[hidden] { display: none; }
+.delivery-settlement__cta:hover { background: var(--fk-cyan-50); }
+.delivery-settlement__cta:focus-visible { outline: 3px solid var(--fk-teal-800); outline-offset: 2px; }
+/* Set by delivery-settlement.js while no approved settlement is chosen; the button stays focusable to explain why. */
+[name=checkout][aria-disabled=true] { opacity: .55; cursor: not-allowed; box-shadow: none; }
+{% endstylesheet %}

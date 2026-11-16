@@ -940,6 +940,17 @@
     "cta": "Explore Group Delivery",
     "setup": "Choose the Group Delivery page in Theme settings, or publish the existing page with the group-delivery handle."
   },
+  "delivery_settlement": {
+    "heading": "Which community are we delivering to?",
+    "text": "Choose your community so we can confirm that we deliver to you.",
+    "placeholder": "Choose a community",
+    "not_listed": "My community isn't listed",
+    "supported": "Great! We deliver to your community.",
+    "unsupported": "Regular delivery to your community isn't available right now.",
+    "group": "You can join a group delivery for your area.",
+    "cta": "Check group delivery",
+    "required": "Choose a community before continuing to checkout."
+  },
   "google_review": {
     "eyebrow": "Google reviews",
     "heading": "Enjoyed shopping with us?",

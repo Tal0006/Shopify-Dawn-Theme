@@ -22,6 +22,7 @@
   {% render 'free-shipping-meter', context: 'cart' %}
   <p class="catalog-cart-total">{{ 'sections.cart.estimated_total' | t }}: <bdi>{{ cart.total_price | money }}</bdi></p>
   <p>{% if cart.taxes_included %}{{ 'products.product.taxes_included' | t }} {% endif %}{% if shop.shipping_policy.body != blank %}{{ 'products.product.shipping_policy_html' | t: link: shop.shipping_policy.url }}{% else %}{{ 'storefront.shipping_note' | t }}{% endif %}</p>
+  {% render 'delivery-settlement', settlement_id: section.id %}
   <div class="catalog-actions"><button type="submit" name="update" class="theme-btn">{{ 'sections.cart.update' | t }}</button><button type="submit" name="checkout" class="theme-btn">{{ 'sections.cart.checkout' | t }}</button><a href="{{ settings.catalog_collection.url | default: routes.all_products_collection_url }}">{{ 'general.continue_shopping' | t }}</a></div>
 </form>
 {% endif %}</section>

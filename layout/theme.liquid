@@ -67,6 +67,7 @@
     </script>
     {% render 'cart-submit-guard' %}
     <script src="{{ 'storefront.js' | asset_url }}" defer></script>
+    <script src="{{ 'delivery-settlement.js' | asset_url }}" defer></script>
     {{ 'accessibility.css' | asset_url | stylesheet_tag }}
     {%- comment -%}
       Accessibility panel and preference modes: loaded without blocking first paint (media switches from print to all

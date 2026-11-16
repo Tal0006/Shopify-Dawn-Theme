@@ -13,6 +13,8 @@
     <header class="cart-drawer__header"><h2 id="MiniCartTitle-{{ drawer_id }}">{{ 'sections.cart.title' | t }} <span>({{ cart.item_count }})</span></h2></header>
     {% if cart.empty? %}
       <div class="cart-drawer__empty"><p>{{ 'storefront.drawer_empty' | t }}</p><button type="button" class="theme-btn" data-cart-continue>{{ 'general.continue_shopping' | t }}</button></div>
+      {%- comment -%}Loads the settlement selector CSS for a cart that is filled after this page loaded.{%- endcomment -%}
+      {% render 'delivery-settlement', styles_only: true %}
     {% else %}
       <form action="{{ routes.cart_url }}" method="post" class="cart-drawer__form">
         <div class="cart-drawer__lines">
@@ -48,6 +50,7 @@
             <textarea id="DrawerNote-{{ drawer_id }}" name="note" rows="3" maxlength="1000" data-cart-note>{{ cart.note | escape }}</textarea>
           </details>
           <p class="cart-drawer__total"><span>{{ 'storefront.drawer_total' | t }}</span><bdi>{{ cart.total_price | money }}</bdi></p>
+          {% render 'delivery-settlement', settlement_id: drawer_id %}
           <button type="submit" name="checkout" class="theme-btn">{{ 'sections.cart.checkout' | t }}</button>
           <a class="cart-drawer__view" href="{{ routes.cart_url }}">{{ 'storefront.drawer_view' | t }}</a>
           <noscript><button type="submit" name="update">{{ 'sections.cart.update' | t }}</button></noscript>
