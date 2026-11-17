@@ -6,12 +6,15 @@ export const PUBLIC_ERROR_CODES=['INVALID_INPUT','INVALID_LOCATION','INVALID_CAR
  'CART_UNAVAILABLE','SHOPIFY_UNAVAILABLE','GROUP_NOT_FOUND','GROUP_CLOSED','GROUP_FULL','GROUP_LIMIT','LOCATION_OUTSIDE_GROUP',
  'ALREADY_JOINED','MEMBER_AUTH_REQUIRED','RATE_LIMITED','INVALID_HOST','INVALID_ORIGIN','NOT_FOUND','BODY_TOO_LARGE','SERVICE_UNAVAILABLE',
  'INVALID_AREA','INVALID_COORDINATES','EMPTY_CART_CANNOT_UPDATE_PLEDGE','WITHDRAW_CONFIRMATION_REQUIRED',
- 'INVALID_OR_EXPIRED_CODE','TOO_MANY_ATTEMPTS','RECOVERY_UNAVAILABLE'] as const;
+ 'INVALID_OR_EXPIRED_CODE','TOO_MANY_ATTEMPTS','RECOVERY_UNAVAILABLE',
+ // Card reservation (Cardcom) and pledge consent.
+ 'CARD_RESERVATION_REQUIRED','PAYMENT_UNAVAILABLE','CONSENT_REQUIRED','PLEDGE_AMOUNT_CHANGED','RESERVATION_NOT_FOUND','CARD_DATA_NOT_ACCEPTED','CHARGE_IN_PROGRESS'] as const;
 // Merchant-only /admin codes; never shown on the storefront.
 export const ADMIN_ERROR_CODES=['LOGIN_FAILED','ADMIN_AUTH_REQUIRED','CSRF_REQUIRED','INVALID_CONTENT_TYPE','APPROVAL_NOT_ALLOWED','AREA_EXISTS','AREA_NOT_FOUND','MEMBER_NOT_FOUND',
  'INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED'] as const;
 export type ErrorCode=typeof PUBLIC_ERROR_CODES[number]|typeof ADMIN_ERROR_CODES[number];
-export class ApiError extends Error {constructor(public status:number,public code:ErrorCode, message='לא ניתן להשלים את הבקשה. יש לבדוק את הפרטים ולנסות שוב.'){super(message)}}
+// details: optional safe integers only (e.g. a re-validated amount in agorot), serialized next to code and message.
+export class ApiError extends Error {constructor(public status:number,public code:ErrorCode, message='לא ניתן להשלים את הבקשה. יש לבדוק את הפרטים ולנסות שוב.',public details?:Record<string,number>){super(message)}}
 export const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
 export const fail=(code:ErrorCode='INVALID_INPUT'):never=>{throw new ApiError(400,code)};
 export function text(value:unknown,min:number,max:number):string{
@@ -69,4 +72,22 @@ export function contact(body:any){
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!/^\+?\d{8,15}$/.test(phone))return fail('INVALID_CONTACT');
  // Normalize Israeli local/international phone formats to the same duplicate key.
  return {email,phone:/^0\d{8,9}$/.test(phone)?'+972'+phone.slice(1):phone.replace(/^(?:00)?972(?=\d{8,9}$)/,'+972')};
+}
+// Card data never enters this service: card entry happens only on Cardcom's hosted page. Any public request body that
+// carries a card-like field name, or a string that looks like a card number (13-19 digits passing Luhn), is refused
+// before any handler runs, so it is never stored, logged or forwarded. Phone and *Id fields are exempt from the digit
+// check (phones are validated as phones; Shopify variant ids are long numbers).
+const CARD_KEYS=/^(card.*|.*card(number|num|no)|pan|cvv2?|cvc2?|cid|track[12]?|magstripe|expir.*|exp(month|year|date)|mmyy|securitycode)$/i;
+const luhn=(digits:string)=>{let sum=0;for(let i=0;i<digits.length;i++){let d=Number(digits[digits.length-1-i]);if(i%2){d*=2;if(d>9)d-=9;}sum+=d;}return sum%10===0;};
+export function containsCardData(value:unknown,depth=0,key=''):boolean{
+ if(depth>6)return false;
+ if(typeof value==='string'){
+  // Phones, and ids such as 14-digit Shopify variant ids, are not card numbers.
+  if(/^(phone|tel)$/i.test(key)||/id$/i.test(key))return false;
+  const digits=value.replace(/[\s-]/g,'');
+  return /^\d{13,19}$/.test(digits)&&luhn(digits);
+ }
+ if(Array.isArray(value))return value.some(item=>containsCardData(item,depth+1,key));
+ if(value&&typeof value==='object')return Object.entries(value).some(([k,v])=>CARD_KEYS.test(k.replace(/[_\s-]/g,''))||containsCardData(v,depth+1,k));
+ return false;
 }

@@ -80,7 +80,7 @@ test('Admin dashboard service',{timeout:180000},async t=>{
   await t.test('groups list: pagination with limits, sorting, filters and search run on the server',async()=>{
    const all=await json('/admin/api/groups?pageSize=5',cookie);
    assert.deepEqual(all.pagination,{page:1,pageSize:5,total:5,pageCount:1});
-   assert.deepEqual(Object.keys(all.groups[0]).sort(),['active','activeMembers','areaName','areaPublicId','completedAt','completedBy','createdAt','expiresAt','legacy','operationalStatus','pledgedTotalAgorot','progressPercent','publicId','remainingAgorot','shortId','status','thresholdAgorot','totalMembers','updatedAt']);
+   assert.deepEqual(Object.keys(all.groups[0]).sort(),['active','activeMembers','areaName','areaPublicId','completedAt','completedBy','createdAt','expiresAt','legacy','operationalStatus','paidTotalAgorot','paymentMode','paymentState','pledgedTotalAgorot','progressPercent','publicId','remainingAgorot','shortId','status','thresholdAgorot','totalMembers','updatedAt']);
    assert.ok(!JSON.stringify(all).includes('@example.test'),'no contact details in the list');
    assert.equal((await json('/admin/api/groups?pageSize=1000',cookie)).pagination.pageSize,100,'maximum page size');
    const small=await json('/admin/api/groups?pageSize=5&page=2',cookie);assert.equal(small.groups.length,0);assert.equal(small.pagination.page,2);
@@ -113,7 +113,7 @@ test('Admin dashboard service',{timeout:180000},async t=>{
    const group=(await json('/admin/api/groups/'+ids.ashdod,cookie)).group;
    assert.deepEqual([group.areaName,group.status,group.activeMembers,group.totalMembers,group.withdrawnMembers,group.pledgedTotalAgorot,group.thresholdAgorot,group.progressPercent],['אשדוד','OPEN',2,3,1,37500,50000,75]);
    const members=await json('/admin/api/groups/'+ids.ashdod+'/members',cookie);
-   assert.equal(members.members.length,3);assert.deepEqual(Object.keys(members.members[0]).sort(),['cartLines','createdAt','email','id','phone','pledgedTotalAgorot','status','updatedAt','withdrawnAt','withdrawnBy']);
+   assert.equal(members.members.length,3);assert.deepEqual(Object.keys(members.members[0]).sort(),['approvedAmountAgorot','cartLines','charge','consentAt','createdAt','email','id','paymentStatus','pendingAmountAgorot','phone','pledgedTotalAgorot','status','updatedAt','withdrawnAt','withdrawnBy']);
    assert.equal(members.members[0].email,'dana@example.test');assert.equal(members.members[0].phone,'+972501234567');assert.equal(members.members[0].cartLines,2);
    assert.deepEqual((await json('/admin/api/groups/'+ids.ashdod+'/members?memberStatus=WITHDRAWN',cookie)).members.map((m:any)=>m.email),['leaving@example.test']);
    assert.deepEqual((await json('/admin/api/groups/'+ids.ashdod+'/members?pageSize=5&page=1',cookie)).pagination,{page:1,pageSize:5,total:3,pageCount:1});

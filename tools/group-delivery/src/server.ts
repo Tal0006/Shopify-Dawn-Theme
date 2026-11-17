@@ -17,10 +17,25 @@ import {SystemHealth,systemsView,type HealthOptions} from './system.js';
 import {systemPage} from './system-page.js';
 import {Recovery,RECOVERY_LIMITS,type RecoveryLimits} from './recovery.js';
 import {emailProvider,type EmailProvider} from './email.js';
+import {Payments,webhookLowProfileId} from './payments.js';
+import {CardcomService,CardcomError,type CardcomGateway} from './cardcom.js';
+import {CARDCOM_WEBHOOK_PATH} from './payments-config.js';
+import {ShopifyOrders,type OrderGateway} from './shopify-orders.js';
+import {containsCardData} from './domain.js';
 // deps: test seams for the operations page (outbound fetch and health-check timings) and for recovery email
 // (provider and limits; the default provider comes from cfg.recovery and is null when recovery is disabled).
-export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>}={}){
- const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator);
+// cardcom/paymentsLog: test seams for the Cardcom gateway (default: the real CardcomService when payments are ENABLED,
+// none otherwise) and for payment log lines.
+export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>;cardcom?:CardcomGateway|null;paymentsLog?:(line:string)=>void;orders?:OrderGateway|null}={}){
+ const app=express(),areas=new Areas(db,cfg);
+ // Card reservation is required for new memberships whenever Cardcom is enabled (even if misconfigured: fail closed).
+ const groups=new Groups(db,cfg,validator,areas,{paymentMode:()=>cfg.payments.state==='DISABLED'?'NONE':'CARDCOM'});
+ const cardcom=deps.cardcom!==undefined?deps.cardcom:cfg.payments.state==='ENABLED'?new CardcomService(cfg.payments.cardcom!):null;
+ // Shopify orders (GraphQL Admin, offline token): required before any Cardcom charge (default: real client when configured).
+ const orders=deps.orders!==undefined?deps.orders:cfg.payments.orders?new ShopifyOrders({domain:cfg.domain,...cfg.payments.orders}):null;
+ const payments=new Payments(db,groups,validator,cfg.payments,cardcom,deps.paymentsLog,orders);
+ groups.attachPayments(payments);app.locals.payments=payments;
+ const auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator,payments);
  const systemHealth=new SystemHealth(db,cfg.ops,()=>cfg.origin,deps.fetch,deps.health);
  const recovery=new Recovery(db,cfg.secret,deps.email!==undefined?deps.email:emailProvider(cfg.recovery),groups,{...RECOVERY_LIMITS,...deps.recoveryLimits});
  app.locals.recovery=recovery;
@@ -44,13 +59,24 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   if(!['GET','HEAD'].includes(req.method)&&(!origin||!allowed.includes(origin)||!req.is('application/json')))throw new ApiError(403,'INVALID_ORIGIN');
   // Nearest-area lookups get their own small bucket so location attempts cannot use up the join budget (or vice versa).
   // The member read is a POST only to carry the bearer token; it changes nothing, so it shares the read budget.
-  const memberRead=req.method==='POST'&&/^\/groups\/[^/]+\/member$/.test(req.path);
+  const memberRead=req.method==='POST'&&(/^\/groups\/[^/]+\/member$/.test(req.path)||/^\/reservations\/[^/]+$/.test(req.path));
   const read=['GET','HEAD'].includes(req.method)||memberRead,nearest=req.method==='POST'&&req.path==='/areas/nearest';
   await auth.limit(req,nearest?'area-nearest':read?'public-read':'public-write',nearest?10:read?120:20,600);
   next();
  });
  app.use(express.json({limit:'24kb'}));
  app.use(express.urlencoded({extended:false,limit:'4kb'}));
+ // Card numbers, CVV and similar fields are refused on every public API before any handler sees them.
+ app.use('/api/v1',(req,_res,next)=>{if(req.body&&typeof req.body==='object'&&containsCardData(req.body))throw new ApiError(400,'CARD_DATA_NOT_ACCEPTED','פרטי כרטיס אשראי מוזנים רק בעמוד המאובטח של קארדקום.');next();});
+ // Cardcom server-to-server webhook (public; HTTPS and the exact host are enforced above). The body is only a pointer:
+ // the LowProfileId is looked up and the result is fetched from Cardcom (GetLpResult) before anything changes.
+ // Replays and retries are no-ops once the reservation is final. 503 asks Cardcom to retry when it cannot be checked.
+ app.post(CARDCOM_WEBHOOK_PATH,async(req,res)=>{
+  await auth.limit(req,'cardcom-webhook',600,600);
+  try{await payments.webhook(webhookLowProfileId(req.body,req.query));}
+  catch(error){if(error instanceof CardcomError){res.status(503).json({ok:false});return;}throw error;}
+  res.json({ok:true});
+ });
  const adminOrigin:express.RequestHandler=(req,_res,next)=>{if(req.get('Origin')!==cfg.origin)throw new ApiError(403,'INVALID_ORIGIN');next();};
  // Every admin response: never indexed, never cached, and only same-origin script/style (no inline code).
  app.use('/admin',(_req,res,next)=>{
@@ -90,7 +116,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  });
  const csrfOf=(res:express.Response)=>res.locals.session.csrf as string;
  // Error codes the group page knows how to explain (anything else is ignored).
- const GROUP_PAGE_ERRORS=['APPROVAL_NOT_ALLOWED','INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED'];
+ const GROUP_PAGE_ERRORS=['APPROVAL_NOT_ALLOWED','PAYMENT_UNAVAILABLE','INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED'];
  const noticeOf=(value:unknown)=>typeof value==='string'&&/^[a-z_]{1,30}$/.test(value)?value:undefined;
  // Dashboard home: summary cards plus the server-side filtered, sorted and paginated groups table.
  app.get('/admin',async(req,res)=>{
@@ -150,9 +176,29 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   const id=req.params.publicId,base='/admin/groups/'+encodeURIComponent(id);
   if(req.body?.confirm!=='yes'){res.redirect(303,base+'?error=confirm');return;}
   try{await approve(res,id);}
-  catch(error){if(error instanceof ApiError&&error.code==='APPROVAL_NOT_ALLOWED'){res.redirect(303,base+'?error=APPROVAL_NOT_ALLOWED');return;}throw error;}
+  catch(error){if(error instanceof ApiError&&['APPROVAL_NOT_ALLOWED','PAYMENT_UNAVAILABLE'].includes(error.code)){res.redirect(303,base+'?error='+error.code);return;}throw error;}
   res.redirect(303,base+'?notice=approved');
  });
+ // Charging after approval (card groups). Both actions are idempotent: charges are claimed one by one and an UNKNOWN
+ // charge is never re-sent; reconciliation only marks a charge paid when Cardcom confirms it by our charge id.
+ const chargeAction=async(res:express.Response,id:string,action:'group.charges_process'|'group.charges_reconcile',run:()=>Promise<any>)=>{
+  try{const result=await run();await audit(db,{action,actor:res.locals.actor,target:id,result:'OK'});return result;}
+  catch(error){await audit(db,{action,actor:res.locals.actor,target:id,result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});throw error;}
+ };
+ app.post('/admin/groups/:publicId/charges/process',async(req,res)=>{
+  const id=req.params.publicId,base='/admin/groups/'+encodeURIComponent(id);
+  try{await chargeAction(res,id,'group.charges_process',()=>payments.processCharges(id));}
+  catch(error){if(error instanceof ApiError&&['APPROVAL_NOT_ALLOWED','PAYMENT_UNAVAILABLE'].includes(error.code)){res.redirect(303,base+'?error='+error.code);return;}throw error;}
+  res.redirect(303,base+'?notice=charges_processed');
+ });
+ app.post('/admin/groups/:publicId/charges/reconcile',async(req,res)=>{
+  const id=req.params.publicId,base='/admin/groups/'+encodeURIComponent(id);
+  try{await chargeAction(res,id,'group.charges_reconcile',()=>payments.reconcile(id));}
+  catch(error){if(error instanceof ApiError&&['APPROVAL_NOT_ALLOWED','PAYMENT_UNAVAILABLE'].includes(error.code)){res.redirect(303,base+'?error='+error.code);return;}throw error;}
+  res.redirect(303,base+'?notice=charges_reconciled');
+ });
+ app.post('/admin/api/groups/:publicId/charges/process',async(req,res)=>res.json({charges:await chargeAction(res,req.params.publicId,'group.charges_process',()=>payments.processCharges(req.params.publicId))}));
+ app.post('/admin/api/groups/:publicId/charges/reconcile',async(req,res)=>res.json(await chargeAction(res,req.params.publicId,'group.charges_reconcile',()=>payments.reconcile(req.params.publicId))));
  app.post('/admin/api/groups/:publicId/approve',async(req,res)=>res.json({group:await approve(res,req.params.publicId)}));
  // Store-owner removal of a customer: the same domain withdrawal as the customer's own (row kept as WITHDRAWN, totals
  // recalculated under the coordination lock). Explicit confirmation, audited with safe metadata only. Idempotent.
@@ -235,6 +281,14 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // Member-only: the receipt holder's pledge and stored cart re-checked against Shopify (no contact details or token).
  app.post('/api/v1/groups/:publicId/member',async(req,res)=>res.json(await groups.memberState(req.params.publicId,bearer(req))));
  // Explicit withdrawal; needs the member token and {"confirm":true}. A cart update never withdraws.
+ // Card reservation (Cardcom, no charge now). reserve returns the Cardcom page URL and the receipt the browser keeps;
+ // the membership exists only after Cardcom confirms the token server-to-server (webhook or the status read below).
+ app.post('/api/v1/groups/reserve',async(req,res)=>{await auth.limit(req,'card-reserve',10,600);res.status(201).json(await payments.reserve(null,req.body));});
+ app.post('/api/v1/groups/:publicId/reserve',async(req,res)=>{await auth.limit(req,'card-reserve',10,600);res.status(201).json(await payments.reserve(req.params.publicId,req.body,bearer(req)));});
+ app.post('/api/v1/reservations/:id',async(req,res)=>res.json(await payments.status(req.params.id,bearer(req),req.body)));
+ app.post('/api/v1/reservations/:id/cancel',async(req,res)=>res.json(await payments.cancel(req.params.id,bearer(req))));
+ // Explicit consent to a higher pledge after a cart change (card members); the card is not entered again.
+ app.post('/api/v1/groups/:publicId/confirm-pledge',async(req,res)=>res.json(await groups.confirmPledge(req.params.publicId,bearer(req),req.body)));
  app.post('/api/v1/groups/:publicId/withdraw',async(req,res)=>res.json(await groups.withdraw(req.params.publicId,bearer(req),req.body)));
  // Email OTP recovery for a browser without the receipt (see src/recovery.ts). Besides the shared public-write budget,
  // each step has its own per-IP hourly bucket; per-details, per-group and per-challenge limits live in Recovery.
@@ -259,7 +313,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   if(_req.path.startsWith('/admin')&&!_req.path.startsWith('/admin/api/')&&_req.path!=='/admin/style.css'&&_req.path!=='/admin/app.js'){
    res.status(status).type('html').send(errorPage(status,message,res.locals.session?.csrf));return;
   }
-  res.status(status).json({error:message,code});
+  const details=error instanceof ApiError&&error.details&&Object.values(error.details).every(Number.isSafeInteger)?error.details:undefined;
+  res.status(status).json({error:message,code,...(details?{details}:{})});
  });
  return app;
 }
@@ -269,9 +324,12 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const cfg=config();db=database(cfg.databaseUrl);await migrate(db);
   // Names variables only, never values.
   if(cfg.recovery.state==='MISCONFIGURED')console.warn('Group delivery recovery email is disabled until configured: '+cfg.recovery.problems.join(' '));
+  // Names variables only, never values. Card reservations fail closed (503) until fixed; joins still require a card.
+  if(cfg.payments.state==='ENABLED'&&cfg.payments.chargingProblems.length)console.warn('Group delivery card groups cannot be approved or charged until configured: '+cfg.payments.chargingProblems.join(' '));
+  if(cfg.payments.state==='MISCONFIGURED')console.warn('Group delivery card reservation is enabled but unavailable until configured: '+cfg.payments.problems.join(' '));
   const app=createApp(db,cfg),server=app.listen(cfg.port,'0.0.0.0',()=>console.info('Group delivery listening on port '+cfg.port));
   // Recovery emails still being sent finish before the pool closes.
-  const stop=()=>{server.close(()=>{void (app.locals.recovery as Recovery).idle().then(()=>db!.end()).then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
+  const stop=()=>{server.close(()=>{void Promise.all([(app.locals.recovery as Recovery).idle(),(app.locals.payments as Payments).idle()]).then(()=>db!.end()).then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
  }catch{console.error('Group delivery startup failed. Check configuration and database connectivity.');await db?.end().catch(()=>{});process.exitCode=1;}
 }

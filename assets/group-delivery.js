@@ -15,26 +15,37 @@
  // One-time code input: typed or pasted text ("123 456", full-width or Arabic-Indic digits) becomes at most 6 ASCII digits.
  const digits=value=>String(value).normalize('NFKC').replace(/[٠-٩۰-۹]/g,d=>String(d.charCodeAt(0)&15)).replace(/\D/g,'').slice(0,6);
  // The member read (POST /groups/:id/member) as the service documents it; anything else is ignored.
+ const PAYMENT_STATUSES=new Set(['CARD_RESERVED','CONSENT_REQUIRED','CHARGE_PENDING','CHARGED','PAYMENT_FAILED','CANCELED']);
+ // Card membership state from the member read; null for groups without cards. Never a token or a Cardcom id.
+ const paymentShape=payment=>payment&&PAYMENT_STATUSES.has(payment.status)&&count(payment.approvedAmountAgorot)&&(payment.pendingAmountAgorot===null||count(payment.pendingAmountAgorot))
+  ?{status:payment.status,approvedAmountAgorot:payment.approvedAmountAgorot,pendingAmountAgorot:payment.pendingAmountAgorot}:null;
+ // Only Cardcom's own HTTPS page may receive the shopper.
+ const CARDCOM_HOSTS=new Set(['secure.cardcom.solutions']);
+ const RESERVATION_FINAL=new Set(['RESERVATION_FAILED','EXPIRED','CANCELED']);
  const memberShape=member=>{
   if(!member||!['PLEDGED','WITHDRAWN'].includes(member.status)||!count(member.pledgedTotalAgorot)||!['OK','UNAVAILABLE'].includes(member.cartCheck))return null;
   if(member.cart!==null&&!(Array.isArray(member.cart)&&member.cart.every(line=>line&&VARIANT.test(line.variantId)&&count(line.quantity)&&line.quantity>0&&count(line.restorableQuantity)&&line.restorableQuantity<=line.quantity&&
    count(line.storedUnitAgorot)&&(line.currentUnitAgorot===null||count(line.currentUnitAgorot))&&typeof line.available==='boolean'&&typeof line.priceChanged==='boolean'&&REASONS.has(line.reason)&&(line.title===null||typeof line.title==='string'))))return null;
-  return {status:member.status,pledgedTotalAgorot:member.pledgedTotalAgorot,cartCheck:member.cartCheck,cart:member.cart};
+  return {status:member.status,pledgedTotalAgorot:member.pledgedTotalAgorot,cartCheck:member.cartCheck,cart:member.cart,payment:paymentShape(member.payment)};
  };
  class GroupDelivery extends HTMLElement {
   // Render cold starts can take close to a minute: announce the wait, then fail at a finite limit.
   static wakeDelay=12000;
   static requestTimeout=90000;
   static cartTimeout=10000;
+  // Return from Cardcom: a short, bounded check (the webhook normally finishes first).
+  static verifyAttempts=6;
+  static verifyInterval=1500;
   connectedCallback(){
    if(this.lifecycle)return;
    this.lifecycle=new AbortController();this.requests=new Set();this.busy=false;this.pending=false;
    this.areas=[];this.area=null;this.options=[];this.active=-1;
    this.areaInput=this.querySelector('[data-area-input]');this.areaList=this.querySelector('[data-area-list]');this.areaStatus=this.querySelector('[data-area-selected]');
-   this.message=this.querySelector('[data-group-message]');this.group=null;this.querySelector('[data-validated-pledge]').hidden=true;
+   this.message=this.querySelector('[data-group-message]');this.group=null;this.noticeText=this.querySelector('[data-notice]').textContent;this.querySelector('[data-validated-pledge]').hidden=true;
    // A (re)connected section starts from the area search; a group appears only through resume() or a new search.
    this.querySelector('[data-group-panel]').hidden=true;this.querySelector('[data-resume]').hidden=true;this.recovery=null;this.querySelector('[data-otp]').hidden=true;this.querySelector('[data-join-group]').hidden=false;
    this.currency=new Intl.NumberFormat(this.dataset.locale||'he',{style:'currency',currency:'ILS'});
+   this.withdrawLabel=this.querySelector('[data-withdraw]').textContent;this.withdrawText=this.querySelector('[data-withdraw-text]').textContent;
    this.labels=JSON.parse(this.querySelector('[data-group-labels]').textContent);
    try{this.errors=JSON.parse(this.querySelector('[data-group-errors]')?.textContent||'{}');}catch{this.errors={};}
    try{
@@ -44,7 +55,12 @@
    // Legacy single receipt (sessionStorage); current receipts are one localStorage key per group under receiptPrefix.
    this.storageKey='fankee-group-delivery:'+this.origin.origin;
    this.receiptPrefix=this.storageKey+':receipt:';
+   // A card reservation in progress: {reservationId, memberToken, publicId, savedAt}. Kept until the service reports a
+   // final state; never contains contacts, card data or anything from Cardcom.
+   this.reservationKey=this.storageKey+':reservation';
    this.loadReceipts();
+   // The return page marker (?gd_result=success|failed) is only a hint; the service decides. It is removed from the URL.
+   try{const url=new URL(location.href),result=url.searchParams.get('gd_result');if(result){this.returnResult=result==='failed'?'failed':'success';url.searchParams.delete('gd_result');history.replaceState(history.state,'',url.pathname+url.search+url.hash);}}catch{}
    const options={signal:this.lifecycle.signal};
    this.querySelector('[data-find-group]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.find(),event.submitter);},options);
    this.querySelector('[data-join-group]').addEventListener('submit',event=>{event.preventDefault();void this.perform(()=>this.join(),event.submitter);},options);
@@ -58,6 +74,12 @@
    this.querySelector('[data-withdraw]').addEventListener('click',()=>{const dialog=this.querySelector('[data-withdraw-dialog]');if(!dialog.open&&!this.busy)dialog.showModal();},options);
    this.querySelector('[data-withdraw-cancel]').addEventListener('click',()=>this.querySelector('[data-withdraw-dialog]').close(),options);
    this.querySelector('[data-withdraw-confirm]').addEventListener('click',event=>{void this.perform(()=>this.withdraw(),event.currentTarget);},options);
+   // Card reservation consent gates the button; a changed pledge has its own explicit consent.
+   this.querySelector('[data-reserve-consent]').addEventListener('change',()=>this.controls(),options);
+   this.querySelector('[data-consent-change-check]').addEventListener('change',event=>{this.querySelector('[data-consent-change-confirm]').disabled=!event.currentTarget.checked||this.busy;},options);
+   this.querySelector('[data-consent-change-confirm]').addEventListener('click',event=>{void this.perform(()=>this.confirmPledge(),event.currentTarget);},options);
+   this.querySelector('[data-verify-primary]').addEventListener('click',()=>this.verifyActions?.primary?.(),options);
+   this.querySelector('[data-verify-secondary]').addEventListener('click',()=>this.verifyActions?.secondary?.(),options);
    this.areaInput.addEventListener('input',()=>this.onAreaInput(),options);
    this.areaInput.addEventListener('keydown',event=>this.onAreaKeydown(event),options);
    this.areaInput.addEventListener('click',()=>this.openAreas(),options);
@@ -84,6 +106,8 @@
    window.addEventListener('pageshow',event=>{if(event.persisted)this.resync();},options);
    void this.perform(async()=>{
     const results=await Promise.allSettled([this.loadAreas(),this.cart()]);
+    // Back from Cardcom: the reservation is confirmed (or not) by the service first, then the normal resume runs.
+    await this.verifyReturn();
     await this.resume();
     const failed=results.find(result=>result.status==='rejected');if(failed)throw failed.reason;
    });
@@ -176,7 +200,7 @@
     this.selectArea(area);this.message.textContent=this.dataset.geoSelected.replace('__AREA__',area.name);
    },this.querySelector('[data-geolocate]'));
   }
-  disconnectedCallback(){const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog?.open)dialog.close();clearInterval(this.otpTimer);this.recovery=null;this.lifecycle?.abort();this.requests?.forEach(request=>request.abort());this.lifecycle=null;}
+  disconnectedCallback(){const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog?.open)dialog.close();clearInterval(this.otpTimer);clearTimeout(this.pollTimer);this.recovery=null;this.lifecycle?.abort();this.requests?.forEach(request=>request.abort());this.lifecycle=null;}
   // Receipts: {publicId, memberToken, savedAt}. No contact details, cart, coordinates or payment data are stored.
   readReceipt(store,key){
    try{
@@ -233,6 +257,97 @@
     throw error;
    }
   }
+  // ---- Card reservation (Cardcom) ----
+  readReservation(){
+   for(const store of [storage('localStorage'),storage('sessionStorage')]){
+    try{const value=JSON.parse(store?.getItem(this.reservationKey)||'null');
+     if(value&&UUID.test(value.reservationId)&&TOKEN.test(value.memberToken)&&(value.publicId===null||UUID.test(value.publicId))&&Number.isSafeInteger(value.savedAt))return value;}catch{}
+   }
+   return null;
+  }
+  saveReservation(value){
+   const text=JSON.stringify(value);let saved=false;
+   try{storage('localStorage').setItem(this.reservationKey,text);saved=storage('localStorage').getItem(this.reservationKey)===text;}catch{}
+   if(!saved)try{storage('sessionStorage').setItem(this.reservationKey,text);}catch{}
+  }
+  clearReservation(){for(const store of [storage('localStorage'),storage('sessionStorage')])try{store?.removeItem(this.reservationKey);}catch{}}
+  showVerify(state,text,actions={}){
+   const box=this.querySelector('[data-verify]');box.hidden=false;box.dataset.state=state;
+   this.querySelector('[data-verify-text]').textContent=text;
+   this.verifyActions={primary:actions.primary?.action,secondary:actions.secondary?.action};
+   const first=this.querySelector('[data-verify-primary]'),second=this.querySelector('[data-verify-secondary]');
+   first.textContent=actions.primary?.label||'';first.hidden=!actions.primary;second.textContent=actions.secondary?.label||'';second.hidden=!actions.secondary;
+  }
+  hideVerify(){const box=this.querySelector('[data-verify]');if(box)box.hidden=true;this.verifyActions=null;}
+  // Sends the shopper to Cardcom's secure page after explicit consent to the server-validated amount. Nothing is
+  // charged (CreateTokenOnly); the membership exists only once the service verifies the token with Cardcom.
+  async reserve(lines,receipt){
+   const consent=this.querySelector('[data-reserve-consent]');
+   if(!consent.checked)throw failure('CONSENT_REQUIRED');
+   const form=this.querySelector('[data-join-group]');
+   const body={lines,consent:{accepted:true,amountAgorot:this.consentAmount()},...(receipt?{}:{areaPublicId:this.foundPlace?.publicId,email:form.querySelector('[name=email]').value,phone:form.querySelector('[name=phone]').value})};
+   const path=receipt?'/groups/'+receipt.publicId+'/reserve':this.group?'/groups/'+this.group.publicId+'/reserve':'/groups/reserve';
+   if(!receipt&&!this.foundPlace)throw failure('DEFAULT');
+   let result;
+   try{result=await this.api(path,body,receipt?.memberToken);}
+   catch(error){
+    // The cart is priced again by the service: show the new amount and ask for consent again.
+    if(error?.code==='PLEDGE_AMOUNT_CHANGED'&&Number.isSafeInteger(error.details?.newAmountAgorot)){this.validatedPledge=error.details.newAmountAgorot;consent.checked=false;this.pledge({validatedPledgeAgorot:this.validatedPledge});}
+    if(error?.code==='ALREADY_JOINED'&&!receipt&&await this.offerRecovery(body))return;
+    throw error;
+   }
+   let page;try{page=new URL(result.redirectUrl);}catch{throw failure('INVALID_RESPONSE');}
+   if(page.protocol!=='https:'||!CARDCOM_HOSTS.has(page.hostname)||!UUID.test(result.reservation?.id)||(!receipt&&!TOKEN.test(result.memberToken)))throw failure('INVALID_RESPONSE');
+   this.saveReservation({reservationId:result.reservation.id,memberToken:receipt?receipt.memberToken:result.memberToken,publicId:receipt?receipt.publicId:null,savedAt:Date.now()});
+   form.reset();consent.checked=false;
+   this.message.textContent=this.dataset.reserveRedirecting;
+   location.assign(page.href);
+  }
+  // After Cardcom: asks the service (which checks Cardcom server-to-server) a few times, briefly. Success saves the
+  // membership receipt; a final failure says plainly that nothing was charged; still pending offers a re-check.
+  async verifyReturn(){
+   const pending=this.readReservation();if(!pending)return;
+   if(Date.now()-pending.savedAt>3*3600000){this.clearReservation();return;}
+   this.showVerify('pending',this.dataset.reserveVerifying);
+   const returned=this.returnResult;this.returnResult=null;
+   let view=null;
+   for(let attempt=0;attempt<GroupDelivery.verifyAttempts;attempt++){
+    try{view=(await this.api('/reservations/'+pending.reservationId,returned==='failed'&&attempt===0?{returned:'failed'}:{},pending.memberToken))?.reservation;}
+    catch(error){
+     if(error?.name==='AbortError')throw error;
+     if(error?.code==='RESERVATION_NOT_FOUND'){this.clearReservation();this.reservationFailed();return;}
+     view=null;
+    }
+    if(view?.status==='CARD_RESERVED'&&UUID.test(view.groupPublicId)){
+     this.clearReservation();
+     const saved={publicId:view.groupPublicId,memberToken:pending.memberToken,savedAt:Date.now()};
+     this.receipts.set(saved.publicId,saved);this.persist(saved);
+     this.showVerify('success',this.dataset.reserveSuccess);
+     return;
+    }
+    if(RESERVATION_FINAL.has(view?.status)){this.clearReservation();this.reservationFailed();return;}
+    if(attempt<GroupDelivery.verifyAttempts-1)await new Promise(resolve=>{this.pollTimer=setTimeout(resolve,GroupDelivery.verifyInterval);});
+    if(!this.isConnected)return;
+   }
+   this.showVerify('pending',this.dataset.reservePending,{primary:{label:this.dataset.reserveCheckAgain,action:()=>{void this.perform(async()=>{await this.verifyReturn();await this.resume();});}},
+    secondary:{label:this.dataset.reserveRetry,action:()=>{void this.perform(async()=>{const p=this.readReservation();if(p)try{await this.api('/reservations/'+p.reservationId+'/cancel',{},p.memberToken);}catch{}this.clearReservation();this.reservationFailed();});}}});
+  }
+  reservationFailed(){this.showVerify('failed',this.dataset.reserveFailed,{primary:{label:this.dataset.reserveRetry,action:()=>{this.hideVerify();this.searchNew();}}});}
+  // Explicit consent to a pending higher pledge (the approved amount kept counting until now).
+  async confirmPledge(){
+   const id=this.group?.publicId,receipt=this.receiptFor(id),member=this.currentMember();
+   if(!receipt||member?.payment?.status!=='CONSENT_REQUIRED')return;
+   if(!this.querySelector('[data-consent-change-check]').checked)throw failure('CONSENT_REQUIRED');
+   try{
+    const result=await this.withReceipt(id,()=>this.api('/groups/'+id+'/confirm-pledge',{confirm:true,amountAgorot:member.payment.pendingAmountAgorot},receipt.memberToken));
+    this.show(result.group);this.pledge(result);
+    await this.loadMember(id);this.message.textContent=this.dataset.consentConfirmed;
+   }catch(error){
+    // Re-priced meanwhile: the new amount is shown and needs a new tick.
+    if(error?.code==='PLEDGE_AMOUNT_CHANGED')await this.loadMember(id);
+    throw error;
+   }finally{this.controls();}
+  }
   async perform(action,trigger){
    if(this.busy)return;const lifecycle=this.lifecycle,focus=document.activeElement;this.busy=true;const loading=trigger||(focus?.matches('button')&&this.contains(focus)?focus:null);loading?.setAttribute('aria-busy','true');this.setAttribute('aria-busy','true');this.querySelectorAll('form').forEach(form=>form.inert=true);this.message.textContent='';
    try{await action();}catch(error){if(this.lifecycle===lifecycle&&this.isConnected&&error.name!=='AbortError')this.message.textContent=this.errorMessage(error);}
@@ -257,8 +372,16 @@
    this.querySelector('[data-pledge-label]').textContent=joined?this.dataset.pledgeLabel:this.dataset.estimate;
    this.querySelector('[data-share]').disabled=!this.group;
    const button=this.querySelector('[data-join-button]');
-   button.textContent=joined?(this.restored?this.dataset.updateRestored:this.cartDiffers()?this.dataset.updateCurrent:this.dataset.updateLabel):this.pending?this.dataset.startLabel:this.dataset.joinLabel;
-   button.disabled=this.pending?!this.foundPlace:!this.group||!['OPEN','THRESHOLD_REACHED'].includes(this.group.status);
+   // Card groups: a new membership (or a withdrawn member's renewal) goes through the consent block and Cardcom.
+   const reserving=this.reserving(joined);
+   const reserve=this.querySelector('[data-reserve]'),consent=this.querySelector('[data-reserve-consent]');
+   reserve.hidden=!reserving;
+   const amount=this.consentAmount();
+   if(reserving)this.querySelector('[data-reserve-total]').textContent=amount!==null?this.dataset.reserveAmount.replace('__AMOUNT__',this.currency.format(amount/100)):'';
+   else consent.checked=false;
+   this.querySelector('[data-notice]').textContent=this.cardMode()?this.dataset.noticeCard:this.noticeText;
+   button.textContent=reserving?this.dataset.reserveButton:joined?(this.restored?this.dataset.updateRestored:this.cartDiffers()?this.dataset.updateCurrent:this.dataset.updateLabel):this.pending?this.dataset.startLabel:this.dataset.joinLabel;
+   button.disabled=(this.pending?!this.foundPlace:!this.group||!['OPEN','THRESHOLD_REACHED'].includes(this.group.status))||(reserving&&(!consent.checked||amount===null));
    this.renderMember(joined,button);
   }
   // Returning device. Only membership receipts are durable (one per joined group); an area, a search result or a
@@ -349,13 +472,13 @@
    if(!this.origin||!this.receipts)return;
    if(this.busy){this.resyncQueued=true;return;}
    const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog.open)dialog.close();
-   this.closeReview(false);this.closeAreas();this.hideOtp();
+   this.closeReview(false);this.closeAreas();this.hideOtp();this.hideVerify();
    this.loadReceipts();this.member=null;this.restored=false;this.foundPlace=null;this.group=null;this.pending=false;
    this.clearArea();this.areaInput.value='';
    const panel=this.querySelector('[data-group-panel]');panel.hidden=true;panel.removeAttribute('data-group-pending');
    this.querySelector('[data-validated-pledge]').hidden=true;this.clearResume();this.message.textContent='';
    this.controls();
-   void this.perform(async()=>{await Promise.allSettled([this.cart()]);await this.resume();});
+   void this.perform(async()=>{await Promise.allSettled([this.cart()]);await this.verifyReturn();await this.resume();});
   }
   // The member read for this browser's receipt, or null. Temporary failures keep the page and the receipt as they are;
   // only the definitive receipt rejections (via withReceipt) remove it. strict callers get every error.
@@ -398,7 +521,33 @@
    if(!recovering&&this.reviewMode==='restore')this.closeReview(false);
    // An empty cart never offers the update action in an open group: it must never read as a withdrawal.
    button.hidden=empty&&open;
-   this.querySelector('[data-withdraw]').hidden=!(pledged&&open);
+   const payment=member?.payment||null,withdraw=this.querySelector('[data-withdraw]');
+   // A card member whose charge started (or happened) has no self-service cancellation.
+   withdraw.hidden=!(pledged&&open&&(!payment||['CARD_RESERVED','CONSENT_REQUIRED'].includes(payment.status)));
+   withdraw.textContent=payment?this.dataset.cancelJoin:this.withdrawLabel;
+   this.querySelector('[data-withdraw-text]').textContent=payment?this.dataset.cancelText:this.withdrawText;
+   const line=this.querySelector('[data-member-payment]'),text={CARD_RESERVED:this.dataset.paymentReserved,CONSENT_REQUIRED:this.dataset.paymentReserved,CHARGE_PENDING:this.dataset.paymentChargePending,CHARGED:this.dataset.paymentCharged,PAYMENT_FAILED:this.dataset.paymentFailed}[payment?.status]||'';
+   line.textContent=pledged?text:'';line.hidden=!pledged||!text;
+   // Pending higher amount: shown with its own consent; the approved pledge keeps counting until then.
+   const change=this.querySelector('[data-consent-change]');
+   const waiting=pledged&&open&&payment?.status==='CONSENT_REQUIRED'&&Number.isSafeInteger(payment.pendingAmountAgorot);
+   if(waiting){
+    const label=this.dataset.consentChanged.replace('__OLD__',this.currency.format(payment.approvedAmountAgorot/100)).replace('__NEW__',this.currency.format(payment.pendingAmountAgorot/100));
+    const title=this.querySelector('[data-consent-change-text]');if(title.textContent!==label){title.textContent=label;this.querySelector('[data-consent-change-check]').checked=false;}
+   }else this.querySelector('[data-consent-change-check]').checked=false;
+   change.hidden=!waiting;
+   this.querySelector('[data-consent-change-confirm]').disabled=!waiting||!this.querySelector('[data-consent-change-check]').checked;
+  }
+  // The amount the shopper consents to: the service-validated pledge from the search, otherwise (renewing from the
+  // group panel) the Shopify cart total; the service re-prices it and asks again (PLEDGE_AMOUNT_CHANGED) if it differs.
+  consentAmount(){return Number.isSafeInteger(this.validatedPledge)&&this.validatedPledge>0?this.validatedPledge:Number.isSafeInteger(this.cartTotal)&&this.cartTotal>0?this.cartTotal:null;}
+  // Card mode of the group being joined: a shown group says so itself; a not-yet-created one follows the search.
+  cardMode(){return this.group?this.group.cardReservation===true:this.pending&&this.findCard===true;}
+  // A new card membership, or the renewal of a withdrawn card member, needs consent + Cardcom now.
+  reserving(joined){
+   if(!this.cardMode())return false;
+   if(!joined)return true;
+   const member=this.currentMember();return member?.status==='WITHDRAWN';
   }
   // Fresh member read (Shopify re-checked now), listed before anything changes. 'restore' explains every change and
   // offers to add only the available lines; 'pledge' lists the stored pledge.
@@ -472,11 +621,12 @@
    let result;
    try{result=await this.withReceipt(id,()=>this.api('/groups/'+id+'/withdraw',{confirm:true},receipt.memberToken));}
    finally{dialog.close();}
+   const card=!!this.currentMember()?.payment;
    this.show(result.group);
-   this.member={publicId:id,status:'WITHDRAWN',pledgedTotalAgorot:0,cartCheck:'OK',cart:[]};
+   this.member={publicId:id,status:'WITHDRAWN',pledgedTotalAgorot:0,cartCheck:'OK',cart:[],payment:card?{status:'CANCELED',approvedAmountAgorot:0,pendingAmountAgorot:null}:null};
    this.restored=false;this.closeReview(false);
    this.querySelector('[data-validated-pledge]').hidden=true;
-   this.message.textContent=this.dataset.withdrawn;
+   this.message.textContent=card?this.dataset.canceledNoCharge:this.dataset.withdrawn;
    this.controls();
    this.focusAfter=this.querySelector('[data-join-button]:not([hidden])')||this.querySelector('[data-refresh]');
   }
@@ -493,7 +643,11 @@
     let data=null;
     try{data=await response.json();}catch(error){const stop=interrupted(error);if(stop)throw stop;}
     // Hosting proxies can answer without the service's JSON body; classify by status alone.
-    if(!response.ok)throw failure(typeof data?.code==='string'?data.code:response.status===429?'RATE_LIMITED':response.status>=500?'SERVICE_UNAVAILABLE':'DEFAULT');
+    if(!response.ok){
+     const error=failure(typeof data?.code==='string'?data.code:response.status===429?'RATE_LIMITED':response.status>=500?'SERVICE_UNAVAILABLE':'DEFAULT');
+     if(data?.details&&typeof data.details==='object'&&Object.values(data.details).every(Number.isSafeInteger))error.details=data.details;
+     throw error;
+    }
     if(!data||typeof data!=='object')throw failure('INVALID_RESPONSE');
     return data;
    }finally{
@@ -527,6 +681,8 @@
    const lines=await this.cart();if(!lines.length)throw failure('CART_EMPTY');
    this.foundPlace=area;
    const result=await this.api('/groups/find',{areaPublicId:area.publicId,lines});
+   this.findCard=result.cardReservationRequired===true;
+   this.validatedPledge=Number.isSafeInteger(result.validatedPledgeAgorot)?result.validatedPledgeAgorot:null;this.hideVerify();
    if(result.group){this.show(result.group);this.message.textContent=this.dataset.found;}
    else{this.showPending(area.name);this.message.textContent=this.dataset.noneFound;}
    if(result.withinStandardRadius===true)this.message.textContent=this.dataset.standard;
@@ -538,12 +694,16 @@
    // An empty cart is never a withdrawal (the service rejects it too); withdrawing has its own confirmed action.
    if(!lines.length&&receipt)throw failure('EMPTY_CART_CANNOT_UPDATE_PLEDGE');
    if(!lines.length&&!receipt)throw failure('CART_EMPTY');
+   if(this.reserving(!!receipt))return this.reserve(lines,receipt);
    if(receipt){
     const id=receipt.publicId;
     try{
      const result=await this.withReceipt(id,()=>this.api('/groups/'+id+'/update-pledge',{lines},receipt.memberToken));
-     this.show(result.group);this.pledge(result);this.message.textContent=this.dataset.updated;
+     this.show(result.group);this.pledge(result);
      this.restored=false;await this.loadMember(id);
+     // Card member, higher cart: nothing changed yet; the consent block asks for the new amount.
+     if(result.consentRequired){this.controls();this.message.textContent=this.errors.PLEDGE_AMOUNT_CHANGED||'';this.focusAfter=this.querySelector('[data-consent-change-text]');}
+     else this.message.textContent=this.dataset.updated;
     }catch(error){
      // Closed groups keep the receipt; show their current state instead of leaving a stale panel.
      if(error?.code==='GROUP_CLOSED')try{this.show((await this.api('/groups/'+id)).group);}catch{}

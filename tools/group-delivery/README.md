@@ -2,7 +2,7 @@
 
 Independent Node.js/TypeScript service in `tools/group-delivery`. Production state lives in PostgreSQL through `pg`; Shopping Assistant and Product Importer are not dependencies.
 
-This phase records nonbinding, unpaid cart intentions. Reaching the target changes OPEN to THRESHOLD_REACHED. Merchant review can change THRESHOLD_REACHED to APPROVED. Approval never creates a payment, checkout, Draft Order, shipping rate or delivery. APPROVED groups are frozen to member changes in this phase.
+This phase records nonbinding, unpaid cart intentions. Reaching the target changes OPEN to THRESHOLD_REACHED. Merchant review can change THRESHOLD_REACHED to APPROVED. Approval never creates a payment, checkout, Draft Order, shipping rate or delivery. APPROVED groups are frozen to member changes in this phase. With `CARDCOM_ENABLED=true`, new memberships require a verified Cardcom card reservation (no charge), and approving such a group charges its active members; see **Card reservation and charging (Cardcom)** below.
 
 ## Local development and Render
 
@@ -89,7 +89,7 @@ Only opaque member receipts (group public ID + random bearer token + save time) 
 - security_events (migration 006): recovery requested/sent/delivery failed/succeeded/failed/locked, with the group public id and (when matched) the internal member id only. Shown on the admin member page; never an email, phone, code, token or IP.
 - schema_migrations / schema_migration_lock and group_coordination: migration tracking and database coordination.
 
-All money arithmetic is bigint/integer agorot. Public monetary fields are integer agorot and are capped below JavaScript's safe-integer limit. Paid totals are constrained to zero in Phase 1. Zero-pledge withdrawn members do not count as participants.
+All money arithmetic is bigint/integer agorot. Public monetary fields are integer agorot and are capped below JavaScript's safe-integer limit. Paid totals stay zero for groups without cards; for Cardcom card groups they come only from confirmed charges (migration 007). Zero-pledge withdrawn members do not count as participants.
 
 Every group mutation locks a shared coordination row inside a PostgreSQL transaction. This intentionally serializes the modest MVP write workload, including joins that create a group, joins, updates and approval, across service instances. Search is read-only and takes no lock. Group state is never kept in an application Map or process-local cache.
 
@@ -231,8 +231,163 @@ Root `tests/group-delivery.browser.cjs` exercises the actual client script and s
 
 No real Shopify API is consumed by automated tests. A live Render PostgreSQL instance, multi-process network concurrency, deployment credentials and real store variants are not part of the local fixtures. Run a staging smoke test against the deployed PostgreSQL/Shopify configuration before customer launch.
 
+## Card reservation and charging (Cardcom)
+
+Off by default (`CARDCOM_ENABLED` unset or `false`): nothing above changes. With it on, a membership exists only after a verified Cardcom card reservation, and approving a group charges its active members. This is independent of the Shopify checkout's Cardcom integration, Shipfn and shipping rates, which are not touched.
+
+**Flow**
+1. After the cart is validated, the section shows "שריינו מקום במשלוח הקבוצתי", the pledge amount and a required consent checkbox; "המשך לשריון באשראי" stays disabled until it is ticked.
+2. `POST /api/v1/groups/reserve` (or `/groups/:publicId/reserve`) requires `consent:{accepted:true, amountAgorot}` equal to the server-validated pledge (otherwise 409 PLEDGE_AMOUNT_CHANGED with `details.newAmountAgorot`). It stores a `PENDING_RESERVATION` (not a member, never counted, holds no slot), calls Cardcom `LowProfile/Create` with `Operation:"CreateTokenOnly"` and `AdvancedDefinition.JValidateType:2` (J2: card check, no charge, no J5 hold), and returns the Cardcom page URL plus the browser receipt. `ReturnValue` is our random reservation id; no email, phone or token is ever sent there or put in a URL.
+3. The shopper enters the card on Cardcom's page only. Cardcom calls `POST /webhooks/cardcom/low-profile`. Only the `LowProfileId` is read from it; the service then calls `LowProfile/GetLpResult` and activates only if ResponseCode is 0, the LowProfileId and TerminalNumber are ours, Operation is CreateTokenOnly, ReturnValue is the reservation id and a token is present. Activation runs under the coordination lock in one transaction: admission rules again (group open, area, capacity, duplicate contacts), member created as `PLEDGED` / `CARD_RESERVED` with the approved amount and consent time, token sealed, group recalculated. Replays and Cardcom retries are no-ops; 503 asks Cardcom to retry when it cannot be reached.
+4. Back on the storefront (`?gd_result=success|failed`, removed from the URL), the section shows "מאמתים את שריון המקום..." and asks `POST /api/v1/reservations/:id` (bearer receipt) a few times; that read also checks Cardcom itself (at most every 2 s), so a delayed webhook never strands the shopper. Success: "המקום שלך במשלוח הקבוצתי נשמר בהצלחה…". Failure: "לא הצלחנו לשריין את המקום. כרטיס האשראי לא חויב. אפשר לנסות שוב.".
+5. Unfinished reservations expire after `CARDCOM_RESERVATION_TTL_MINUTES` (default 30); their contact and cart are erased and the same details can reserve again. A newer reservation for the same details supersedes an older pending one.
+
+**Cart changes.** A cart at or below the last approved amount replaces the pledge directly. A higher cart is stored as a pending change (`CONSENT_REQUIRED`); the member keeps counting with the approved cart and amount, and the section shows "ההתחייבות שלך השתנתה מ־X ל־Y" with its own checkbox and "אישור ההתחייבות החדשה" (`POST /api/v1/groups/:publicId/confirm-pledge` with `{confirm:true, amountAgorot}`; the pending cart is re-priced first). A database constraint guarantees that a card member's counted pledge never exceeds the approved amount.
+
+**Cancellation.** "ביטול ההצטרפות" is the existing confirmed withdrawal: WITHDRAWN, pledge 0, group recalculated, reservation `CANCELED` and sealed token deleted; repeating it changes nothing. After charging has started or happened it is refused (CHARGE_IN_PROGRESS); refunds follow the business's own process. A withdrawn card member renews through a new reservation with the same receipt.
+
+**Shopify Admin authentication.**
+- The service is a Dev Dashboard app acting on our own store, so it uses the client credentials grant: `POST https://{shop}.myshopify.com/admin/oauth/access_token` with `grant_type=client_credentials`, `client_id` and `client_secret`. There is no static Admin token; `SHOPIFY_ADMIN_ACCESS_TOKEN` is refused if set.
+- **Caching:** the access token is cached in memory only (not in PostgreSQL). It is refreshed before it expires: `expires_in` from the response, minus a tenth, at most 5 minutes early.
+- **Single flight:** concurrent requests share one token request.
+- **401:** the token is dropped, one new token is fetched and the request is retried once. A second 401 fails.
+- **Scopes:** the granted `scope` must include `write_orders`, which also grants read access to orders; no other scope is requested or needed. Otherwise authentication fails closed.
+- **Failure:** any authentication failure (rejected credentials, missing scope, token endpoint unreachable) leaves the charge rows PENDING with `SHOPIFY_AUTH_FAILED`. No order is created and nothing is charged; the next "process" continues once fixed. The startup log and failure codes name variables and kinds only, never the secret or a token.
+
+**Approval, Shopify order and charging.** Approving a card group requires Cardcom *and* the Shopify client credentials (otherwise 409 PAYMENT_UNAVAILABLE, nothing changes). In the approval transaction it creates one `group_payment_charges` row per active card member (UNIQUE per member and group) for the amount the member counts with, plus a copy of the exact approved cart; an unapproved pending change is discarded. Rows then advance in the background, and every stage is claimed in the database before its external call:
+
+1. **Shopify order** (`PENDING → ORDER_CREATING → ORDER_CREATED`):
+   - The approved cart is revalidated with Shopify first (availability, quantity rules, currency).
+   - `orderCreate` then creates an unpaid order: `financialStatus: PENDING`, the approved unit prices in `priceSet`, `taxesIncluded: true`.
+   - **No customer data:** no email, phone, name, shipping or billing address. The store is on Shopify Basic, which has no Level 2 protected customer data access, and the app needs only `write_orders`. Member contacts stay in the Group Delivery database (admin pages and exports) and are never put into the order's note, tags or attributes.
+   - It carries tags `group-delivery`, `group:<publicId>` and `gd-charge-<ref>`, a note and custom attributes with the group and area, and `sourceIdentifier` = our reference.
+   - Options: `inventoryBehaviour: DECREMENT_OBEYING_POLICY` (an item that can no longer be sold fails the order) and no Shopify customer emails.
+   - No shipping line: Group Delivery defines no shipping price and collects no address.
+   - The order total must equal the approved amount, otherwise `ORDER_FAILED/ORDER_TOTAL_MISMATCH`: the order is kept unpaid and not charged.
+2. **Cardcom charge** (`ORDER_CREATED → IN_FLIGHT → SUCCEEDED | FAILED | UNKNOWN`). It runs only for a row that has its Shopify order (database constraint) and is sent once, with:
+   - `Token`;
+   - `CardExpirationMMYY` built from the stored CardMonth/CardYear;
+   - `ExternalUniqTranId` = the charge reference (`G` + 24 hex digits = 25 characters, derived from the charge id, UNIQUE, never regenerated);
+   - `ExternalUniqUniqTranIdResponse: true`;
+   - no CVV.
+
+   Expired cards or tokens are not sent.
+3. **Payment record in Shopify** (after SUCCEEDED; `shopify_payment_state NOT_STARTED → SYNCED | SYNC_REQUIRED`):
+   - `orderCreateManualPayment` (payment method "Cardcom (Group Delivery)", processedAt = charge time) records the full outstanding amount, so the order shows Paid. It is not routed through the storefront's Cardcom checkout provider.
+   - Then `tagsAdd` adds `cardcom-tx-<transaction id>`.
+   - It first reads the order and skips the payment record when it is already PAID with nothing outstanding, so repeating it never pays twice.
+   - It is SYNCED only after re-reading `displayFinancialStatus = PAID` and `totalOutstandingSet = 0`; otherwise SYNC_REQUIRED.
+
+Failure handling:
+- **Shopify order rejected** (userErrors, unavailable cart): `ORDER_FAILED`, member `PAYMENT_FAILED`, never charged.
+- **Shopify not executed** (HTTP 429 / top-level GraphQL error): back to `PENDING`, retried by the next "process".
+- **Shopify answer lost / timeout / 5xx:** `ORDER_UNKNOWN`, never re-created blindly.
+- **Cardcom declined** (or an expired card/token, not sent):
+  - `FAILED`, member `PAYMENT_FAILED`, no automatic resend.
+  - The unpaid order is canceled with `orderCancel(reason: DECLINED, restock: true, notifyCustomer: false)`, with no refund because nothing was paid (migration 009).
+  - States: `ORDER_CANCEL_REQUIRED` (set together with FAILED), then `ORDER_CANCEL_REQUESTED` (Shopify cancels asynchronously), then `ORDER_CANCELED`.
+  - `inventory_released_at` is set only once Shopify reports `cancelledAt`.
+  - A failed cancellation keeps `ORDER_CANCEL_REQUIRED`, and the Cardcom state is unchanged.
+  - "process" and reconciliation retry only the cancellation: they read the order first and never send `orderCancel` again while an accepted request is running (up to 10 minutes).
+  - Never for UNKNOWN or SUCCEEDED rows (database constraint).
+- **Cardcom answer lost:** `UNKNOWN`, never inferred as failed and never re-sent.
+- **Cardcom succeeded but the Shopify payment record failed:** member `CHARGED` (money moved), row keeps the Cardcom transaction id, Shopify order id and reference, `SYNC_REQUIRED`.
+- **Restart:** rows left `ORDER_CREATING` or `IN_FLIGHT` for 2+ minutes become `ORDER_UNKNOWN` or `UNKNOWN`.
+
+The group's `payment_state` is CHARGING while rows are open, PAID when every row is SUCCEEDED and SYNCED, and PAYMENT_REVIEW_REQUIRED otherwise. Admin actions:
+- **"המשך חיובים שטרם נשלחו":** continues only PENDING, ORDER_CREATED and unsynced SUCCEEDED rows.
+- **"בדיקה מול קארדקום ושופיפיי (ללא חיוב)":** never creates an order and never charges.
+  - ORDER_UNKNOWN: finds the order by its `gd-charge-<ref>` tag. Found becomes ORDER_CREATED; not found 10+ minutes after the attempt becomes PENDING.
+  - UNKNOWN: `GetTransactionByExternalUniqTran`. Only a confirmed success counts.
+  - SYNC_REQUIRED: retries only the Shopify payment record.
+
+The members table shows each member's stage (כרטיס שמור, הזמנה נוצרה בשופיפיי, בחיוב, שולם, החיוב נכשל – ההזמנה לא שולמה, חויב בקארדקום – נדרש עדכון בשופיפיי, …) with the Shopify order name. Retrying failed members and refunds are not implemented.
+
+**Data (migrations 007 and 008).**
+- `delivery_groups.payment_mode`: NONE (all existing groups, backfilled) or CARDCOM (created while Cardcom is required).
+- `delivery_groups.payment_state`.
+- `paid_total_agorot`: may now be positive, for CARDCOM groups only.
+- `group_members`: `payment_status`, `approved_amount_agorot`, `consent_at`, and `pending_cart_snapshot` / `pending_amount_agorot`.
+- `group_payment_reservations`: our id (= ReturnValue), status, target area/group/member, pending contact and cart (erased once final), receipt hash, approved amount, consent time and version, LowProfileId, sealed token (only the token is sealed), token expiry (TokenExDate), `card_exp_month` / `card_exp_year` (008, normalized), last 4 digits and brand (usually absent), a safe failure code, Cardcom's numeric response code, and timestamps.
+- `group_payment_charges`:
+  - our id;
+  - `external_uniq_tran_id` (008): ≤ 25 characters, UNIQUE, CHECKed as derived from the id;
+  - amount and `order_lines` (the approved cart);
+  - status (see above), attempts;
+  - `shopify_order_id` (UNIQUE), `shopify_order_name`, `shopify_order_created_at`;
+  - `shopify_payment_state`, `shopify_synced_at`;
+  - Cardcom transaction id, response code, failure code, and timestamps.
+
+  A CHECK forbids every Cardcom stage without a Shopify order id.
+- Migration 007 was left unchanged (it may already be applied to a local or staging database); 008 is additive.
+
+**Compatibility.** While Cardcom is required, groups created without cards accept no new members (their members still update, withdraw and get approved as before) and `POST /groups/join` / `/groups/:id/join` answer 409 CARD_RESERVATION_REQUIRED. Public responses of groups without cards are unchanged; card groups add `cardReservation:true`, `find` adds `cardReservationRequired:true`, and the member read adds `payment`. Roll out in this order: deploy the service (flag off), then the theme, then configure the variables and enable the flag.
+
+**Security.**
+- Card numbers, CVV and expiry are entered only on Cardcom's page. Public APIs refuse card-like fields or Luhn-valid card numbers (400 CARD_DATA_NOT_ACCEPTED).
+- The token is never returned, logged, put in a URL or shown. It is stored only AES-256-GCM sealed, bound to its reservation row, with `GROUP_DELIVERY_PAYMENT_ENCRYPTION_KEY`; there is no fallback key.
+- Cardcom credentials stay in the environment only (never in the database or theme). Log lines are fixed sentences with an error kind.
+
+| Variable | Purpose |
+| --- | --- |
+| CARDCOM_ENABLED | `true` to require card reservations; default off |
+| CARDCOM_TERMINAL_NUMBER | Cardcom terminal number (use a sandbox/test terminal until a live test is approved) |
+| CARDCOM_API_NAME | Cardcom API name; server only |
+| GROUP_DELIVERY_PAYMENT_ENCRYPTION_KEY | 32 bytes (64 hex or base64); seals tokens; required, no fallback |
+| CARDCOM_SUCCESS_URL | Storefront page with the Group Delivery section; origin must be in STOREFRONT_ORIGINS |
+| CARDCOM_ERROR_URL | Optional; defaults to CARDCOM_SUCCESS_URL |
+| CARDCOM_WEBHOOK_URL | Optional; must equal APP_ORIGIN + `/webhooks/cardcom/low-profile` |
+| CARDCOM_RESERVATION_TTL_MINUTES | 10-120, default 30 |
+| SHOPIFY_CLIENT_ID | Client ID of the Dev Dashboard app (same organization as the store), installed with `write_orders`; required to approve and charge card groups |
+| SHOPIFY_CLIENT_SECRET | That app's client secret; server only (never in the browser, logs, errors or git) |
+| SHOPIFY_ADMIN_API_VERSION | Default 2026-10 |
+| SHOPIFY_ORDERS_TEST | `true` creates Shopify test orders (staging); default false |
+
+With CARDCOM_ENABLED=true and anything missing or invalid, the startup log names the variables and card reservations fail closed: new joins still require a card, the reservation endpoints answer 503 PAYMENT_UNAVAILABLE and card groups cannot be approved. The rest of the service runs normally. Cardcom's JSON API v11 needs only the terminal number and API name for these operations; the API password is needed only for refunds, which are not implemented.
+
+### Cardcom facts checked, and points still to verify
+
+These were checked against the v11 OpenAPI (`https://secure.cardcom.solutions/swagger/v11/swagger.json`) and the Cardcom developer KB (`https://kb.cardcom.solutions/apijosn/en`).
+
+**Settled:**
+- **J2 / J5 result codes** (KB "Preventing Duplicate Transactions When Charging Tokens"): charge = 0, J2 verification = 701, J5 authorization = 700. The OpenAPI's own wording ("700 and 701 success for J2 and J5") is ambiguous, so we follow the KB.
+  - A reservation activates only for Operation CreateTokenOnly with ResponseCode 0 or 701. If TranzactionInfo is present, its ResponseCode must be 0 or 701 and JParameter 2.
+  - 700 or JParameter 5 gives `J5_NOT_ALLOWED`; another JParameter (e.g. 0 = a regular charge) gives `NOT_J2`. Neither ever activates.
+- **ExternalUniqTranId:** "a string of up to 25 characters" (same KB article). Ours are exactly 25.
+- **ExternalUniqUniqTranIdResponse: true** (KB "Do Transaction"): a repeat is not charged and the original response is returned.
+- **CVV** (KB "Do Transaction"): CVV2 "works only with a card number, not with a token". CVV is never asked for, sent with a token or stored.
+
+**Still to verify** (isolated in `src/cardcom.ts`, marked VERIFY):
+1. **Production blocker — Tokens module and terminal setup:** the terminal must be configured with the card companies to operate without CVV for token charges, and the Tokens model must be active on our terminal.
+2. The webhook body format. Only `LowProfileId` is read, so it does not matter.
+3. `Operation` as the string `CreateTokenOnly` or its index 2. Both are accepted.
+4. Which top-level GetLpResult codes Cardcom uses for a completed J2 page (0 and 701 are accepted).
+5. What the cardholder sees for the required `Amount` on a CreateTokenOnly page.
+6. The exact "not found" answer of GetTransactionByExternalUniqTran. Only ResponseCode 0 with a transaction id counts as found.
+7. TokenInfo.CardYear is documented as an integer "card expiration year"; both 4-digit and 2-digit values are normalized explicitly, and anything else is refused.
+8. The hosted page host `secure.cardcom.solutions`.
+
+### Shopify points to verify
+1. Prices are VAT-inclusive (`taxesIncluded: true`). If Shopify computes a different total on the live store, the row stops at `ORDER_TOTAL_MISMATCH` (unpaid, not charged).
+2. Reconciliation of a lost `orderCreate` answer relies on the order search index (tag query). A row is only sent back to PENDING 10+ minutes after the attempt.
+3. Inventory is claimed at order creation (`DECREMENT_OBEYING_POLICY`), before the charge, and released by `orderCancel(restock: true)` after a definitive failure. A row stuck in ORDER_CANCEL_REQUIRED keeps the stock held until reconciliation succeeds.
+4. Shopify sends no order emails for these orders (`sendReceipt: false`); the store decides how customers are notified.
+
+### Manual sandbox test (no live terminal without explicit approval)
+
+1. Ask Cardcom support for a sandbox/test terminal and API name. Set them, a fresh encryption key, CARDCOM_SUCCESS_URL (a development theme's group-delivery page) and CARDCOM_ENABLED=true on a staging service with its own database.
+2. Reserve with a Cardcom test card. Check that the webhook arrives, the member is `CARD_RESERVED`, and the Cardcom report shows a J2 validation with no charge.
+3. Decline with a test card that Cardcom documents as declined, close the page, and wait 30 minutes. In each case: no member, no charge.
+4. Raise the cart, check the consent prompt, then cancel and check that the token row is CANCELED.
+5. With a Dev Dashboard app installed on the development store (scope `write_orders`; SHOPIFY_CLIENT_ID / SHOPIFY_CLIENT_SECRET) and SHOPIFY_ORDERS_TEST=true, reach the threshold and approve. Check:
+   - one unpaid Shopify test order per member first, then one Cardcom transaction per member with our 25-character reference as ExternalUniqTranId;
+   - each order then shows Paid with the `cardcom-tx-` tag;
+   - double-clicking approve creates no second order or transaction.
+6. Make a test card decline the charge and check that the order stays unpaid and the group shows PAYMENT_REVIEW_REQUIRED.
+7. Temporarily break the client secret after a charge to force SYNC_REQUIRED, restore it, and check that reconciliation marks the order Paid without a second transaction.
+
 ## Phase 2 integration points - intentionally not implemented
 
-Add a new migration to support paid totals/payment member states and an explicit state machine beyond APPROVED. Before opening payment, revalidate stock, prices, currency, customer consent and the exact intended cart (including customizations/discount rules supported then). Bind each approved pledge revision to an idempotent Draft Order/payment record. Use verified Shopify webhooks and deduplicated payment events to update paid_total_agorot; do not treat pledge totals as paid totals. Scheduling/delivery confirmation and checkout links require separate, merchant-approved transitions.
+Not implemented yet: retrying failed charges, refunds and order cancellation from this service, and Shopify customer notifications.
 
-No Shopify Admin calls, Draft Orders, payment links, checkout changes, shipping-rate changes, automatic charges or delivery creation exist in this phase.
+No Draft Orders, payment links, checkout changes, shipping-rate changes or delivery creation exist. Shopify Admin calls are limited to the order mutations above, and happen only for Cardcom card groups after admin approval.

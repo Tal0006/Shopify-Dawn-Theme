@@ -111,13 +111,53 @@ export function dashboardPage(data:{metrics:any;list:any;areas:any[];csrf:string
   '</section>',{csrf:data.csrf,active:'dashboard'});
 }
 
+// Card payments (migration 007). Labels only; tokens and Cardcom ids are never stored in a form that could be shown.
+export const PAYMENT_LABELS:Record<string,string>={CARD_RESERVED:'כרטיס שמור',CONSENT_REQUIRED:'ממתין לאישור סכום חדש',CHARGE_PENDING:'חיוב בתהליך',CHARGED:'חויב',PAYMENT_FAILED:'החיוב נכשל',CANCELED:'השריון בוטל'};
+export const PAYMENT_STATE_LABELS:Record<string,string>={CHARGING:'חיובים בתהליך',PAID:'כל החיובים הצליחו',PAYMENT_REVIEW_REQUIRED:'נדרשת בדיקת חיובים'};
+const paymentChip=(status:string|null|undefined)=>status?' <span class="chip chip--pay-'+escape(status.toLowerCase())+'">'+escape(PAYMENT_LABELS[status]||status)+'</span>':'';
+// Per-member stage after approval: Shopify order first, then the Cardcom charge, then the payment record in Shopify.
+export const CHARGE_LABELS:Record<string,string>={PENDING:'ממתין להזמנה ולחיוב',ORDER_CREATING:'יוצר הזמנה בשופיפיי',ORDER_UNKNOWN:'הזמנה לא ודאית – נדרשת בדיקה',
+ ORDER_FAILED:'יצירת ההזמנה נכשלה – לא חויב',ORDER_CREATED:'הזמנה נוצרה בשופיפיי',IN_FLIGHT:'בחיוב',FAILED:'החיוב נכשל – ההזמנה לא שולמה',
+ UNKNOWN:'תוצאת החיוב לא ודאית – נדרשת בדיקה',PAID:'שולם',FAILED_CANCELED:'החיוב נכשל – ההזמנה בוטלה והמלאי שוחרר',MISMATCH_CANCELED:'סכום ההזמנה שגוי – לא חויב, ההזמנה בוטלה והמלאי שוחרר',MISMATCH_CANCEL_REQUIRED:'סכום ההזמנה שגוי – לא חויב, נדרש ביטול ההזמנה בשופיפיי',FAILED_CANCEL_REQUIRED:'החיוב נכשל – נדרש ביטול ההזמנה בשופיפיי',SYNC_REQUIRED:'חויב בקארדקום – נדרש עדכון בשופיפיי'};
+const chargeKind=(c:any)=>c.status==='SUCCEEDED'?(c.shopifyPaymentState==='SYNCED'?'PAID':'SYNC_REQUIRED'):c.shopifyCancelState&&(c.status==='FAILED'||c.status==='ORDER_FAILED')?(c.status==='FAILED'?'FAILED':'MISMATCH')+(c.shopifyCancelState==='ORDER_CANCELED'?'_CANCELED':'_CANCEL_REQUIRED'):c.status;
+const chargeTone:Record<string,string>={PAID:'charged',FAILED_CANCELED:'canceled',FAILED_CANCEL_REQUIRED:'payment_failed',MISMATCH_CANCELED:'canceled',MISMATCH_CANCEL_REQUIRED:'payment_failed',SYNC_REQUIRED:'payment_failed',FAILED:'payment_failed',ORDER_FAILED:'payment_failed',UNKNOWN:'payment_failed',ORDER_UNKNOWN:'payment_failed'};
+const chargeChip=(c:any)=>{const kind=chargeKind(c);return ' <span class="chip chip--pay-'+escape(chargeTone[kind]||'charge_pending')+'">'+escape(CHARGE_LABELS[kind]||kind)+'</span>'+
+ (c.shopifyOrderName?' <span class="tag" dir="ltr">'+escape(c.shopifyOrderName)+'</span>':'');};
+// Charges card for a group with card reservations: before approval it explains what approval does; after approval it
+// shows counts and sums per outcome, and the two idempotent actions (send charges not started; ask Cardcom about
+// UNKNOWN ones). Retrying failed members is intentionally not offered yet.
+function chargesCard(g:any,csrf:string){
+ if(g.paymentMode!=='CARDCOM')return '';
+ const base='/admin/groups/'+g.publicId,c=g.charges;
+ const shopify='<p class="muted">לכל משתתף נוצרת הזמנה בשופיפיי (לא משולמת) לפני החיוב בקארדקום. ההזמנה מסומנת כשולמה רק אחרי שהחיוב הצליח. אם יצירת ההזמנה נכשלת, המשתתף אינו מחויב.</p>';
+ if(g.status!=='APPROVED'||!c||!c.members)return '<section class="card" aria-labelledby="charges-title"><div class="section-head"><h2 id="charges-title">תשלום בכרטיסי אשראי</h2></div>'+
+  '<p>ההצטרפות לקבוצה הזאת דורשת שריון כרטיס אשראי בקארדקום (ללא חיוב). רק משתתפים עם כרטיס שמור ואישור לסכום נספרים ביעד.</p>'+
+  (g.status==='APPROVED'?'<p class="muted">לא נוצרו חיובים לקבוצה הזאת.</p>':'<p class="muted">אישור הקבוצה יפעיל חיוב חד־פעמי של כל משתתף פעיל בסכום שאישר במפורש. משתתף שסכומו השתנה ולא אושר יחויב בסכום שאישר קודם.</p>')+
+  (g.paymentsAvailable?'':'<p class="notice notice--error" role="alert">חיוב בכרטיסי אשראי אינו זמין כרגע (הגדרות קארדקום חסרות). לא ניתן לאשר את הקבוצה.</p>')+shopify+'</section>';
+ const fact=(label:string,value:string)=>'<div><dt>'+escape(label)+'</dt><dd>'+value+'</dd></div>';
+ const actions=(c.pending?'<form method="post" action="'+escape(base+'/charges/process')+'"><input type="hidden" name="csrf" value="'+escape(csrf)+'"><button class="btn btn--quiet" data-once>המשך חיובים שטרם נשלחו</button></form>':'')+
+  (c.unknown||c.orderUnknown||c.syncRequired||c.cancelRequired?'<form method="post" action="'+escape(base+'/charges/reconcile')+'"><input type="hidden" name="csrf" value="'+escape(csrf)+'"><button class="btn btn--quiet" data-once>בדיקה מול קארדקום ושופיפיי (ללא חיוב)</button></form>':'');
+ return '<section class="card" aria-labelledby="charges-title"><div class="section-head"><h2 id="charges-title">חיובים</h2>'+
+   (c.state?'<span class="chip chip--paystate-'+escape(String(c.state).toLowerCase())+'">'+escape(PAYMENT_STATE_LABELS[c.state]||c.state)+'</span>':'')+'</div>'+
+  '<dl class="facts">'+fact('משתתפים לחיוב',String(c.members))+fact('חיובים שהצליחו',c.succeeded+' · '+escape(money(c.paidAgorot)))+fact('חיובים שנכשלו',c.failed+' · '+escape(money(c.failedAgorot)))+
+   fact('תוצאה לא ודאית',c.unknown+' · '+escape(money(c.unknownAgorot)))+fact('בתהליך',c.pending+' · '+escape(money(c.pendingAgorot)))+fact('סך הכול שולם',escape(money(g.paidTotalAgorot)))+
+   fact('הזמנות שופיפיי שנוצרו',String(c.ordersCreated))+fact('יצירת הזמנה נכשלה (לא חויבו)',String(c.orderFailed))+fact('הזמנה לא ודאית',String(c.orderUnknown))+fact('נדרש עדכון תשלום בשופיפיי',String(c.syncRequired))+fact('הזמנות שבוטלו (מלאי שוחרר)',String(c.ordersCanceled))+fact('נדרש ביטול הזמנה',String(c.cancelRequired))+'</dl>'+
+  (c.cancelRequired?'<p class="notice notice--error" role="alert">יש הזמנות של חיובים שנכשלו שעדיין לא בוטלו בשופיפיי, והמלאי שלהן תפוס. הבדיקה מול קארדקום ושופיפיי תנסה לבטל אותן בלבד, בלי חיוב ובלי הזמנה חדשה.</p>':'')+
+  (c.syncRequired?'<p class="notice notice--error" role="alert">יש משתתפים שחויבו בקארדקום אך ההזמנה שלהם בשופיפיי עדיין לא מסומנת כשולמה. הבדיקה מול קארדקום ושופיפיי תנסה לעדכן רק את שופיפיי, בלי חיוב נוסף.</p>':'')+
+  (c.orderUnknown?'<p class="notice notice--error" role="alert">יש הזמנות שתוצאת יצירתן לא ידועה. הן לא ייווצרו שוב ולא יחויבו לפני בדיקה.</p>':'')+
+  (c.unknown?'<p class="notice notice--error" role="alert">יש חיובים שתוצאתם לא ידועה (למשל ניתוק תקשורת). הם לא יישלחו שוב אוטומטית. יש לבדוק אותם מול קארדקום לפני כל פעולה נוספת.</p>':'')+
+  (c.failed?'<p class="muted">חיובים שנכשלו לא נשלחים שוב. ניסיון חוזר ללקוחות שנכשלו עדיין אינו זמין במסך זה; יש ליצור קשר עם הלקוחות.</p>':'')+
+  (actions?'<div class="actions">'+actions+'</div>':'')+shopify+'</section>';
+}
 const NOTICES:Record<string,string>={approved:'הקבוצה אושרה. אישור אינו פותח תשלום ואינו שולח הודעות ללקוחות.',area_saved:'האזור נשמר.',
+ approved_card:'הקבוצה אושרה והחיובים בכרטיסי האשראי התחילו. ניתן לרענן את העמוד כדי לראות את התוצאות.',charges_processed:'שליחת החיובים שטרם נשלחו הופעלה.',charges_reconciled:'הבדיקה מול קארדקום ושופיפיי הושלמה. לא בוצע חיוב.',
  member_withdrawn:'הלקוח הוסר מהמשלוח הקבוצתי.',operational_updated:'סטטוס המשלוח עודכן.',operational_unchanged:'סטטוס המשלוח כבר מעודכן. לא בוצע שינוי.',
  delivery_completed:'המשלוח הושלם ונשמר בהיסטוריה. הקבוצה סגורה להצטרפות ולשינויים.',member_already_withdrawn:'הלקוח כבר הוסר מהקבוצה קודם לכן. לא בוצע שינוי.'};
 const ERRORS:Record<string,string>={confirm:'יש לסמן את תיבת האישור לפני אישור הקבוצה.',APPROVAL_NOT_ALLOWED:'ניתן לאשר רק קבוצה פעילה שהגיעה ליעד.',
  GROUP_CLOSED:'לא ניתן להסיר לקוח מקבוצה שאינה פעילה. לא בוצע שינוי.',WITHDRAW_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להסרת הלקוח. לא בוצע שינוי.',
  INVALID_OPERATIONAL_STATUS:'סטטוס המשלוח אינו תקין. לא בוצע שינוי.',OPERATIONAL_TRANSITION_NOT_ALLOWED:'מעבר הסטטוס הזה אינו אפשרי. לא בוצע שינוי.',
- COMPLETION_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להשלמת המשלוח. לא בוצע שינוי.'};
+ COMPLETION_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להשלמת המשלוח. לא בוצע שינוי.',
+ PAYMENT_UNAVAILABLE:'חיוב בכרטיסי אשראי אינו זמין כרגע. לא בוצע שינוי.',CHARGE_IN_PROGRESS:'החיוב של הלקוח כבר התחיל או בוצע, ולכן לא ניתן להסיר אותו כאן. לא בוצע שינוי.'};
 // Withdrawn members are labelled by who withdrew them (migration 004 backfills older rows as MEMBER).
 const WITHDRAWN_BY:Record<string,string>={ADMIN:'הוסר על ידי מנהל',MEMBER:'פרש מהקבוצה'};
 // Customer recovery events (security_events). Codes, tokens and contact details are never stored, so none are shown.
@@ -177,7 +217,7 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
   return '<tr data-href="'+escape(base+'/members/'+m.id)+'"'+(m.status==='WITHDRAWN'?' class="row--withdrawn"':'')+'>'+
    '<td data-label="אימייל"><a class="row-link" href="'+escape(base+'/members/'+m.id)+'" dir="ltr">'+escape(m.email)+'</a></td>'+
    '<td data-label="טלפון"><span dir="ltr">'+escape(m.phone)+'</span></td>'+
-   '<td data-label="סטטוס">'+memberChip(m)+'</td>'+
+   '<td data-label="סטטוס">'+memberChip(m)+(m.charge?chargeChip(m.charge):paymentChip(m.paymentStatus))+'</td>'+
    '<td data-label="התחייבות" class="num">'+escape(money(m.pledgedTotalAgorot))+'</td>'+
    '<td data-label="שורות בסל" class="num">'+m.cartLines+'</td>'+
    '<td data-label="הצטרפות">'+time(m.createdAt)+'</td><td data-label="עדכון אחרון">'+time(m.updatedAt)+'</td>'+
@@ -189,11 +229,14 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
  }).join('');
  const filter=(value:string,label:string)=>'<a class="segmented__item" href="'+escape(query(base,{memberStatus:value||undefined}))+'"'+(data.memberStatus===value?' aria-current="true"':'')+'>'+escape(label)+'</a>';
  const approve=g.status==='THRESHOLD_REACHED'&&g.operationalStatus!=='COMPLETED'?'<form method="post" action="'+escape(base+'/approve')+'" class="approve card card--inset"><input type="hidden" name="csrf" value="'+escape(data.csrf)+'">'+
-  '<h2>אישור הקבוצה</h2><p class="muted">אישור מסמן שהקבוצה הגיעה ליעד ונבדקה. הוא אינו פותח תשלום, אינו שולח הודעות ואינו ניתן לביטול מכאן.</p>'+
-  '<label class="check"><input type="checkbox" name="confirm" value="yes" required> בדקתי את הקבוצה ואני מאשר/ת אותה</label><button class="btn btn--primary">אישור הקבוצה</button></form>':'';
+  (g.paymentMode==='CARDCOM'
+   ?'<h2>אישור הקבוצה וחיוב המשתתפים</h2><p class="muted">אישור הקבוצה יחייב מיד את כרטיסי האשראי של '+g.activeMembers+' המשתתפים הפעילים, כל אחד בסכום שאישר במפורש (סך הכול עד '+escape(money(g.pledgedTotalAgorot))+'). כל משתתף מחויב פעם אחת בלבד, גם בלחיצה כפולה. הפעולה אינה ניתנת לביטול מכאן.</p>'+
+    '<label class="check"><input type="checkbox" name="confirm" value="yes" required> בדקתי את הקבוצה ואני מאשר/ת אותה ואת חיוב המשתתפים</label><button class="btn btn--primary" data-once'+(g.paymentsAvailable?'':' disabled')+'>אישור הקבוצה וחיוב</button></form>'
+   :'<h2>אישור הקבוצה</h2><p class="muted">אישור מסמן שהקבוצה הגיעה ליעד ונבדקה. הוא אינו פותח תשלום, אינו שולח הודעות ואינו ניתן לביטול מכאן.</p>'+
+    '<label class="check"><input type="checkbox" name="confirm" value="yes" required> בדקתי את הקבוצה ואני מאשר/ת אותה</label><button class="btn btn--primary">אישור הקבוצה</button></form>'):'';
  return layout('קבוצה ב'+g.areaName,
   '<p><a href="/admin" class="back">→ חזרה לרשימת הקבוצות</a></p>'+
-  (data.notice&&NOTICES[data.notice]?notice('ok',NOTICES[data.notice]):'')+(data.error&&ERRORS[data.error]?notice('error',ERRORS[data.error]):'')+
+  (data.notice&&NOTICES[data.notice]?notice('ok',NOTICES[data.notice==='approved'&&g.paymentMode==='CARDCOM'?'approved_card':data.notice]):'')+(data.error&&ERRORS[data.error]?notice('error',ERRORS[data.error]):'')+
   '<section class="card group-head" aria-labelledby="group-title"><div class="page-head"><div><h1 id="group-title">'+escape(g.areaName)+'</h1>'+chip('group',g.status)+' '+opChip(g.operationalStatus)+(g.legacy?' <span class="tag">ללא אזור מוגדר</span>':'')+'</div>'+
    '<div class="actions"><a class="btn btn--quiet" href="'+escape(query(base,{memberStatus:data.memberStatus||undefined}))+'">רענון</a><a class="btn btn--quiet" href="'+escape(base+'/export.csv')+'" download>ייצוא לקובץ CSV</a><a class="btn btn--quiet" href="'+escape(base+'/export-lines.csv')+'" download>ייצוא שורות סל (CSV)</a></div></div>'+
    progress(g,true)+
@@ -207,7 +250,7 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
     '<div><dt>תפוסה</dt><dd>'+g.capacity.active+' מתוך '+g.capacity.limit+' מקומות פעילים</dd></div>'+
     '<div><dt>נפתחה</dt><dd>'+time(g.createdAt)+'</dd></div><div><dt>עדכון אחרון</dt><dd>'+time(g.updatedAt)+'</dd></div>'+
     '<div><dt>'+(g.active?'פתוחה להצטרפות עד':g.operationalStatus==='COMPLETED'?'תוקף ההצטרפות היה עד':'תאריך תפוגה')+'</dt><dd>'+time(g.expiresAt)+'</dd></div>'+
-   '</dl></section>'+approve+operationsCard(g,data.timeline||[],data.csrf,!!data.confirming)+
+   '</dl></section>'+approve+chargesCard(g,data.csrf)+operationsCard(g,data.timeline||[],data.csrf,!!data.confirming)+
   '<section class="card" aria-labelledby="members-title"><div class="section-head"><h2 id="members-title">לקוחות בקבוצה</h2>'+
    '<nav class="segmented" aria-label="סינון לפי סטטוס">'+filter('','הכול')+filter('PLEDGED','פעילים')+filter('WITHDRAWN','הוסרו מהקבוצה')+'</nav></div>'+
    (data.members.length?'<div class="table-wrap"><table class="table table--members"><caption class="sr-only">לקוחות בקבוצה, לפי סדר ההצטרפות</caption><thead><tr><th scope="col">אימייל</th><th scope="col">טלפון</th><th scope="col">סטטוס</th><th scope="col">התחייבות</th><th scope="col">שורות בסל</th><th scope="col">הצטרפות</th><th scope="col">עדכון אחרון</th><th scope="col">פעולות</th></tr></thead><tbody>'+members+'</tbody></table></div>'+
@@ -363,6 +406,7 @@ input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd
 .row-link{font-weight:700;text-decoration:none}.row-link:hover{text-decoration:underline}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;background:#eef2f3;color:#4b5e64}
 .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip--pay-card_reserved,.chip--pay-charged,.chip--paystate-paid{background:var(--ok-soft);color:var(--ok)}.chip--pay-consent_required,.chip--pay-charge_pending,.chip--paystate-charging{background:var(--warn-soft);color:var(--warn)}.chip--pay-payment_failed,.chip--paystate-payment_review_required{background:var(--bad-soft);color:var(--bad)}.chip--pay-canceled{background:#eef1f2;color:var(--muted)}
 .chip--open{background:var(--cyan-soft);color:var(--teal-strong)}.chip--threshold_reached{background:var(--ok-soft);color:var(--ok)}.chip--approved{background:#e8ecfb;color:#3346a8}
 .chip--expired,.chip--cancelled{background:#f1f1f1;color:#666}.chip--pledged{background:var(--ok-soft);color:var(--ok)}.chip--withdrawn{background:#f1f1f1;color:#666}.chip--removed{background:var(--bad-soft);color:var(--bad)}
 .card--history{background:#fafbfb;border-style:dashed}
