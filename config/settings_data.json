@@ -167,6 +167,7 @@
           "show_newsletter": false,
           "show_payment_icons": true,
           "accessibility_statement_page": "הצהרת-נגישות",
+          "cancellation_page": "ביטול-עסקה",
           "brand_description": ""
         }
       }
