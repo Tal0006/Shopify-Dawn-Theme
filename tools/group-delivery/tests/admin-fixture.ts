@@ -13,8 +13,8 @@ import {migrate,type Database,type Connection} from '../src/db.js';
 import type {HealthOptions} from '../src/system.js';
 export const AREA={beerSheva:'6f1a2c00-0001-4a00-8000-0000000000a1',ashdod:'6f1a2c00-0002-4a00-8000-0000000000a2',ashkelon:'6f1a2c00-0003-4a00-8000-0000000000a3',sderot:'6f1a2c00-0007-4a00-8000-0000000000a7'};
 // options: OPS_* settings, a handler for outbound requests outside the local service (default: refused, so no test
-// ever reaches the internet) and health-check timings. faults.selectOne simulates the ops database check failing.
-export async function adminFixture(options:{env?:Record<string,string>;external?:(url:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>}={}){
+// ever reaches the internet), health-check timings and the finance clock (now). faults.selectOne simulates the ops database check failing.
+export async function adminFixture(options:{env?:Record<string,string>;external?:(url:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;now?:()=>Date}={}){
  const dir=await mkdtemp(join(tmpdir(),'fankee-admin-db-'));
  const engine=new PGlite(dir);
  let tail=Promise.resolve();
@@ -35,7 +35,7 @@ export async function adminFixture(options:{env?:Record<string,string>;external?
  });
  await migrate(db);
  const areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),outbound:{url:string;method:string}[]=[];
- const app=createApp(db,cfg,validator,{health:options.health,fetch:async(url,init)=>{
+ const app=createApp(db,cfg,validator,{health:options.health,now:options.now,fetch:async(url,init)=>{
   outbound.push({url,method:init?.method||'GET'});
   if(url.startsWith(cfg.origin+'/'))return fetch(url,init);
   if(options.external)return options.external(url,init);

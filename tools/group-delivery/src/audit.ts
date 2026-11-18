@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import type {Queryable} from './db.js';
-export type AuditAction='login'|'logout'|'group.approve'|'area.create'|'area.update'|'group.export'|'member.withdraw'|'group.operational_status_change'|'group.complete';
+export type AuditAction='login'|'logout'|'group.approve'|'area.create'|'area.update'|'group.export'|'member.withdraw'|'group.operational_status_change'|'group.complete'|'group.charges_process'|'group.charges_reconcile'|'finance.transaction_create'|'finance.transaction_update'|'finance.transaction_delete'|'finance.recurring_create'|'finance.recurring_update'|'finance.recurring_deactivate'|'finance.recurring_delete';
 export type AuditResult='OK'|'DENIED'|'FAILED';
 export type AuditEntry={action:AuditAction;actor:string;target?:string|null;result:AuditResult;detail?:string|null;subject?:string|null;previousStatus?:string|null;newStatus?:string|null;amountAgorot?:number|null};
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/,STATUS=/^[A-Z_]{3,30}$/;

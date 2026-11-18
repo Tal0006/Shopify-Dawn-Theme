@@ -17,11 +17,30 @@ import {SystemHealth,systemsView,type HealthOptions} from './system.js';
 import {systemPage} from './system-page.js';
 import {Recovery,RECOVERY_LIMITS,type RecoveryLimits} from './recovery.js';
 import {emailProvider,type EmailProvider} from './email.js';
+import {Payments,webhookLowProfileId} from './payments.js';
+import {CardcomService,CardcomError,type CardcomGateway} from './cardcom.js';
+import {CARDCOM_WEBHOOK_PATH} from './payments-config.js';
+import {ShopifyOrders,type OrderGateway} from './shopify-orders.js';
+import {containsCardData} from './domain.js';
+import {Finance,FinanceInputError,listFilters,rangeOf,nextBilling,UUID} from './finance.js';
+import {financePage,formValues,valuesOf,recurringValuesOf,type DialogState,type ViewParams} from './finance-page.js';
 // deps: test seams for the operations page (outbound fetch and health-check timings) and for recovery email
 // (provider and limits; the default provider comes from cfg.recovery and is null when recovery is disabled).
-export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>}={}){
- const app=express(),areas=new Areas(db,cfg),groups=new Groups(db,cfg,validator,areas),auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator);
+// cardcom/paymentsLog: test seams for the Cardcom gateway (default: the real CardcomService when payments are ENABLED,
+// none otherwise) and for payment log lines.
+export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>;cardcom?:CardcomGateway|null;paymentsLog?:(line:string)=>void;orders?:OrderGateway|null;now?:()=>Date}={}){
+ const app=express(),areas=new Areas(db,cfg);
+ // Card reservation is required for new memberships whenever Cardcom is enabled (even if misconfigured: fail closed).
+ const groups=new Groups(db,cfg,validator,areas,{paymentMode:()=>cfg.payments.state==='DISABLED'?'NONE':'CARDCOM'});
+ const cardcom=deps.cardcom!==undefined?deps.cardcom:cfg.payments.state==='ENABLED'?new CardcomService(cfg.payments.cardcom!):null;
+ // Shopify orders (GraphQL Admin, offline token): required before any Cardcom charge (default: real client when configured).
+ const orders=deps.orders!==undefined?deps.orders:cfg.payments.orders?new ShopifyOrders({domain:cfg.domain,...cfg.payments.orders}):null;
+ const payments=new Payments(db,groups,validator,cfg.payments,cardcom,deps.paymentsLog,orders);
+ groups.attachPayments(payments);app.locals.payments=payments;
+ const auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator,payments);
  const systemHealth=new SystemHealth(db,cfg.ops,()=>cfg.origin,deps.fetch,deps.health);
+ // Business finance (/admin/system). deps.now: test seam for "today" (Israel time decides the current month).
+ const finance=new Finance(db,cfg.ops.costs,deps.now);
  const recovery=new Recovery(db,cfg.secret,deps.email!==undefined?deps.email:emailProvider(cfg.recovery),groups,{...RECOVERY_LIMITS,...deps.recoveryLimits});
  app.locals.recovery=recovery;
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
@@ -44,13 +63,24 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   if(!['GET','HEAD'].includes(req.method)&&(!origin||!allowed.includes(origin)||!req.is('application/json')))throw new ApiError(403,'INVALID_ORIGIN');
   // Nearest-area lookups get their own small bucket so location attempts cannot use up the join budget (or vice versa).
   // The member read is a POST only to carry the bearer token; it changes nothing, so it shares the read budget.
-  const memberRead=req.method==='POST'&&/^\/groups\/[^/]+\/member$/.test(req.path);
+  const memberRead=req.method==='POST'&&(/^\/groups\/[^/]+\/member$/.test(req.path)||/^\/reservations\/[^/]+$/.test(req.path));
   const read=['GET','HEAD'].includes(req.method)||memberRead,nearest=req.method==='POST'&&req.path==='/areas/nearest';
   await auth.limit(req,nearest?'area-nearest':read?'public-read':'public-write',nearest?10:read?120:20,600);
   next();
  });
  app.use(express.json({limit:'24kb'}));
  app.use(express.urlencoded({extended:false,limit:'4kb'}));
+ // Card numbers, CVV and similar fields are refused on every public API before any handler sees them.
+ app.use('/api/v1',(req,_res,next)=>{if(req.body&&typeof req.body==='object'&&containsCardData(req.body))throw new ApiError(400,'CARD_DATA_NOT_ACCEPTED','פרטי כרטיס אשראי מוזנים רק בעמוד המאובטח של קארדקום.');next();});
+ // Cardcom server-to-server webhook (public; HTTPS and the exact host are enforced above). The body is only a pointer:
+ // the LowProfileId is looked up and the result is fetched from Cardcom (GetLpResult) before anything changes.
+ // Replays and retries are no-ops once the reservation is final. 503 asks Cardcom to retry when it cannot be checked.
+ app.post(CARDCOM_WEBHOOK_PATH,async(req,res)=>{
+  await auth.limit(req,'cardcom-webhook',600,600);
+  try{await payments.webhook(webhookLowProfileId(req.body,req.query));}
+  catch(error){if(error instanceof CardcomError){res.status(503).json({ok:false});return;}throw error;}
+  res.json({ok:true});
+ });
  const adminOrigin:express.RequestHandler=(req,_res,next)=>{if(req.get('Origin')!==cfg.origin)throw new ApiError(403,'INVALID_ORIGIN');next();};
  // Every admin response: never indexed, never cached, and only same-origin script/style (no inline code).
  app.use('/admin',(_req,res,next)=>{
@@ -90,7 +120,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  });
  const csrfOf=(res:express.Response)=>res.locals.session.csrf as string;
  // Error codes the group page knows how to explain (anything else is ignored).
- const GROUP_PAGE_ERRORS=['APPROVAL_NOT_ALLOWED','INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED'];
+ const GROUP_PAGE_ERRORS=['APPROVAL_NOT_ALLOWED','PAYMENT_UNAVAILABLE','INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED'];
  const noticeOf=(value:unknown)=>typeof value==='string'&&/^[a-z_]{1,30}$/.test(value)?value:undefined;
  // Dashboard home: summary cards plus the server-side filtered, sorted and paginated groups table.
  app.get('/admin',async(req,res)=>{
@@ -111,8 +141,109 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // Operations overview (מערכות האתר): safe configuration plus on-demand health checks; ?refresh=1 re-checks (rate floor).
  const systemData=async(req:express.Request)=>systemsView(cfg.ops,await systemHealth.results(req.query.refresh==='1'),cfg.origin,
   {state:deps.email!==undefined?(deps.email?'ENABLED':'DISABLED'):cfg.recovery.state,provider:deps.email?deps.email.name:cfg.recovery.provider,senderDomain:cfg.recovery.senderDomain});
- app.get('/admin/system',async(req,res)=>res.type('html').send(systemPage({...await systemData(req),csrf:csrfOf(res)})));
+ // The systems overview moved under /admin/system/services; /admin/system is the finance dashboard. Old refresh
+ // links keep working.
+ // The cost table also says how the finance page counts each cost (read only: no synchronization from this page).
+ app.get('/admin/system/services',async(req,res)=>res.type('html').send(systemPage({...await systemData(req),finance:await finance.opsCosts(),csrf:csrfOf(res)})));
  app.get('/admin/api/system',async(req,res)=>res.json(await systemData(req)));
+ // ---- Business finance ("כספים"). Admin session only (above); mutations also need Origin + CSRF (above), have their
+ // own rate limit and are audited with the change in one transaction (finance.ts). HTML forms redirect back to the
+ // same filters; a rejected form is shown again with its values and field errors.
+ const financeLimit=(req:express.Request)=>auth.limit(req,'admin-finance-write',120,600);
+ const viewParams=(source:any):ViewParams=>{const f=listFilters(source);return {range:rangeOf(source?.range),q:f.q,month:f.month,type:f.type,category:f.category,page:f.page};};
+ // The hidden "back" field: only the dashboard's own filter parameters survive (validated again by viewParams).
+ const backParams=(value:unknown)=>{const raw=typeof value==='string'&&value.length<=400?value:'';return viewParams(Object.fromEntries(new URLSearchParams(raw)));};
+ const backUrl=(p:ViewParams,notice:string)=>{
+  const search=new URLSearchParams();
+  if(p.range!=='6m')search.set('range',p.range);for(const key of ['q','month','type','category'] as const)if(p[key])search.set(key,p[key]);if(p.page>1)search.set('page',String(p.page));
+  search.set('notice',notice);return '/admin/system?'+search.toString();
+ };
+ const errorUrl=(p:ViewParams,code:string)=>{const url=new URL(backUrl(p,'x'),'http://x');url.searchParams.delete('notice');url.searchParams.set('error',code);return url.pathname+url.search;};
+ const renderFinance=async(res:express.Response,p:ViewParams,extra:{dialog?:DialogState|null;notice?:string;error?:string}={},status=200)=>{
+  // Record due billing dates once, then read (summary/list record again, which is then a no-op).
+  await finance.record();
+  const [summary,list,ops]=await Promise.all([finance.summary(p.range),finance.list(p),finance.opsCosts()]);
+  res.status(status).type('html').send(financePage({summary,list,ops,csrf:csrfOf(res),params:{...p,page:list.filters.page},...extra}));
+ };
+ const FINANCE_NOTICES=['tx_created','tx_updated','tx_deleted','tx_deactivated','rec_updated'];
+ const FINANCE_ERRORS=['delete_confirm','occurrence_locked','inactive','ops_managed'];
+ app.get('/admin/system',async(req,res)=>{
+  if(req.query.refresh==='1'){res.redirect(303,'/admin/system/services?refresh=1');return;}
+  const p=viewParams(req.query),today=finance.today();
+  let dialog:DialogState|null=null,error:string|undefined;
+  const add=req.query.add,edit=req.query.edit,remove=req.query.delete;
+  if(add==='INCOME'||add==='EXPENSE'||add==='RECURRING')dialog={mode:'create',kind:add,values:formValues(add,today),errors:{}};
+  else if(typeof edit==='string'||typeof remove==='string'){
+   const id=String(edit??remove);
+   let item=UUID.test(id)?await finance.find(id).catch(()=>null):null;
+   // A recorded billing date is history: "edit" opens its charge; "delete" is refused.
+   if(item?.kind==='transaction'&&item.transaction.recurringDefinitionId){
+    if(typeof edit==='string')item=await finance.find(item.transaction.recurringDefinitionId).catch(()=>null);else{item=null;error='occurrence_locked';}
+   }
+   if(!item)error??='not_found';
+   else if(item.kind==='recurring'&&typeof edit==='string'&&!item.recurring.active)error='inactive';
+   else if(typeof edit==='string')dialog=item.kind==='transaction'?{mode:'edit',kind:item.transaction.type,id,values:valuesOf(item.transaction),errors:{}}:
+    {mode:'edit',kind:'RECURRING',id:item.recurring.id,values:recurringValuesOf(item.recurring),errors:{},nextBilling:nextBilling(item.recurring,today),opsLocked:finance.opsLocked(item.recurring)};
+   // An OPS-managed charge is stopped by removing it from OPS_COSTS, not here.
+   else if(item.kind==='recurring'&&finance.opsLocked(item.recurring))error='ops_managed';
+   else dialog=item.kind==='transaction'?{mode:'delete',transaction:item.transaction}:{mode:'delete',recurring:item.recurring};
+  }
+  const notice=typeof req.query.notice==='string'&&FINANCE_NOTICES.includes(req.query.notice)?req.query.notice:undefined;
+  if(!error&&typeof req.query.error==='string'&&FINANCE_ERRORS.includes(req.query.error))error=req.query.error;
+  await renderFinance(res,p,{dialog,notice,error});
+ });
+ // Form values to show again after a refusal (strings only; the server never trusts them for anything else).
+ const formEcho=(body:any)=>{const v:Record<string,string>={};for(const key of ['type','amount','date','category','description','paymentMethod','source','notes','recurring','frequency','startDate','endDate'])v[key]=typeof body?.[key]==='string'?body[key].slice(0,1000):'';return v;};
+ const refused=async(res:express.Response,error:unknown,p:ViewParams,dialog:Omit<Extract<DialogState,{mode:'create'|'edit'|'import'}>,'errors'|'error'>)=>{
+  if(error instanceof FinanceInputError){await renderFinance(res,p,{dialog:{...dialog,errors:error.fields,error:error.message}},422);return true;}
+  return false;
+ };
+ app.post('/admin/system/transactions',async(req,res)=>{
+  await financeLimit(req);
+  const p=backParams(req.body?.back),values=formEcho(req.body);
+  try{await finance.create(req.body,res.locals.actor);}
+  catch(error){
+   if(await refused(res,error,p,{mode:'create',kind:values.recurring==='on'?'RECURRING':values.type==='INCOME'?'INCOME':'EXPENSE',values}))return;
+   throw error;
+  }
+  res.redirect(303,backUrl(p,'tx_created'));
+ });
+ app.post('/admin/system/transactions/:id',async(req,res)=>{
+  await financeLimit(req);
+  const p=backParams(req.body?.back),values=formEcho(req.body);
+  let result;
+  try{result=await finance.update(req.params.id,req.body,res.locals.actor);}
+  catch(error){
+   const item=error instanceof FinanceInputError?await finance.find(req.params.id).catch(()=>null):null;
+   if(await refused(res,error,p,{mode:'edit',kind:values.recurring==='on'?'RECURRING':values.type==='INCOME'?'INCOME':'EXPENSE',id:req.params.id,values,
+    opsLocked:item?.kind==='recurring'&&finance.opsLocked(item.recurring)}))return;
+   if(error instanceof ApiError&&(error.code==='RECURRING_OCCURRENCE'||error.code==='RECURRING_INACTIVE')){res.redirect(303,errorUrl(p,error.code==='RECURRING_INACTIVE'?'inactive':'occurrence_locked'));return;}
+   throw error;
+  }
+  res.redirect(303,backUrl(p,'recurring' in result?'rec_updated':'tx_updated'));
+ });
+ app.post('/admin/system/transactions/:id/delete',async(req,res)=>{
+  await financeLimit(req);
+  const p=backParams(req.body?.back);
+  if(req.body?.confirm!=='yes'){
+   await finance.remove(req.params.id,false,res.locals.actor).catch(()=>{});// audited as DENIED
+   res.redirect(303,errorUrl(p,'delete_confirm'));return;
+  }
+  let result;
+  try{result=await finance.remove(req.params.id,true,res.locals.actor);}
+  catch(error){if(error instanceof ApiError&&(error.code==='RECURRING_OCCURRENCE'||error.code==='OPS_MANAGED')){res.redirect(303,errorUrl(p,error.code==='OPS_MANAGED'?'ops_managed':'occurrence_locked'));return;}throw error;}
+  res.redirect(303,backUrl(p,'deactivated' in result?'tx_deactivated':'tx_deleted'));
+ });
+ // JSON API (same session; X-CSRF-Token for mutations). Amounts are integer agorot (amountAgorot) or a decimal
+ // shekel string (amount). 422 INVALID_TRANSACTION carries per-field messages in "fields".
+ app.get('/admin/api/finance/summary',async(req,res)=>res.json({summary:await finance.summary(req.query.range),opsCosts:await finance.opsCosts()}));
+ app.get('/admin/api/finance/transactions',async(req,res)=>res.json(await finance.list(req.query)));
+ // One id space: a one-off/recorded row answers {transaction}, a recurring charge {recurring}.
+ app.get('/admin/api/finance/transactions/:id',async(req,res)=>{const item=await finance.find(req.params.id);res.json(item.kind==='transaction'?{transaction:item.transaction}:{recurring:item.recurring});});
+ app.get('/admin/api/finance/recurring',async(_req,res)=>{await finance.record();res.json({recurring:await finance.recurring()});});
+ app.post('/admin/api/finance/transactions',async(req,res)=>{await financeLimit(req);res.status(201).json(await finance.create(req.body,res.locals.actor));});
+ app.post('/admin/api/finance/transactions/:id',async(req,res)=>{await financeLimit(req);res.json(await finance.update(req.params.id,req.body,res.locals.actor));});
+ app.post('/admin/api/finance/transactions/:id/delete',async(req,res)=>{await financeLimit(req);res.json(await finance.remove(req.params.id,req.body?.confirm===true,res.locals.actor));});
  app.get('/admin/audit',async(req,res)=>res.type('html').send(auditView({...await auditPage(db,req.query),csrf:csrfOf(res)})));
  // CSV exports (members, or one row per stored cart line). UTF-8 with BOM; formula-like cells neutralised in csv().
  const dateText=(iso:string)=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Jerusalem',dateStyle:'short',timeStyle:'medium'}).format(new Date(iso));
@@ -150,9 +281,29 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   const id=req.params.publicId,base='/admin/groups/'+encodeURIComponent(id);
   if(req.body?.confirm!=='yes'){res.redirect(303,base+'?error=confirm');return;}
   try{await approve(res,id);}
-  catch(error){if(error instanceof ApiError&&error.code==='APPROVAL_NOT_ALLOWED'){res.redirect(303,base+'?error=APPROVAL_NOT_ALLOWED');return;}throw error;}
+  catch(error){if(error instanceof ApiError&&['APPROVAL_NOT_ALLOWED','PAYMENT_UNAVAILABLE'].includes(error.code)){res.redirect(303,base+'?error='+error.code);return;}throw error;}
   res.redirect(303,base+'?notice=approved');
  });
+ // Charging after approval (card groups). Both actions are idempotent: charges are claimed one by one and an UNKNOWN
+ // charge is never re-sent; reconciliation only marks a charge paid when Cardcom confirms it by our charge id.
+ const chargeAction=async(res:express.Response,id:string,action:'group.charges_process'|'group.charges_reconcile',run:()=>Promise<any>)=>{
+  try{const result=await run();await audit(db,{action,actor:res.locals.actor,target:id,result:'OK'});return result;}
+  catch(error){await audit(db,{action,actor:res.locals.actor,target:id,result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});throw error;}
+ };
+ app.post('/admin/groups/:publicId/charges/process',async(req,res)=>{
+  const id=req.params.publicId,base='/admin/groups/'+encodeURIComponent(id);
+  try{await chargeAction(res,id,'group.charges_process',()=>payments.processCharges(id));}
+  catch(error){if(error instanceof ApiError&&['APPROVAL_NOT_ALLOWED','PAYMENT_UNAVAILABLE'].includes(error.code)){res.redirect(303,base+'?error='+error.code);return;}throw error;}
+  res.redirect(303,base+'?notice=charges_processed');
+ });
+ app.post('/admin/groups/:publicId/charges/reconcile',async(req,res)=>{
+  const id=req.params.publicId,base='/admin/groups/'+encodeURIComponent(id);
+  try{await chargeAction(res,id,'group.charges_reconcile',()=>payments.reconcile(id));}
+  catch(error){if(error instanceof ApiError&&['APPROVAL_NOT_ALLOWED','PAYMENT_UNAVAILABLE'].includes(error.code)){res.redirect(303,base+'?error='+error.code);return;}throw error;}
+  res.redirect(303,base+'?notice=charges_reconciled');
+ });
+ app.post('/admin/api/groups/:publicId/charges/process',async(req,res)=>res.json({charges:await chargeAction(res,req.params.publicId,'group.charges_process',()=>payments.processCharges(req.params.publicId))}));
+ app.post('/admin/api/groups/:publicId/charges/reconcile',async(req,res)=>res.json(await chargeAction(res,req.params.publicId,'group.charges_reconcile',()=>payments.reconcile(req.params.publicId))));
  app.post('/admin/api/groups/:publicId/approve',async(req,res)=>res.json({group:await approve(res,req.params.publicId)}));
  // Store-owner removal of a customer: the same domain withdrawal as the customer's own (row kept as WITHDRAWN, totals
  // recalculated under the coordination lock). Explicit confirmation, audited with safe metadata only. Idempotent.
@@ -235,6 +386,14 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // Member-only: the receipt holder's pledge and stored cart re-checked against Shopify (no contact details or token).
  app.post('/api/v1/groups/:publicId/member',async(req,res)=>res.json(await groups.memberState(req.params.publicId,bearer(req))));
  // Explicit withdrawal; needs the member token and {"confirm":true}. A cart update never withdraws.
+ // Card reservation (Cardcom, no charge now). reserve returns the Cardcom page URL and the receipt the browser keeps;
+ // the membership exists only after Cardcom confirms the token server-to-server (webhook or the status read below).
+ app.post('/api/v1/groups/reserve',async(req,res)=>{await auth.limit(req,'card-reserve',10,600);res.status(201).json(await payments.reserve(null,req.body));});
+ app.post('/api/v1/groups/:publicId/reserve',async(req,res)=>{await auth.limit(req,'card-reserve',10,600);res.status(201).json(await payments.reserve(req.params.publicId,req.body,bearer(req)));});
+ app.post('/api/v1/reservations/:id',async(req,res)=>res.json(await payments.status(req.params.id,bearer(req),req.body)));
+ app.post('/api/v1/reservations/:id/cancel',async(req,res)=>res.json(await payments.cancel(req.params.id,bearer(req))));
+ // Explicit consent to a higher pledge after a cart change (card members); the card is not entered again.
+ app.post('/api/v1/groups/:publicId/confirm-pledge',async(req,res)=>res.json(await groups.confirmPledge(req.params.publicId,bearer(req),req.body)));
  app.post('/api/v1/groups/:publicId/withdraw',async(req,res)=>res.json(await groups.withdraw(req.params.publicId,bearer(req),req.body)));
  // Email OTP recovery for a browser without the receipt (see src/recovery.ts). Besides the shared public-write budget,
  // each step has its own per-IP hourly bucket; per-details, per-group and per-challenge limits live in Recovery.
@@ -259,7 +418,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   if(_req.path.startsWith('/admin')&&!_req.path.startsWith('/admin/api/')&&_req.path!=='/admin/style.css'&&_req.path!=='/admin/app.js'){
    res.status(status).type('html').send(errorPage(status,message,res.locals.session?.csrf));return;
   }
-  res.status(status).json({error:message,code});
+  const details=error instanceof ApiError&&error.details&&Object.values(error.details).every(Number.isSafeInteger)?error.details:undefined;
+  res.status(status).json({error:message,code,...(details?{details}:{}),...(error instanceof FinanceInputError?{fields:error.fields}:{})});
  });
  return app;
 }
@@ -269,9 +429,13 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const cfg=config();db=database(cfg.databaseUrl);await migrate(db);
   // Names variables only, never values.
   if(cfg.recovery.state==='MISCONFIGURED')console.warn('Group delivery recovery email is disabled until configured: '+cfg.recovery.problems.join(' '));
+  // Names variables only, never values. Card reservations fail closed (503) until fixed; joins still require a card.
+  if(cfg.payments.state==='ENABLED'&&cfg.payments.chargingProblems.length)console.warn('Group delivery card groups cannot be approved or charged until configured: '+cfg.payments.chargingProblems.join(' '));
+  if(cfg.payments.state==='MISCONFIGURED')console.warn('Group delivery card reservation is enabled but unavailable until configured: '+cfg.payments.problems.join(' '));
   const app=createApp(db,cfg),server=app.listen(cfg.port,'0.0.0.0',()=>console.info('Group delivery listening on port '+cfg.port));
   // Recovery emails still being sent finish before the pool closes.
-  const stop=()=>{server.close(()=>{void (app.locals.recovery as Recovery).idle().then(()=>db!.end()).then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
+  const stop=()=>{server.close(()=>{void Promise.all([(app.locals.recovery as Recovery).idle(),(app.locals.payments as Payments).idle()]).then(()=>db!.end()).then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
- }catch{console.error('Group delivery startup failed. Check configuration and database connectivity.');await db?.end().catch(()=>{});process.exitCode=1;}
+ }catch {
+  console.error('Group delivery startup failed. Check configuration and database connectivity.'); }
 }

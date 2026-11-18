@@ -48,9 +48,11 @@ test('Operations page (מערכות האתר)',{timeout:180000},async t=>{
 
   await t.test('admin only: 401 for the API, login redirect for the page, no-store',async()=>{
    const api=await get('/admin/api/system','');assert.equal(api.status,401);
-   const page=await get('/admin/system','');assert.equal(page.status,303);assert.equal(page.headers.get('location'),'/admin?expired=1&next='+encodeURIComponent('/admin/system'));
+   const page=await get('/admin/system/services','');assert.equal(page.status,303);assert.equal(page.headers.get('location'),'/admin?expired=1&next='+encodeURIComponent('/admin/system/services'));
    assert.equal(f.outbound.length,0,'no check runs for anonymous requests');
-   const r=await get('/admin/api/system');assert.equal(r.headers.get('cache-control'),'no-store');assert.equal(r.headers.get('x-robots-tag'),'noindex, nofollow');
+   const r=await get('/admin/api/system');assert.equal(r.headers.get('cache-control'),'no-store');
+   // /admin/system is now the finance dashboard; the old refresh link still reaches the systems overview.
+   const old=await get('/admin/system?refresh=1');assert.equal(old.status,303);assert.equal(old.headers.get('location'),'/admin/system/services?refresh=1');assert.equal(r.headers.get('x-robots-tag'),'noindex, nofollow');
   });
 
   await t.test('statuses come from real checks, or are explicitly manual or postponed',async()=>{
@@ -81,7 +83,7 @@ test('Operations page (מערכות האתר)',{timeout:180000},async t=>{
   await t.test('checks are not repeated: cache, shared refresh floor, then a fresh run',async()=>{
    const before=f.outbound.length;
    assert.equal((await system()).cached,true);assert.equal((await system('?refresh=1')).cached,true,'refresh within 10 s reuses the result');
-   await Promise.all([get('/admin/system'),get('/admin/api/system')]);
+   await Promise.all([get('/admin/system/services'),get('/admin/api/system')]);
    assert.equal(f.outbound.length,before,'no new outbound requests');
    clock+=11000;const fresh=await system('?refresh=1');assert.equal(fresh.cached,false);assert.ok(f.outbound.length>before);
    const after=f.outbound.length;clock+=30000;await system();assert.equal(f.outbound.length,after,'within the 60 s cache');
@@ -95,7 +97,7 @@ test('Operations page (מערכות האתר)',{timeout:180000},async t=>{
    const down=await run('down');assert.deepEqual([down.status,down.check.reason,down.check.latencyMs],['OFFLINE','UNREACHABLE',null]);assert.ok(down.check.lastSuccessAt,'last success kept in memory');
    const started=Date.now(),slow=await run('hang');
    assert.deepEqual([slow.status,slow.check.reason],['OFFLINE','TIMEOUT']);assert.ok(Date.now()-started<3000,'short timeout, no retries');
-   const page=await(await get('/admin/system')).text();
+   const page=await(await get('/admin/system/services')).text();
    assert.match(page,/לא ניתן לבדוק את השירות כרגע \(תם הזמן הקצוב לבדיקה\)\./);assert.match(page,/בדיקה תקינה אחרונה/);
    assert.doesNotMatch(page,/ENOTFOUND|getaddrinfo|AbortError|TimeoutError|TypeError|stack/);
    assert.match(page,/<strong>1 דורשים תשומת לב<\/strong>/,'postponed systems are not counted as problems');
@@ -109,7 +111,7 @@ test('Operations page (מערכות האתר)',{timeout:180000},async t=>{
    f.faults.selectOne='fail';clock+=11000;data=await system('?refresh=1');
    assert.deepEqual([byId(data,'neon').status,byId(data,'neon').check.reason],['OFFLINE','UNREACHABLE']);
    assert.equal(byId(data,'group-delivery-admin').status,'OFFLINE','derived from service + database');
-   assert.match(await(await get('/admin/system')).text(),/לא ניתן להתחבר למסד הנתונים כרגע\./);
+   assert.match(await(await get('/admin/system/services')).text(),/לא ניתן להתחבר למסד הנתונים כרגע\./);
    f.faults.selectOne='hang';clock+=11000;data=await system('?refresh=1');
    assert.deepEqual([byId(data,'neon').status,byId(data,'neon').check.reason],['OFFLINE','TIMEOUT']);
    f.faults.selectOne='ok';clock+=11000;data=await system('?refresh=1');assert.equal(byId(data,'neon').status,'OPERATIONAL');
@@ -129,10 +131,10 @@ test('Operations page (מערכות האתר)',{timeout:180000},async t=>{
    assert.deepEqual(data.costs.monthlyTotals,{USD:46,ILS:5});
    assert.ok(data.warnings.some((w:string)=>w==='OPS_COSTS: 1 invalid entry ignored (service, amount ≥ 0, currency USD/ILS, frequency MONTHLY/YEARLY).'));
    assert.deepEqual(byId(data,'render-group-delivery').costs.map((c:any)=>c.amountCents),[700]);
-   const page=await(await get('/admin/system')).text();
+   const page=await(await get('/admin/system/services')).text();
    assert.match(page,/<h2 id="costs-title">עלויות חודשיות<\/h2>/);assert.match(page,/סה"כ עלות חודשית משוערת:/);
    assert.match(page,/<strong data-currency="USD">[^<]*46\.00[^<]*\$ לחודש<\/strong>/);assert.match(page,/<strong data-currency="ILS">[^<]*5\.00[^<]*₪ לחודש<\/strong>/);
-   assert.match(page,/<td data-label="עלות" class="num">חינם<\/td>/);assert.match(page,/המטבעות מוצגים בנפרד ואינם מומרים\./);
+   assert.match(page,/<td data-label="עלות ספק" class="num">חינם<\/td>/);assert.match(page,/המטבעות מוצגים בנפרד ואינם מומרים\./);
    // One currency only: one total. Nothing configured: no price shown at all.
    const usd=systemsView(opsConfig({OPS_COSTS:'[{"service":"Render","amount":7,"currency":"USD"}]'}),{results:{},checkedAt:new Date().toISOString(),cached:false},'https://svc.example.test');
    assert.deepEqual(usd.costs.monthlyTotals,{USD:7});
@@ -141,7 +143,7 @@ test('Operations page (מערכות האתר)',{timeout:180000},async t=>{
   });
 
   await t.test('no secrets: credentials, database URL, tokens and rejected values never appear',async()=>{
-   const responses=[JSON.stringify(await system()),await(await get('/admin/system')).text()];
+   const responses=[JSON.stringify(await system()),await(await get('/admin/system/services')).text()];
    for(const body of responses)for(const secret of [f.cfg.password,f.cfg.secret,f.cfg.databaseUrl,f.cfg.token,'secret-pass','user:','postgresql://',cookie.split('=')[1]])
     assert.ok(!body.includes(secret),'leaks '+secret.slice(0,8));
    const data=await system();
@@ -153,10 +155,11 @@ test('Operations page (מערכות האתר)',{timeout:180000},async t=>{
   });
 
   await t.test('page: navigation, quick links in new tabs, missing configuration and postponed section',async()=>{
-   const page=await(await get('/admin/system')).text();
-   assert.match(page,/<a href="\/admin\/system" aria-current="page">מערכות האתר<\/a>/);
+   const page=await(await get('/admin/system/services')).text();
+   assert.match(page,/<a href="\/admin\/system\/services" aria-current="page">מערכות האתר<\/a>/);
+   assert.match(page,/<a href="\/admin\/system">כספים<\/a>/,'the finance dashboard is its own section');
    assert.match(page,/<h1>מערכות האתר<\/h1><p class="muted">ניהול ומעקב אחר השירותים שמפעילים את פאנקי<\/p>/);
-   assert.match(page,/<form method="get" action="\/admin\/system" class="sys-refresh"><input type="hidden" name="refresh" value="1"><button class="btn btn--primary">בדיקה מחדש<\/button>/);
+   assert.match(page,/<form method="get" action="\/admin\/system\/services" class="sys-refresh"><input type="hidden" name="refresh" value="1"><button class="btn btn--primary">בדיקה מחדש<\/button>/);
    const external=[...page.matchAll(/<a [^>]*href="https?:[^"]+"[^>]*>/g)].map(m=>m[0]);
    assert.ok(external.length>10);for(const a of external)assert.match(a,/target="_blank" rel="noopener noreferrer"/,a);
    for(const label of ['פתיחת Shopify','פתיחת GitHub','פתיחת Neon','פתיחת Google Merchant Center','פתיחת Google Business Profile','פתיחת האתר','ניהול משלוחים קבוצתיים','יומן פעולות'])

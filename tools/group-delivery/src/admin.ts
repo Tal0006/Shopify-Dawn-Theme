@@ -2,6 +2,7 @@
 // one same-origin script (/admin/app.js) only adds copy buttons, row clicks, a loading bar and back-cache protection.
 // Customer contact details appear only on these authenticated pages, never in public HTML or browser storage.
 import {REACHABLE_STATUSES,dialable,type Page} from './admin-data.js';
+import {ils} from './finance.js';
 export const escape=(value:unknown)=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]!));
 const TZ='Asia/Jerusalem';
 const money=(agorot:number)=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS'}).format(agorot/100);
@@ -13,12 +14,14 @@ export const MEMBER_LABELS:Record<string,string>={PLEDGED:'התחייבות פע
 export const OPERATIONAL_LABELS:Record<string,string>={NEW:'חדש',IN_PROGRESS:'בטיפול',READY_FOR_DELIVERY:'מוכן למשלוח',OUT_FOR_DELIVERY:'יצא למשלוח',COMPLETED:'הושלם'};
 const OPERATIONAL_ORDER=['NEW','IN_PROGRESS','READY_FOR_DELIVERY','OUT_FOR_DELIVERY','COMPLETED'];
 const opChip=(status:string)=>'<span class="chip chip--op chip--op-'+escape(status.toLowerCase().replace(/_/g,'-'))+'">'+escape(OPERATIONAL_LABELS[status]||status)+'</span>';
-const ACTION_LABELS:Record<string,string>={'group.operational_status_change':'שינוי סטטוס משלוח','group.complete':'השלמת משלוח','login':'התחברות','logout':'התנתקות','group.approve':'אישור קבוצה','area.create':'הוספת אזור','area.update':'עדכון אזור','group.export':'ייצוא נתוני קבוצה','member.withdraw':'הסרת לקוח מהקבוצה'};
+const ACTION_LABELS:Record<string,string>={'group.operational_status_change':'שינוי סטטוס משלוח','group.complete':'השלמת משלוח','login':'התחברות','logout':'התנתקות','group.approve':'אישור קבוצה','area.create':'הוספת אזור','area.update':'עדכון אזור','group.export':'ייצוא נתוני קבוצה','member.withdraw':'הסרת לקוח מהקבוצה',
+ 'group.charges_process':'שליחת חיובים','group.charges_reconcile':'בדיקת חיובים','finance.transaction_create':'רישום תנועה כספית','finance.transaction_update':'עדכון תנועה כספית','finance.transaction_delete':'מחיקת תנועה כספית',
+ 'finance.recurring_create':'הוספת חיוב קבוע','finance.recurring_update':'עדכון חיוב קבוע','finance.recurring_deactivate':'הפסקת חיוב קבוע','finance.recurring_delete':'מחיקת חיוב קבוע'};
 const RESULT_LABELS:Record<string,string>={OK:'הצליח',DENIED:'נדחה',FAILED:'נכשל'};
 const chip=(kind:'group'|'member',status:string)=>'<span class="chip chip--'+escape(status.toLowerCase())+'">'+escape((kind==='group'?GROUP_LABELS:MEMBER_LABELS)[status]||status)+'</span>';
 // Visible, specific labels ("העתקת טלפון"), so neighbouring copy buttons are never ambiguous.
 const copyButton=(value:string,label:string)=>'<button type="button" class="icon-btn" data-copy="'+escape(value)+'" data-copy-label="'+escape(label)+'" hidden>העתקת '+escape(label)+'</button>';
-const query=(base:string,params:Record<string,string|number|undefined|null>)=>{
+export const query=(base:string,params:Record<string,string|number|undefined|null>)=>{
  const search=new URLSearchParams();for(const [key,value] of Object.entries(params))if(value!==undefined&&value!==null&&value!=='')search.set(key,String(value));
  const text=search.toString();return base+(text?'?'+text:'');
 };
@@ -26,20 +29,31 @@ const progress=(group:{pledgedTotalAgorot:number;thresholdAgorot:number;progress
  '<div class="meter'+(large?' meter--large':'')+(group.progressPercent>=100?' meter--reached':'')+'">'+
  '<div class="meter__label"><span><strong>'+escape(money(group.pledgedTotalAgorot))+'</strong> מתוך '+escape(money(group.thresholdAgorot))+'</span><span>'+group.progressPercent+'%</span></div>'+
  '<div class="meter__track" role="progressbar" aria-label="התקדמות ליעד ההזמנה" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+group.progressPercent+'" aria-valuetext="'+escape(money(group.pledgedTotalAgorot)+' מתוך '+money(group.thresholdAgorot))+'"><span class="p'+Math.max(0,Math.min(100,group.progressPercent))+'"></span></div></div>';
-const pager=(base:string,params:Record<string,string|number|undefined>,page:Page,label:string)=>{
+export const pager=(base:string,params:Record<string,string|number|undefined>,page:Page,label:string)=>{
  if(page.pageCount<=1)return '<p class="muted">'+page.total+' '+escape(label)+'</p>';
  const link=(target:number,text:string,rel:string)=>target<1||target>page.pageCount?'<span class="pager__link" aria-disabled="true">'+text+'</span>':'<a class="pager__link" rel="'+rel+'" href="'+escape(query(base,{...params,page:target}))+'">'+text+'</a>';
  return '<nav class="pager" aria-label="דפדוף">'+link(page.page-1,'הקודם','prev')+'<span>עמוד '+page.page+' מתוך '+page.pageCount+' · '+page.total+' '+escape(label)+'</span>'+link(page.page+1,'הבא','next')+'</nav>';
 };
 
+// Admin sections, in navigation order. The next phase adds a section by declaring it here (enabled once its pages
+// exist); "active" on a page is the section key. Disabled sections are never rendered or linked.
+export const ADMIN_SECTIONS:{key:string;label:string;href:string;enabled:boolean}[]=[
+ {key:'overview',label:'סקירה',href:'/admin/overview',enabled:false},
+ {key:'finance',label:'כספים',href:'/admin/system',enabled:true},
+ {key:'orders',label:'הזמנות',href:'/admin/orders',enabled:false},
+ {key:'dashboard',label:'משלוחים קבוצתיים',href:'/admin',enabled:true},
+ {key:'areas',label:'אזורי משלוח',href:'/admin/areas',enabled:true},
+ {key:'audit',label:'יומן פעולות',href:'/admin/audit',enabled:true},
+ {key:'system',label:'מערכות האתר',href:'/admin/system/services',enabled:true},
+];
 export function layout(title:string,body:string,options:{csrf?:string;active?:string}={}){
- const nav=options.csrf?'<nav class="topbar__nav" aria-label="ניווט ניהול">'+[['/admin','לוח בקרה','dashboard'],['/admin/areas','אזורי משלוח','areas'],['/admin/audit','יומן פעולות','audit'],['/admin/system','מערכות האתר','system']]
-  .map(([href,text,key])=>'<a href="'+href+'"'+(options.active===key?' aria-current="page"':'')+'>'+text+'</a>').join('')+'</nav>'+
+ const nav=options.csrf?'<nav class="topbar__nav" aria-label="ניווט ניהול">'+ADMIN_SECTIONS.filter(section=>section.enabled)
+  .map(({href,label,key})=>'<a href="'+href+'"'+(options.active===key?' aria-current="page"':'')+'>'+label+'</a>').join('')+'</nav>'+
   '<form method="post" action="/admin/logout" class="topbar__logout"><input type="hidden" name="csrf" value="'+escape(options.csrf)+'"><button class="btn btn--quiet">יציאה</button></form>':'';
  return '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'+
   '<title>'+escape(title)+' · ניהול משלוחים קבוצתיים</title><link rel="stylesheet" href="/admin/style.css"><script src="/admin/app.js" defer></script></head>'+
   '<body><a class="skip" href="#main">דילוג לתוכן</a><div class="loading-bar" aria-hidden="true"></div>'+
-  '<header class="topbar"><a class="topbar__brand" href="/admin"><span class="topbar__dot" aria-hidden="true"></span>פאנקי · משלוחים קבוצתיים</a>'+nav+'</header>'+
+  '<header class="topbar"><a class="topbar__brand" href="/admin"><span class="topbar__dot" aria-hidden="true"></span>פאנקי · ניהול העסק</a>'+nav+'</header>'+
   '<main id="main" tabindex="-1">'+body+'</main><p class="sr-only" role="status" aria-live="polite" id="admin-live"></p></body></html>';
 }
 export const notice=(kind:'ok'|'error'|'info',text:string)=>'<p class="notice notice--'+kind+'" role="'+(kind==='error'?'alert':'status')+'">'+escape(text)+'</p>';
@@ -111,13 +125,53 @@ export function dashboardPage(data:{metrics:any;list:any;areas:any[];csrf:string
   '</section>',{csrf:data.csrf,active:'dashboard'});
 }
 
+// Card payments (migration 007). Labels only; tokens and Cardcom ids are never stored in a form that could be shown.
+export const PAYMENT_LABELS:Record<string,string>={CARD_RESERVED:'כרטיס שמור',CONSENT_REQUIRED:'ממתין לאישור סכום חדש',CHARGE_PENDING:'חיוב בתהליך',CHARGED:'חויב',PAYMENT_FAILED:'החיוב נכשל',CANCELED:'השריון בוטל'};
+export const PAYMENT_STATE_LABELS:Record<string,string>={CHARGING:'חיובים בתהליך',PAID:'כל החיובים הצליחו',PAYMENT_REVIEW_REQUIRED:'נדרשת בדיקת חיובים'};
+const paymentChip=(status:string|null|undefined)=>status?' <span class="chip chip--pay-'+escape(status.toLowerCase())+'">'+escape(PAYMENT_LABELS[status]||status)+'</span>':'';
+// Per-member stage after approval: Shopify order first, then the Cardcom charge, then the payment record in Shopify.
+export const CHARGE_LABELS:Record<string,string>={PENDING:'ממתין להזמנה ולחיוב',ORDER_CREATING:'יוצר הזמנה בשופיפיי',ORDER_UNKNOWN:'הזמנה לא ודאית – נדרשת בדיקה',
+ ORDER_FAILED:'יצירת ההזמנה נכשלה – לא חויב',ORDER_CREATED:'הזמנה נוצרה בשופיפיי',IN_FLIGHT:'בחיוב',FAILED:'החיוב נכשל – ההזמנה לא שולמה',
+ UNKNOWN:'תוצאת החיוב לא ודאית – נדרשת בדיקה',PAID:'שולם',FAILED_CANCELED:'החיוב נכשל – ההזמנה בוטלה והמלאי שוחרר',MISMATCH_CANCELED:'סכום ההזמנה שגוי – לא חויב, ההזמנה בוטלה והמלאי שוחרר',MISMATCH_CANCEL_REQUIRED:'סכום ההזמנה שגוי – לא חויב, נדרש ביטול ההזמנה בשופיפיי',FAILED_CANCEL_REQUIRED:'החיוב נכשל – נדרש ביטול ההזמנה בשופיפיי',SYNC_REQUIRED:'חויב בקארדקום – נדרש עדכון בשופיפיי'};
+const chargeKind=(c:any)=>c.status==='SUCCEEDED'?(c.shopifyPaymentState==='SYNCED'?'PAID':'SYNC_REQUIRED'):c.shopifyCancelState&&(c.status==='FAILED'||c.status==='ORDER_FAILED')?(c.status==='FAILED'?'FAILED':'MISMATCH')+(c.shopifyCancelState==='ORDER_CANCELED'?'_CANCELED':'_CANCEL_REQUIRED'):c.status;
+const chargeTone:Record<string,string>={PAID:'charged',FAILED_CANCELED:'canceled',FAILED_CANCEL_REQUIRED:'payment_failed',MISMATCH_CANCELED:'canceled',MISMATCH_CANCEL_REQUIRED:'payment_failed',SYNC_REQUIRED:'payment_failed',FAILED:'payment_failed',ORDER_FAILED:'payment_failed',UNKNOWN:'payment_failed',ORDER_UNKNOWN:'payment_failed'};
+const chargeChip=(c:any)=>{const kind=chargeKind(c);return ' <span class="chip chip--pay-'+escape(chargeTone[kind]||'charge_pending')+'">'+escape(CHARGE_LABELS[kind]||kind)+'</span>'+
+ (c.shopifyOrderName?' <span class="tag" dir="ltr">'+escape(c.shopifyOrderName)+'</span>':'');};
+// Charges card for a group with card reservations: before approval it explains what approval does; after approval it
+// shows counts and sums per outcome, and the two idempotent actions (send charges not started; ask Cardcom about
+// UNKNOWN ones). Retrying failed members is intentionally not offered yet.
+function chargesCard(g:any,csrf:string){
+ if(g.paymentMode!=='CARDCOM')return '';
+ const base='/admin/groups/'+g.publicId,c=g.charges;
+ const shopify='<p class="muted">לכל משתתף נוצרת הזמנה בשופיפיי (לא משולמת) לפני החיוב בקארדקום. ההזמנה מסומנת כשולמה רק אחרי שהחיוב הצליח. אם יצירת ההזמנה נכשלת, המשתתף אינו מחויב.</p>';
+ if(g.status!=='APPROVED'||!c||!c.members)return '<section class="card" aria-labelledby="charges-title"><div class="section-head"><h2 id="charges-title">תשלום בכרטיסי אשראי</h2></div>'+
+  '<p>ההצטרפות לקבוצה הזאת דורשת שריון כרטיס אשראי בקארדקום (ללא חיוב). רק משתתפים עם כרטיס שמור ואישור לסכום נספרים ביעד.</p>'+
+  (g.status==='APPROVED'?'<p class="muted">לא נוצרו חיובים לקבוצה הזאת.</p>':'<p class="muted">אישור הקבוצה יפעיל חיוב חד־פעמי של כל משתתף פעיל בסכום שאישר במפורש. משתתף שסכומו השתנה ולא אושר יחויב בסכום שאישר קודם.</p>')+
+  (g.paymentsAvailable?'':'<p class="notice notice--error" role="alert">חיוב בכרטיסי אשראי אינו זמין כרגע (הגדרות קארדקום חסרות). לא ניתן לאשר את הקבוצה.</p>')+shopify+'</section>';
+ const fact=(label:string,value:string)=>'<div><dt>'+escape(label)+'</dt><dd>'+value+'</dd></div>';
+ const actions=(c.pending?'<form method="post" action="'+escape(base+'/charges/process')+'"><input type="hidden" name="csrf" value="'+escape(csrf)+'"><button class="btn btn--quiet" data-once>המשך חיובים שטרם נשלחו</button></form>':'')+
+  (c.unknown||c.orderUnknown||c.syncRequired||c.cancelRequired?'<form method="post" action="'+escape(base+'/charges/reconcile')+'"><input type="hidden" name="csrf" value="'+escape(csrf)+'"><button class="btn btn--quiet" data-once>בדיקה מול קארדקום ושופיפיי (ללא חיוב)</button></form>':'');
+ return '<section class="card" aria-labelledby="charges-title"><div class="section-head"><h2 id="charges-title">חיובים</h2>'+
+   (c.state?'<span class="chip chip--paystate-'+escape(String(c.state).toLowerCase())+'">'+escape(PAYMENT_STATE_LABELS[c.state]||c.state)+'</span>':'')+'</div>'+
+  '<dl class="facts">'+fact('משתתפים לחיוב',String(c.members))+fact('חיובים שהצליחו',c.succeeded+' · '+escape(money(c.paidAgorot)))+fact('חיובים שנכשלו',c.failed+' · '+escape(money(c.failedAgorot)))+
+   fact('תוצאה לא ודאית',c.unknown+' · '+escape(money(c.unknownAgorot)))+fact('בתהליך',c.pending+' · '+escape(money(c.pendingAgorot)))+fact('סך הכול שולם',escape(money(g.paidTotalAgorot)))+
+   fact('הזמנות שופיפיי שנוצרו',String(c.ordersCreated))+fact('יצירת הזמנה נכשלה (לא חויבו)',String(c.orderFailed))+fact('הזמנה לא ודאית',String(c.orderUnknown))+fact('נדרש עדכון תשלום בשופיפיי',String(c.syncRequired))+fact('הזמנות שבוטלו (מלאי שוחרר)',String(c.ordersCanceled))+fact('נדרש ביטול הזמנה',String(c.cancelRequired))+'</dl>'+
+  (c.cancelRequired?'<p class="notice notice--error" role="alert">יש הזמנות של חיובים שנכשלו שעדיין לא בוטלו בשופיפיי, והמלאי שלהן תפוס. הבדיקה מול קארדקום ושופיפיי תנסה לבטל אותן בלבד, בלי חיוב ובלי הזמנה חדשה.</p>':'')+
+  (c.syncRequired?'<p class="notice notice--error" role="alert">יש משתתפים שחויבו בקארדקום אך ההזמנה שלהם בשופיפיי עדיין לא מסומנת כשולמה. הבדיקה מול קארדקום ושופיפיי תנסה לעדכן רק את שופיפיי, בלי חיוב נוסף.</p>':'')+
+  (c.orderUnknown?'<p class="notice notice--error" role="alert">יש הזמנות שתוצאת יצירתן לא ידועה. הן לא ייווצרו שוב ולא יחויבו לפני בדיקה.</p>':'')+
+  (c.unknown?'<p class="notice notice--error" role="alert">יש חיובים שתוצאתם לא ידועה (למשל ניתוק תקשורת). הם לא יישלחו שוב אוטומטית. יש לבדוק אותם מול קארדקום לפני כל פעולה נוספת.</p>':'')+
+  (c.failed?'<p class="muted">חיובים שנכשלו לא נשלחים שוב. ניסיון חוזר ללקוחות שנכשלו עדיין אינו זמין במסך זה; יש ליצור קשר עם הלקוחות.</p>':'')+
+  (actions?'<div class="actions">'+actions+'</div>':'')+shopify+'</section>';
+}
 const NOTICES:Record<string,string>={approved:'הקבוצה אושרה. אישור אינו פותח תשלום ואינו שולח הודעות ללקוחות.',area_saved:'האזור נשמר.',
+ approved_card:'הקבוצה אושרה והחיובים בכרטיסי האשראי התחילו. ניתן לרענן את העמוד כדי לראות את התוצאות.',charges_processed:'שליחת החיובים שטרם נשלחו הופעלה.',charges_reconciled:'הבדיקה מול קארדקום ושופיפיי הושלמה. לא בוצע חיוב.',
  member_withdrawn:'הלקוח הוסר מהמשלוח הקבוצתי.',operational_updated:'סטטוס המשלוח עודכן.',operational_unchanged:'סטטוס המשלוח כבר מעודכן. לא בוצע שינוי.',
  delivery_completed:'המשלוח הושלם ונשמר בהיסטוריה. הקבוצה סגורה להצטרפות ולשינויים.',member_already_withdrawn:'הלקוח כבר הוסר מהקבוצה קודם לכן. לא בוצע שינוי.'};
 const ERRORS:Record<string,string>={confirm:'יש לסמן את תיבת האישור לפני אישור הקבוצה.',APPROVAL_NOT_ALLOWED:'ניתן לאשר רק קבוצה פעילה שהגיעה ליעד.',
  GROUP_CLOSED:'לא ניתן להסיר לקוח מקבוצה שאינה פעילה. לא בוצע שינוי.',WITHDRAW_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להסרת הלקוח. לא בוצע שינוי.',
  INVALID_OPERATIONAL_STATUS:'סטטוס המשלוח אינו תקין. לא בוצע שינוי.',OPERATIONAL_TRANSITION_NOT_ALLOWED:'מעבר הסטטוס הזה אינו אפשרי. לא בוצע שינוי.',
- COMPLETION_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להשלמת המשלוח. לא בוצע שינוי.'};
+ COMPLETION_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להשלמת המשלוח. לא בוצע שינוי.',
+ PAYMENT_UNAVAILABLE:'חיוב בכרטיסי אשראי אינו זמין כרגע. לא בוצע שינוי.',CHARGE_IN_PROGRESS:'החיוב של הלקוח כבר התחיל או בוצע, ולכן לא ניתן להסיר אותו כאן. לא בוצע שינוי.'};
 // Withdrawn members are labelled by who withdrew them (migration 004 backfills older rows as MEMBER).
 const WITHDRAWN_BY:Record<string,string>={ADMIN:'הוסר על ידי מנהל',MEMBER:'פרש מהקבוצה'};
 // Customer recovery events (security_events). Codes, tokens and contact details are never stored, so none are shown.
@@ -177,7 +231,7 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
   return '<tr data-href="'+escape(base+'/members/'+m.id)+'"'+(m.status==='WITHDRAWN'?' class="row--withdrawn"':'')+'>'+
    '<td data-label="אימייל"><a class="row-link" href="'+escape(base+'/members/'+m.id)+'" dir="ltr">'+escape(m.email)+'</a></td>'+
    '<td data-label="טלפון"><span dir="ltr">'+escape(m.phone)+'</span></td>'+
-   '<td data-label="סטטוס">'+memberChip(m)+'</td>'+
+   '<td data-label="סטטוס">'+memberChip(m)+(m.charge?chargeChip(m.charge):paymentChip(m.paymentStatus))+'</td>'+
    '<td data-label="התחייבות" class="num">'+escape(money(m.pledgedTotalAgorot))+'</td>'+
    '<td data-label="שורות בסל" class="num">'+m.cartLines+'</td>'+
    '<td data-label="הצטרפות">'+time(m.createdAt)+'</td><td data-label="עדכון אחרון">'+time(m.updatedAt)+'</td>'+
@@ -189,11 +243,14 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
  }).join('');
  const filter=(value:string,label:string)=>'<a class="segmented__item" href="'+escape(query(base,{memberStatus:value||undefined}))+'"'+(data.memberStatus===value?' aria-current="true"':'')+'>'+escape(label)+'</a>';
  const approve=g.status==='THRESHOLD_REACHED'&&g.operationalStatus!=='COMPLETED'?'<form method="post" action="'+escape(base+'/approve')+'" class="approve card card--inset"><input type="hidden" name="csrf" value="'+escape(data.csrf)+'">'+
-  '<h2>אישור הקבוצה</h2><p class="muted">אישור מסמן שהקבוצה הגיעה ליעד ונבדקה. הוא אינו פותח תשלום, אינו שולח הודעות ואינו ניתן לביטול מכאן.</p>'+
-  '<label class="check"><input type="checkbox" name="confirm" value="yes" required> בדקתי את הקבוצה ואני מאשר/ת אותה</label><button class="btn btn--primary">אישור הקבוצה</button></form>':'';
+  (g.paymentMode==='CARDCOM'
+   ?'<h2>אישור הקבוצה וחיוב המשתתפים</h2><p class="muted">אישור הקבוצה יחייב מיד את כרטיסי האשראי של '+g.activeMembers+' המשתתפים הפעילים, כל אחד בסכום שאישר במפורש (סך הכול עד '+escape(money(g.pledgedTotalAgorot))+'). כל משתתף מחויב פעם אחת בלבד, גם בלחיצה כפולה. הפעולה אינה ניתנת לביטול מכאן.</p>'+
+    '<label class="check"><input type="checkbox" name="confirm" value="yes" required> בדקתי את הקבוצה ואני מאשר/ת אותה ואת חיוב המשתתפים</label><button class="btn btn--primary" data-once'+(g.paymentsAvailable?'':' disabled')+'>אישור הקבוצה וחיוב</button></form>'
+   :'<h2>אישור הקבוצה</h2><p class="muted">אישור מסמן שהקבוצה הגיעה ליעד ונבדקה. הוא אינו פותח תשלום, אינו שולח הודעות ואינו ניתן לביטול מכאן.</p>'+
+    '<label class="check"><input type="checkbox" name="confirm" value="yes" required> בדקתי את הקבוצה ואני מאשר/ת אותה</label><button class="btn btn--primary">אישור הקבוצה</button></form>'):'';
  return layout('קבוצה ב'+g.areaName,
   '<p><a href="/admin" class="back">→ חזרה לרשימת הקבוצות</a></p>'+
-  (data.notice&&NOTICES[data.notice]?notice('ok',NOTICES[data.notice]):'')+(data.error&&ERRORS[data.error]?notice('error',ERRORS[data.error]):'')+
+  (data.notice&&NOTICES[data.notice]?notice('ok',NOTICES[data.notice==='approved'&&g.paymentMode==='CARDCOM'?'approved_card':data.notice]):'')+(data.error&&ERRORS[data.error]?notice('error',ERRORS[data.error]):'')+
   '<section class="card group-head" aria-labelledby="group-title"><div class="page-head"><div><h1 id="group-title">'+escape(g.areaName)+'</h1>'+chip('group',g.status)+' '+opChip(g.operationalStatus)+(g.legacy?' <span class="tag">ללא אזור מוגדר</span>':'')+'</div>'+
    '<div class="actions"><a class="btn btn--quiet" href="'+escape(query(base,{memberStatus:data.memberStatus||undefined}))+'">רענון</a><a class="btn btn--quiet" href="'+escape(base+'/export.csv')+'" download>ייצוא לקובץ CSV</a><a class="btn btn--quiet" href="'+escape(base+'/export-lines.csv')+'" download>ייצוא שורות סל (CSV)</a></div></div>'+
    progress(g,true)+
@@ -207,7 +264,7 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
     '<div><dt>תפוסה</dt><dd>'+g.capacity.active+' מתוך '+g.capacity.limit+' מקומות פעילים</dd></div>'+
     '<div><dt>נפתחה</dt><dd>'+time(g.createdAt)+'</dd></div><div><dt>עדכון אחרון</dt><dd>'+time(g.updatedAt)+'</dd></div>'+
     '<div><dt>'+(g.active?'פתוחה להצטרפות עד':g.operationalStatus==='COMPLETED'?'תוקף ההצטרפות היה עד':'תאריך תפוגה')+'</dt><dd>'+time(g.expiresAt)+'</dd></div>'+
-   '</dl></section>'+approve+operationsCard(g,data.timeline||[],data.csrf,!!data.confirming)+
+   '</dl></section>'+approve+chargesCard(g,data.csrf)+operationsCard(g,data.timeline||[],data.csrf,!!data.confirming)+
   '<section class="card" aria-labelledby="members-title"><div class="section-head"><h2 id="members-title">לקוחות בקבוצה</h2>'+
    '<nav class="segmented" aria-label="סינון לפי סטטוס">'+filter('','הכול')+filter('PLEDGED','פעילים')+filter('WITHDRAWN','הוסרו מהקבוצה')+'</nav></div>'+
    (data.members.length?'<div class="table-wrap"><table class="table table--members"><caption class="sr-only">לקוחות בקבוצה, לפי סדר ההצטרפות</caption><thead><tr><th scope="col">אימייל</th><th scope="col">טלפון</th><th scope="col">סטטוס</th><th scope="col">התחייבות</th><th scope="col">שורות בסל</th><th scope="col">הצטרפות</th><th scope="col">עדכון אחרון</th><th scope="col">פעולות</th></tr></thead><tbody>'+members+'</tbody></table></div>'+
@@ -298,6 +355,11 @@ export function auditView(data:{events:any[];pagination:Page;csrf:string}){
     (OPERATIONAL_LABELS[e.previousStatus]||e.previousStatus||'')+' ← '+(OPERATIONAL_LABELS[e.newStatus]||e.newStatus||'')+(e.action==='group.complete'&&e.amountAgorot!==null?'. סכום סופי '+money(e.amountAgorot)+'.':'');
    return '<span class="audit__desc">'+escape(text)+'</span>';
   }
+  if(e.action.startsWith('finance.')){
+   const kind=String(e.detail||''),label=kind.startsWith('INCOME')?'הכנסה':kind.includes('RECURRING')?'חיוב קבוע':kind.startsWith('OPS_COSTS')?'חיוב קבוע (OPS_COSTS)':'הוצאה';
+   const text=e.result!=='OK'?'הבקשה לא בוצעה; לא נשמר שינוי.':label+(e.amountAgorot!==null?' · '+ils(e.amountAgorot):'');
+   return '<span class="audit__desc">'+escape(text)+'</span>';
+  }
   if(e.action!=='member.withdraw')return '';
   const text=e.result!=='OK'?'הבקשה לא בוצעה; הלקוח וההתחייבות לא שונו.':e.detail==='ALREADY_WITHDRAWN'?'הלקוח כבר הוסר קודם לכן. לא בוצע שינוי.':
    'הלקוח הוסר מהקבוצה.'+(e.amountAgorot!==null?' התחייבות של '+money(e.amountAgorot)+' הוסרה.':'');
@@ -352,7 +414,7 @@ h1{font-size:24px;line-height:1.3;margin:0 0 6px}h2{font-size:18px;margin:0}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font-size:13px;font-weight:600;color:var(--muted)}
 input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd4;border-radius:10px;background:#fff;color:inherit;font:inherit}
 .filters__actions{display:flex;gap:6px}
-.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.table-wrap{position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:12px}
 .table{width:100%;border-collapse:collapse;font-size:14px}
 .table th,.table td{padding:10px 12px;text-align:start;vertical-align:middle;border-bottom:1px solid var(--line)}
 .table thead th{position:sticky;top:0;background:#f6fafb;color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap}
@@ -363,6 +425,7 @@ input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd
 .row-link{font-weight:700;text-decoration:none}.row-link:hover{text-decoration:underline}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap;background:#eef2f3;color:#4b5e64}
 .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip--pay-card_reserved,.chip--pay-charged,.chip--paystate-paid{background:var(--ok-soft);color:var(--ok)}.chip--pay-consent_required,.chip--pay-charge_pending,.chip--paystate-charging{background:var(--warn-soft);color:var(--warn)}.chip--pay-payment_failed,.chip--paystate-payment_review_required{background:var(--bad-soft);color:var(--bad)}.chip--pay-canceled{background:#eef1f2;color:var(--muted)}
 .chip--open{background:var(--cyan-soft);color:var(--teal-strong)}.chip--threshold_reached{background:var(--ok-soft);color:var(--ok)}.chip--approved{background:#e8ecfb;color:#3346a8}
 .chip--expired,.chip--cancelled{background:#f1f1f1;color:#666}.chip--pledged{background:var(--ok-soft);color:var(--ok)}.chip--withdrawn{background:#f1f1f1;color:#666}.chip--removed{background:var(--bad-soft);color:var(--bad)}
 .card--history{background:#fafbfb;border-style:dashed}
@@ -432,6 +495,52 @@ input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd
 .cost-total{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;margin:12px 0 4px;font-size:15px}
 .sys-warnings,.sys-missing{margin:6px 0 0;padding-inline-start:20px}.sys-missing{display:flex;flex-wrap:wrap;gap:6px 18px}
 .audit__desc{display:block;margin-top:2px;font-size:13px;color:var(--muted)}
+textarea{width:100%;min-height:64px;padding:8px 10px;border:1px solid #b9cfd4;border-radius:10px;background:#fff;color:inherit;font:inherit;resize:vertical}
+fieldset{margin:0;padding:0;border:0;min-width:0}legend{padding:0;font-size:13px;font-weight:600;color:var(--muted)}
+[aria-invalid=true]{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+.field-error{margin:2px 0 0;font-size:13px;font-weight:600;color:var(--bad)}.field-hint{font-size:12px;color:var(--muted)}
+.money{unicode-bidi:isolate;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fin-head{align-items:center}.fin-actions{display:flex;flex-wrap:wrap;gap:8px}
+.metrics--fin{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.metric--fin{background:#fff;border-inline-start:4px solid var(--line)}.metric--fin .metric__value{font-size:28px;overflow-wrap:anywhere}
+.metric--income{border-inline-start-color:var(--ok)}.metric--expense{border-inline-start-color:#c2581b}.metric--recurring{border-inline-start-color:#3346a8}
+.metric--profit{border-inline-start-color:var(--ok)}.metric--profit .metric__value{color:var(--ok)}.metric--loss{border-inline-start-color:var(--bad)}.metric--loss .metric__value{color:var(--bad)}
+.fin-state{font-weight:700}.fin-state--profit{color:var(--ok)}.fin-state--loss{color:var(--bad)}
+.fin-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0 16px;align-items:start}.fin-grid>*{min-width:0}
+.fin-chart .section-head{margin-bottom:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;margin:0 0 6px;padding:0;font-size:13px;color:var(--muted)}.legend li{display:inline-flex;align-items:center;gap:6px}
+.swatch{display:inline-block;width:14px;height:14px;border-radius:3px}.swatch--income{background:var(--teal)}
+.swatch--expense{background:repeating-linear-gradient(45deg,#c2581b 0 2.5px,#f6d9c6 2.5px 6px)}
+.chart-scroll{overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.chart__svg{display:block;width:100%;height:auto;min-width:470px}.chart__svg--12{min-width:680px}
+.chart__svg--7,.chart__svg--8,.chart__svg--9,.chart__svg--10,.chart__svg--11{min-width:620px}
+.chart__grid{stroke:var(--line);stroke-width:1}.chart__grid--base{stroke:#9fb6bb}
+.chart__axis{font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}.chart__label{font-size:12px;fill:var(--ink);font-weight:600}
+.chart__bar--income{fill:var(--teal)}.chart__hatch-bg{fill:#f6d9c6}.chart__hatch{fill:#c2581b}.chart__bar--expense{stroke:#c2581b;stroke-width:1}
+.chart__bar:hover{opacity:.85}.chart__empty{text-align:center;margin:-8px 0 8px}
+.chart__data{margin-top:8px}.chart__data summary{display:inline-flex;align-items:center;min-height:44px;cursor:pointer;font-weight:600;color:var(--teal-strong)}
+.tx-type{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.tx-type--income{background:var(--ok-soft);color:var(--ok)}.tx-type--expense{background:#fbeee6;color:#9a4413}
+.tx-amount{font-weight:700}.tx-amount--income{color:var(--ok)}.tx-amount--expense{color:#9a4413}
+.row--occurrence{background:#f8f9fe}
+.icon-btn--danger{color:var(--bad);border-color:#f0c4be}.icon-btn--danger:hover{background:var(--bad-soft)}
+.filters--fin{grid-template-columns:2fr repeat(3,minmax(130px,1fr)) auto}
+.fin-totals{display:flex;flex-wrap:wrap;gap:4px 8px;margin:0 0 12px;font-size:14px;color:var(--muted)}.fin-totals .money{color:var(--ink);font-weight:700}
+.chip--rec-active{background:var(--ok-soft);color:var(--ok)}.chip--rec-scheduled{background:var(--cyan-soft);color:var(--teal-strong)}.chip--rec-ended{background:#f1f1f1;color:#666}
+.chip--rec-inactive{background:#f1f1f1;color:#666}.chip--rec-ended::before,.chip--rec-inactive::before{background:transparent;border:1.5px solid currentColor;box-sizing:border-box}
+.dialog--form{width:min(640px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}
+.dialog--form:not(:modal){border-color:var(--line)}
+.dialog--form .dialog__body{padding:16px 18px}.dialog--form .dialog__actions{position:sticky;bottom:-16px;margin:4px -16px -16px;padding:12px 16px;background:var(--surface);border-top:1px solid var(--line)}
+.tx-form{gap:10px}.tx-form__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.tx-form .notice ul{margin:6px 0 0;padding-inline-start:18px}.tx-form .notice a{color:inherit}
+.choice{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}.choice__item{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border:1px solid #b9cfd4;border-radius:10px;font-weight:600;cursor:pointer}
+.choice__item input{width:18px;height:18px;min-height:0;margin:0}.choice__item:has(input:checked){border-color:var(--teal);background:var(--cyan-soft);color:var(--teal-strong)}
+.tx-recurrence{padding:12px;border:1px solid var(--line);border-radius:10px;background:#f6fafb}.tx-recurrence legend{padding:0 4px}.tx-recurrence p{margin:8px 0 0}
+.fin-ops code{font-size:12px}
+.tag--ops{background:#e8ecfb;color:#3346a8;font-weight:700;white-space:nowrap}
+.table--ops .chip{white-space:normal}.table--ops td{overflow-wrap:anywhere}
+@media (max-width:1100px){.fin-grid{grid-template-columns:minmax(0,1fr)}.filters--fin{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.tx-form__grid{grid-template-columns:1fr}.fin-actions{width:100%}.fin-actions .btn{flex:1 1 0;padding:0 10px}}
 @media (max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.field--wide{grid-column:1/-1}.filters__actions{grid-column:1/-1}}
 @media (max-width:760px){
  body{font-size:15px}.topbar__nav{order:3;width:100%;margin:0}.filters{grid-template-columns:1fr 1fr}
@@ -442,6 +551,7 @@ input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd
  .table tfoot tr{display:flex;justify-content:space-between;padding:10px 12px;border-radius:12px}.table tfoot th,.table tfoot td{width:auto;border:0}
  .meter{min-width:0}
 }
+@media (max-width:760px){.filters--fin{grid-template-columns:1fr 1fr}.filters--fin .field--wide,.filters--fin .filters__actions{grid-column:1/-1}.table th[scope=row]{display:block;padding:6px 0;border:0;font-weight:700}}
 @media (max-width:420px){.filters{grid-template-columns:1fr}.dialog__actions .btn,.danger-zone .btn{flex:1 1 100%}}
 @media print{.topbar,.filters,.actions,.pager{display:none}}
 `+Array.from({length:101},(_,i)=>`.meter__track .p${i}{width:${i}%}`).join("")+``;
@@ -476,6 +586,32 @@ export const adminJS=`(()=>{'use strict';
    if(trigger.isConnected)trigger.focus();
   });
   if(dialog.open)open();
+ }
+ // Finance dialogs (/admin/system). Server-rendered open dialogs (?add/?edit/?delete/?import, or a form with errors)
+ // become modal; the add buttons open the add dialog in place with the right type. Closing removes those parameters.
+ const strip=()=>{const url=new URL(location.href);let changed=false;for(const key of ['add','edit','delete','import'])if(url.searchParams.has(key)){url.searchParams.delete(key);changed=true;}if(changed)history.replaceState(null,'',url.pathname+url.search);};
+ const modal=dialog=>{if(!(dialog instanceof HTMLDialogElement)||typeof dialog.showModal!=='function')return false;if(dialog.open)dialog.close();dialog.showModal();
+  const target=dialog.querySelector('[data-error-summary]')||dialog.querySelector('[aria-invalid=true]')||dialog.querySelector('[data-dialog-cancel][autofocus]')||dialog.querySelector('input:not([type=hidden]):not([type=radio]),input[type=radio]:checked');target?.focus();return true;};
+ const sync=form=>{
+  const type=form.querySelector('[data-tx-type]:checked')?.value,recurring=form.querySelector('[data-tx-recurring]'),fields=form.querySelector('[data-tx-recurrence]'),category=form.querySelector('[data-tx-category]');
+  if(recurring){if(type==='INCOME'){recurring.checked=false;recurring.disabled=true;}else recurring.disabled=false;}
+  if(fields&&recurring)fields.hidden=!recurring.checked;
+  if(category)category.setAttribute('list','fin-categories-'+(type==='INCOME'?'income':'expense'));
+ };
+ for(const form of document.querySelectorAll('[data-tx-form]')){form.addEventListener('change',()=>sync(form));sync(form);}
+ for(const dialog of document.querySelectorAll('dialog[data-autoshow]')){dialog.addEventListener('close',strip);if(dialog.open)modal(dialog);}
+ const add=document.getElementById('tx-new');
+ if(add instanceof HTMLDialogElement&&typeof add.showModal==='function'){
+  add.addEventListener('close',strip);
+  for(const trigger of document.querySelectorAll('[data-tx-add]'))trigger.addEventListener('click',event=>{
+   event.preventDefault();
+   const kind=trigger.dataset.txAdd,form=add.querySelector('form');
+   if(!add.querySelector('[data-error-summary]'))form.reset();
+   const radio=form.querySelector('[data-tx-type][value='+(kind==='INCOME'?'INCOME':'EXPENSE')+']');if(radio)radio.checked=true;
+   const recurring=form.querySelector('[data-tx-recurring]');if(recurring){recurring.disabled=false;recurring.checked=kind==='RECURRING';}
+   const title=add.querySelector('h2');if(title)title.textContent=title.dataset['title'+(kind==='INCOME'?'Income':kind==='RECURRING'?'Recurring':'Expense')]||title.textContent;
+   sync(form);modal(add);add.addEventListener('close',()=>{if(trigger.isConnected)trigger.focus();},{once:true});
+  });
  }
  const busy=()=>{document.body.setAttribute('data-loading','');document.querySelector('main')?.setAttribute('aria-busy','true');};
  document.addEventListener('submit',event=>{
