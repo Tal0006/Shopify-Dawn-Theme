@@ -2,6 +2,7 @@
 // one same-origin script (/admin/app.js) only adds copy buttons, row clicks, a loading bar and back-cache protection.
 // Customer contact details appear only on these authenticated pages, never in public HTML or browser storage.
 import {REACHABLE_STATUSES,dialable,type Page} from './admin-data.js';
+import {ils} from './finance.js';
 export const escape=(value:unknown)=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]!));
 const TZ='Asia/Jerusalem';
 const money=(agorot:number)=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS'}).format(agorot/100);
@@ -13,12 +14,14 @@ export const MEMBER_LABELS:Record<string,string>={PLEDGED:'התחייבות פע
 export const OPERATIONAL_LABELS:Record<string,string>={NEW:'חדש',IN_PROGRESS:'בטיפול',READY_FOR_DELIVERY:'מוכן למשלוח',OUT_FOR_DELIVERY:'יצא למשלוח',COMPLETED:'הושלם'};
 const OPERATIONAL_ORDER=['NEW','IN_PROGRESS','READY_FOR_DELIVERY','OUT_FOR_DELIVERY','COMPLETED'];
 const opChip=(status:string)=>'<span class="chip chip--op chip--op-'+escape(status.toLowerCase().replace(/_/g,'-'))+'">'+escape(OPERATIONAL_LABELS[status]||status)+'</span>';
-const ACTION_LABELS:Record<string,string>={'group.operational_status_change':'שינוי סטטוס משלוח','group.complete':'השלמת משלוח','login':'התחברות','logout':'התנתקות','group.approve':'אישור קבוצה','area.create':'הוספת אזור','area.update':'עדכון אזור','group.export':'ייצוא נתוני קבוצה','member.withdraw':'הסרת לקוח מהקבוצה'};
+const ACTION_LABELS:Record<string,string>={'group.operational_status_change':'שינוי סטטוס משלוח','group.complete':'השלמת משלוח','login':'התחברות','logout':'התנתקות','group.approve':'אישור קבוצה','area.create':'הוספת אזור','area.update':'עדכון אזור','group.export':'ייצוא נתוני קבוצה','member.withdraw':'הסרת לקוח מהקבוצה',
+ 'group.charges_process':'שליחת חיובים','group.charges_reconcile':'בדיקת חיובים','finance.transaction_create':'רישום תנועה כספית','finance.transaction_update':'עדכון תנועה כספית','finance.transaction_delete':'מחיקת תנועה כספית',
+ 'finance.recurring_create':'הוספת חיוב קבוע','finance.recurring_update':'עדכון חיוב קבוע','finance.recurring_deactivate':'הפסקת חיוב קבוע','finance.recurring_delete':'מחיקת חיוב קבוע'};
 const RESULT_LABELS:Record<string,string>={OK:'הצליח',DENIED:'נדחה',FAILED:'נכשל'};
 const chip=(kind:'group'|'member',status:string)=>'<span class="chip chip--'+escape(status.toLowerCase())+'">'+escape((kind==='group'?GROUP_LABELS:MEMBER_LABELS)[status]||status)+'</span>';
 // Visible, specific labels ("העתקת טלפון"), so neighbouring copy buttons are never ambiguous.
 const copyButton=(value:string,label:string)=>'<button type="button" class="icon-btn" data-copy="'+escape(value)+'" data-copy-label="'+escape(label)+'" hidden>העתקת '+escape(label)+'</button>';
-const query=(base:string,params:Record<string,string|number|undefined|null>)=>{
+export const query=(base:string,params:Record<string,string|number|undefined|null>)=>{
  const search=new URLSearchParams();for(const [key,value] of Object.entries(params))if(value!==undefined&&value!==null&&value!=='')search.set(key,String(value));
  const text=search.toString();return base+(text?'?'+text:'');
 };
@@ -26,20 +29,31 @@ const progress=(group:{pledgedTotalAgorot:number;thresholdAgorot:number;progress
  '<div class="meter'+(large?' meter--large':'')+(group.progressPercent>=100?' meter--reached':'')+'">'+
  '<div class="meter__label"><span><strong>'+escape(money(group.pledgedTotalAgorot))+'</strong> מתוך '+escape(money(group.thresholdAgorot))+'</span><span>'+group.progressPercent+'%</span></div>'+
  '<div class="meter__track" role="progressbar" aria-label="התקדמות ליעד ההזמנה" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+group.progressPercent+'" aria-valuetext="'+escape(money(group.pledgedTotalAgorot)+' מתוך '+money(group.thresholdAgorot))+'"><span class="p'+Math.max(0,Math.min(100,group.progressPercent))+'"></span></div></div>';
-const pager=(base:string,params:Record<string,string|number|undefined>,page:Page,label:string)=>{
+export const pager=(base:string,params:Record<string,string|number|undefined>,page:Page,label:string)=>{
  if(page.pageCount<=1)return '<p class="muted">'+page.total+' '+escape(label)+'</p>';
  const link=(target:number,text:string,rel:string)=>target<1||target>page.pageCount?'<span class="pager__link" aria-disabled="true">'+text+'</span>':'<a class="pager__link" rel="'+rel+'" href="'+escape(query(base,{...params,page:target}))+'">'+text+'</a>';
  return '<nav class="pager" aria-label="דפדוף">'+link(page.page-1,'הקודם','prev')+'<span>עמוד '+page.page+' מתוך '+page.pageCount+' · '+page.total+' '+escape(label)+'</span>'+link(page.page+1,'הבא','next')+'</nav>';
 };
 
+// Admin sections, in navigation order. The next phase adds a section by declaring it here (enabled once its pages
+// exist); "active" on a page is the section key. Disabled sections are never rendered or linked.
+export const ADMIN_SECTIONS:{key:string;label:string;href:string;enabled:boolean}[]=[
+ {key:'overview',label:'סקירה',href:'/admin/overview',enabled:false},
+ {key:'finance',label:'כספים',href:'/admin/system',enabled:true},
+ {key:'orders',label:'הזמנות',href:'/admin/orders',enabled:false},
+ {key:'dashboard',label:'משלוחים קבוצתיים',href:'/admin',enabled:true},
+ {key:'areas',label:'אזורי משלוח',href:'/admin/areas',enabled:true},
+ {key:'audit',label:'יומן פעולות',href:'/admin/audit',enabled:true},
+ {key:'system',label:'מערכות האתר',href:'/admin/system/services',enabled:true},
+];
 export function layout(title:string,body:string,options:{csrf?:string;active?:string}={}){
- const nav=options.csrf?'<nav class="topbar__nav" aria-label="ניווט ניהול">'+[['/admin','לוח בקרה','dashboard'],['/admin/areas','אזורי משלוח','areas'],['/admin/audit','יומן פעולות','audit'],['/admin/system','מערכות האתר','system']]
-  .map(([href,text,key])=>'<a href="'+href+'"'+(options.active===key?' aria-current="page"':'')+'>'+text+'</a>').join('')+'</nav>'+
+ const nav=options.csrf?'<nav class="topbar__nav" aria-label="ניווט ניהול">'+ADMIN_SECTIONS.filter(section=>section.enabled)
+  .map(({href,label,key})=>'<a href="'+href+'"'+(options.active===key?' aria-current="page"':'')+'>'+label+'</a>').join('')+'</nav>'+
   '<form method="post" action="/admin/logout" class="topbar__logout"><input type="hidden" name="csrf" value="'+escape(options.csrf)+'"><button class="btn btn--quiet">יציאה</button></form>':'';
  return '<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'+
   '<title>'+escape(title)+' · ניהול משלוחים קבוצתיים</title><link rel="stylesheet" href="/admin/style.css"><script src="/admin/app.js" defer></script></head>'+
   '<body><a class="skip" href="#main">דילוג לתוכן</a><div class="loading-bar" aria-hidden="true"></div>'+
-  '<header class="topbar"><a class="topbar__brand" href="/admin"><span class="topbar__dot" aria-hidden="true"></span>פאנקי · משלוחים קבוצתיים</a>'+nav+'</header>'+
+  '<header class="topbar"><a class="topbar__brand" href="/admin"><span class="topbar__dot" aria-hidden="true"></span>פאנקי · ניהול העסק</a>'+nav+'</header>'+
   '<main id="main" tabindex="-1">'+body+'</main><p class="sr-only" role="status" aria-live="polite" id="admin-live"></p></body></html>';
 }
 export const notice=(kind:'ok'|'error'|'info',text:string)=>'<p class="notice notice--'+kind+'" role="'+(kind==='error'?'alert':'status')+'">'+escape(text)+'</p>';
@@ -341,6 +355,11 @@ export function auditView(data:{events:any[];pagination:Page;csrf:string}){
     (OPERATIONAL_LABELS[e.previousStatus]||e.previousStatus||'')+' ← '+(OPERATIONAL_LABELS[e.newStatus]||e.newStatus||'')+(e.action==='group.complete'&&e.amountAgorot!==null?'. סכום סופי '+money(e.amountAgorot)+'.':'');
    return '<span class="audit__desc">'+escape(text)+'</span>';
   }
+  if(e.action.startsWith('finance.')){
+   const kind=String(e.detail||''),label=kind.startsWith('INCOME')?'הכנסה':kind.includes('RECURRING')?'חיוב קבוע':kind.startsWith('OPS_COSTS')?'חיוב קבוע (OPS_COSTS)':'הוצאה';
+   const text=e.result!=='OK'?'הבקשה לא בוצעה; לא נשמר שינוי.':label+(e.amountAgorot!==null?' · '+ils(e.amountAgorot):'');
+   return '<span class="audit__desc">'+escape(text)+'</span>';
+  }
   if(e.action!=='member.withdraw')return '';
   const text=e.result!=='OK'?'הבקשה לא בוצעה; הלקוח וההתחייבות לא שונו.':e.detail==='ALREADY_WITHDRAWN'?'הלקוח כבר הוסר קודם לכן. לא בוצע שינוי.':
    'הלקוח הוסר מהקבוצה.'+(e.amountAgorot!==null?' התחייבות של '+money(e.amountAgorot)+' הוסרה.':'');
@@ -395,7 +414,7 @@ h1{font-size:24px;line-height:1.3;margin:0 0 6px}h2{font-size:18px;margin:0}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font-size:13px;font-weight:600;color:var(--muted)}
 input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd4;border-radius:10px;background:#fff;color:inherit;font:inherit}
 .filters__actions{display:flex;gap:6px}
-.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.table-wrap{position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:12px}
 .table{width:100%;border-collapse:collapse;font-size:14px}
 .table th,.table td{padding:10px 12px;text-align:start;vertical-align:middle;border-bottom:1px solid var(--line)}
 .table thead th{position:sticky;top:0;background:#f6fafb;color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap}
@@ -476,6 +495,52 @@ input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd
 .cost-total{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;margin:12px 0 4px;font-size:15px}
 .sys-warnings,.sys-missing{margin:6px 0 0;padding-inline-start:20px}.sys-missing{display:flex;flex-wrap:wrap;gap:6px 18px}
 .audit__desc{display:block;margin-top:2px;font-size:13px;color:var(--muted)}
+textarea{width:100%;min-height:64px;padding:8px 10px;border:1px solid #b9cfd4;border-radius:10px;background:#fff;color:inherit;font:inherit;resize:vertical}
+fieldset{margin:0;padding:0;border:0;min-width:0}legend{padding:0;font-size:13px;font-weight:600;color:var(--muted)}
+[aria-invalid=true]{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+.field-error{margin:2px 0 0;font-size:13px;font-weight:600;color:var(--bad)}.field-hint{font-size:12px;color:var(--muted)}
+.money{unicode-bidi:isolate;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fin-head{align-items:center}.fin-actions{display:flex;flex-wrap:wrap;gap:8px}
+.metrics--fin{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+.metric--fin{background:#fff;border-inline-start:4px solid var(--line)}.metric--fin .metric__value{font-size:28px;overflow-wrap:anywhere}
+.metric--income{border-inline-start-color:var(--ok)}.metric--expense{border-inline-start-color:#c2581b}.metric--recurring{border-inline-start-color:#3346a8}
+.metric--profit{border-inline-start-color:var(--ok)}.metric--profit .metric__value{color:var(--ok)}.metric--loss{border-inline-start-color:var(--bad)}.metric--loss .metric__value{color:var(--bad)}
+.fin-state{font-weight:700}.fin-state--profit{color:var(--ok)}.fin-state--loss{color:var(--bad)}
+.fin-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0 16px;align-items:start}.fin-grid>*{min-width:0}
+.fin-chart .section-head{margin-bottom:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;margin:0 0 6px;padding:0;font-size:13px;color:var(--muted)}.legend li{display:inline-flex;align-items:center;gap:6px}
+.swatch{display:inline-block;width:14px;height:14px;border-radius:3px}.swatch--income{background:var(--teal)}
+.swatch--expense{background:repeating-linear-gradient(45deg,#c2581b 0 2.5px,#f6d9c6 2.5px 6px)}
+.chart-scroll{overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.chart__svg{display:block;width:100%;height:auto;min-width:470px}.chart__svg--12{min-width:680px}
+.chart__svg--7,.chart__svg--8,.chart__svg--9,.chart__svg--10,.chart__svg--11{min-width:620px}
+.chart__grid{stroke:var(--line);stroke-width:1}.chart__grid--base{stroke:#9fb6bb}
+.chart__axis{font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}.chart__label{font-size:12px;fill:var(--ink);font-weight:600}
+.chart__bar--income{fill:var(--teal)}.chart__hatch-bg{fill:#f6d9c6}.chart__hatch{fill:#c2581b}.chart__bar--expense{stroke:#c2581b;stroke-width:1}
+.chart__bar:hover{opacity:.85}.chart__empty{text-align:center;margin:-8px 0 8px}
+.chart__data{margin-top:8px}.chart__data summary{display:inline-flex;align-items:center;min-height:44px;cursor:pointer;font-weight:600;color:var(--teal-strong)}
+.tx-type{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.tx-type--income{background:var(--ok-soft);color:var(--ok)}.tx-type--expense{background:#fbeee6;color:#9a4413}
+.tx-amount{font-weight:700}.tx-amount--income{color:var(--ok)}.tx-amount--expense{color:#9a4413}
+.row--occurrence{background:#f8f9fe}
+.icon-btn--danger{color:var(--bad);border-color:#f0c4be}.icon-btn--danger:hover{background:var(--bad-soft)}
+.filters--fin{grid-template-columns:2fr repeat(3,minmax(130px,1fr)) auto}
+.fin-totals{display:flex;flex-wrap:wrap;gap:4px 8px;margin:0 0 12px;font-size:14px;color:var(--muted)}.fin-totals .money{color:var(--ink);font-weight:700}
+.chip--rec-active{background:var(--ok-soft);color:var(--ok)}.chip--rec-scheduled{background:var(--cyan-soft);color:var(--teal-strong)}.chip--rec-ended{background:#f1f1f1;color:#666}
+.chip--rec-inactive{background:#f1f1f1;color:#666}.chip--rec-ended::before,.chip--rec-inactive::before{background:transparent;border:1.5px solid currentColor;box-sizing:border-box}
+.dialog--form{width:min(640px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto}
+.dialog--form:not(:modal){border-color:var(--line)}
+.dialog--form .dialog__body{padding:16px 18px}.dialog--form .dialog__actions{position:sticky;bottom:-16px;margin:4px -16px -16px;padding:12px 16px;background:var(--surface);border-top:1px solid var(--line)}
+.tx-form{gap:10px}.tx-form__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.tx-form .notice ul{margin:6px 0 0;padding-inline-start:18px}.tx-form .notice a{color:inherit}
+.choice{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}.choice__item{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border:1px solid #b9cfd4;border-radius:10px;font-weight:600;cursor:pointer}
+.choice__item input{width:18px;height:18px;min-height:0;margin:0}.choice__item:has(input:checked){border-color:var(--teal);background:var(--cyan-soft);color:var(--teal-strong)}
+.tx-recurrence{padding:12px;border:1px solid var(--line);border-radius:10px;background:#f6fafb}.tx-recurrence legend{padding:0 4px}.tx-recurrence p{margin:8px 0 0}
+.fin-ops code{font-size:12px}
+.tag--ops{background:#e8ecfb;color:#3346a8;font-weight:700;white-space:nowrap}
+.table--ops .chip{white-space:normal}.table--ops td{overflow-wrap:anywhere}
+@media (max-width:1100px){.fin-grid{grid-template-columns:minmax(0,1fr)}.filters--fin{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.tx-form__grid{grid-template-columns:1fr}.fin-actions{width:100%}.fin-actions .btn{flex:1 1 0;padding:0 10px}}
 @media (max-width:1100px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}.field--wide{grid-column:1/-1}.filters__actions{grid-column:1/-1}}
 @media (max-width:760px){
  body{font-size:15px}.topbar__nav{order:3;width:100%;margin:0}.filters{grid-template-columns:1fr 1fr}
@@ -486,6 +551,7 @@ input,select{min-height:44px;width:100%;padding:8px 10px;border:1px solid #b9cfd
  .table tfoot tr{display:flex;justify-content:space-between;padding:10px 12px;border-radius:12px}.table tfoot th,.table tfoot td{width:auto;border:0}
  .meter{min-width:0}
 }
+@media (max-width:760px){.filters--fin{grid-template-columns:1fr 1fr}.filters--fin .field--wide,.filters--fin .filters__actions{grid-column:1/-1}.table th[scope=row]{display:block;padding:6px 0;border:0;font-weight:700}}
 @media (max-width:420px){.filters{grid-template-columns:1fr}.dialog__actions .btn,.danger-zone .btn{flex:1 1 100%}}
 @media print{.topbar,.filters,.actions,.pager{display:none}}
 `+Array.from({length:101},(_,i)=>`.meter__track .p${i}{width:${i}%}`).join("")+``;
@@ -520,6 +586,32 @@ export const adminJS=`(()=>{'use strict';
    if(trigger.isConnected)trigger.focus();
   });
   if(dialog.open)open();
+ }
+ // Finance dialogs (/admin/system). Server-rendered open dialogs (?add/?edit/?delete/?import, or a form with errors)
+ // become modal; the add buttons open the add dialog in place with the right type. Closing removes those parameters.
+ const strip=()=>{const url=new URL(location.href);let changed=false;for(const key of ['add','edit','delete','import'])if(url.searchParams.has(key)){url.searchParams.delete(key);changed=true;}if(changed)history.replaceState(null,'',url.pathname+url.search);};
+ const modal=dialog=>{if(!(dialog instanceof HTMLDialogElement)||typeof dialog.showModal!=='function')return false;if(dialog.open)dialog.close();dialog.showModal();
+  const target=dialog.querySelector('[data-error-summary]')||dialog.querySelector('[aria-invalid=true]')||dialog.querySelector('[data-dialog-cancel][autofocus]')||dialog.querySelector('input:not([type=hidden]):not([type=radio]),input[type=radio]:checked');target?.focus();return true;};
+ const sync=form=>{
+  const type=form.querySelector('[data-tx-type]:checked')?.value,recurring=form.querySelector('[data-tx-recurring]'),fields=form.querySelector('[data-tx-recurrence]'),category=form.querySelector('[data-tx-category]');
+  if(recurring){if(type==='INCOME'){recurring.checked=false;recurring.disabled=true;}else recurring.disabled=false;}
+  if(fields&&recurring)fields.hidden=!recurring.checked;
+  if(category)category.setAttribute('list','fin-categories-'+(type==='INCOME'?'income':'expense'));
+ };
+ for(const form of document.querySelectorAll('[data-tx-form]')){form.addEventListener('change',()=>sync(form));sync(form);}
+ for(const dialog of document.querySelectorAll('dialog[data-autoshow]')){dialog.addEventListener('close',strip);if(dialog.open)modal(dialog);}
+ const add=document.getElementById('tx-new');
+ if(add instanceof HTMLDialogElement&&typeof add.showModal==='function'){
+  add.addEventListener('close',strip);
+  for(const trigger of document.querySelectorAll('[data-tx-add]'))trigger.addEventListener('click',event=>{
+   event.preventDefault();
+   const kind=trigger.dataset.txAdd,form=add.querySelector('form');
+   if(!add.querySelector('[data-error-summary]'))form.reset();
+   const radio=form.querySelector('[data-tx-type][value='+(kind==='INCOME'?'INCOME':'EXPENSE')+']');if(radio)radio.checked=true;
+   const recurring=form.querySelector('[data-tx-recurring]');if(recurring){recurring.disabled=false;recurring.checked=kind==='RECURRING';}
+   const title=add.querySelector('h2');if(title)title.textContent=title.dataset['title'+(kind==='INCOME'?'Income':kind==='RECURRING'?'Recurring':'Expense')]||title.textContent;
+   sync(form);modal(add);add.addEventListener('close',()=>{if(trigger.isConnected)trigger.focus();},{once:true});
+  });
  }
  const busy=()=>{document.body.setAttribute('data-loading','');document.querySelector('main')?.setAttribute('aria-busy','true');};
  document.addEventListener('submit',event=>{

@@ -11,7 +11,9 @@ export const PUBLIC_ERROR_CODES=['INVALID_INPUT','INVALID_LOCATION','INVALID_CAR
  'CARD_RESERVATION_REQUIRED','PAYMENT_UNAVAILABLE','CONSENT_REQUIRED','PLEDGE_AMOUNT_CHANGED','RESERVATION_NOT_FOUND','CARD_DATA_NOT_ACCEPTED','CHARGE_IN_PROGRESS'] as const;
 // Merchant-only /admin codes; never shown on the storefront.
 export const ADMIN_ERROR_CODES=['LOGIN_FAILED','ADMIN_AUTH_REQUIRED','CSRF_REQUIRED','INVALID_CONTENT_TYPE','APPROVAL_NOT_ALLOWED','AREA_EXISTS','AREA_NOT_FOUND','MEMBER_NOT_FOUND',
- 'INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED'] as const;
+ 'INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED',
+ // Business finance (/admin/system).
+ 'INVALID_TRANSACTION','TRANSACTION_NOT_FOUND','TRANSACTION_EXISTS','DELETE_CONFIRMATION_REQUIRED','RECURRING_OCCURRENCE','RECURRING_INACTIVE','OPS_MANAGED'] as const;
 export type ErrorCode=typeof PUBLIC_ERROR_CODES[number]|typeof ADMIN_ERROR_CODES[number];
 // details: optional safe integers only (e.g. a re-validated amount in agorot), serialized next to code and message.
 export class ApiError extends Error {constructor(public status:number,public code:ErrorCode, message='לא ניתן להשלים את הבקשה. יש לבדוק את הפרטים ולנסות שוב.',public details?:Record<string,number>){super(message)}}

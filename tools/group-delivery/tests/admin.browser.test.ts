@@ -272,7 +272,7 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
   await t.test('systems page: navigation, RTL, status chips, quick links, refresh, costs, postponed, desktop and mobile',async()=>{
    await size(1440);await go('/admin');
    await ev('[...document.querySelectorAll(".topbar__nav a")].find(a=>a.textContent==="מערכות האתר").click()');
-   await wait('location.pathname==="/admin/system"&&!!document.querySelector(".sys-grid")');
+   await wait('location.pathname==="/admin/system/services"&&!!document.querySelector(".sys-grid")');
    assert.deepEqual(await ev('[document.querySelector("h1").textContent,document.documentElement.dir,document.querySelector(".topbar__nav a[aria-current=page]").textContent,document.title]'),['מערכות האתר','rtl','מערכות האתר','מערכות האתר · ניהול משלוחים קבוצתיים']);
    const chip=(id:string)=>ev('document.querySelector("[data-system=\\"'+id+'\\"] .chip--sys").textContent');
    assert.deepEqual(await Promise.all(['render-group-delivery','neon','domain','group-delivery-admin','shopify','github','merchant-center','dynamic-google-reviews','group-delivery-payments'].map(chip)),
@@ -295,12 +295,102 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key:'Enter',code:'Enter',windowsVirtualKeyCode:13,...(type==='keyDown'?{text:String.fromCharCode(13)}:{})});
    await wait('location.search==="?refresh=1"&&!!document.querySelector(".sys-grid")');
    // Mobile: cards stack, no overflow, 44px controls.
-   await size(390,844);await go('/admin/system');
+   await size(390,844);await go('/admin/system/services');
    assert.equal(await ev(overflow),false);
    assert.equal(await ev('getComputedStyle(document.querySelector(".sys-grid")).gridTemplateColumns.split(" ").length'),1);
    assert.deepEqual(await ev('[...document.querySelectorAll("main .btn,.topbar a,.topbar button")].filter(e=>e.offsetParent&&e.getBoundingClientRect().height<43.5).map(e=>e.outerHTML.slice(0,60))'),[]);
    await shot('admin-mobile-system');
    await size(1440);
+  });
+
+  await t.test('finance dashboard: RTL, KPIs, chart, add/edit/delete dialogs, recurring charges, desktop and mobile',async()=>{
+   await size(1440);await go('/admin');
+   await ev('[...document.querySelectorAll(".topbar__nav a")].find(a=>a.textContent==="כספים").click()');
+   await wait('location.pathname==="/admin/system"&&!!document.querySelector(".metrics--fin")');
+   assert.deepEqual(await ev('[document.querySelector("h1").textContent,document.documentElement.dir,document.querySelector(".topbar__nav a[aria-current=page]").textContent]'),['כספים','rtl','כספים']);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".metric--fin .metric__label")].map(e=>e.textContent)'),['הכנסות החודש','הוצאות החודש','רווח / הפסד','חיובים קבועים']);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".topbar__nav a")].map(a=>a.textContent)'),['כספים','משלוחים קבוצתיים','אזורי משלוח','יומן פעולות','מערכות האתר']);
+   const modal=(id:string)=>'!!document.querySelector("#'+id+'")?.matches(":modal")';
+   const submit=(id:string)=>ev('document.querySelector("#'+id+' form").requestSubmit(document.querySelector("#'+id+' button.btn--primary"))');
+   const fill=(id:string,values:Record<string,string>)=>ev('(()=>{const d=document.querySelector("#'+id+'");'+Object.entries(values).map(([k,v])=>'d.querySelector("[name='+k+']").value='+JSON.stringify(v)+';').join('')+'})()');
+   const key=async(k:string,code:number)=>{for(const type of ['keyDown','keyUp'])await call('Input.dispatchKeyEvent',{type,key:k,code:k,windowsVirtualKeyCode:code});};
+   // "+ הוצאה" opens the dialog in place (no navigation); recurrence fields stay hidden; Escape closes without saving.
+   await ev('document.querySelector("[data-tx-add=EXPENSE]").click()');await wait(modal('tx-new'));
+   assert.deepEqual(await ev('[location.search,document.querySelector("#tx-new h2").textContent,document.querySelector("#tx-new [data-tx-recurrence]").hidden,document.querySelector("#tx-new-type-EXPENSE").checked]'),['','הוספת הוצאה',true,true]);
+   await ev('document.querySelector("#tx-new-type-INCOME").click()');
+   assert.equal(await ev('document.querySelector("#tx-new-recurring").disabled'),true,'income cannot be recurring');
+   assert.equal(await ev('document.querySelector("#tx-new-category").getAttribute("list")'),'fin-categories-income');
+   await key('Escape',27);await wait('!document.querySelector("#tx-new").open');
+   // OPS_COSTS "Domain" (₪60 yearly, ILS) is synchronized automatically: one recorded row this month, marked as a system expense.
+   assert.equal(await ev('document.querySelectorAll(".table--tx tbody tr").length'),1);
+   assert.match(await ev('document.querySelector(".table--recurring").textContent'),/Domainהוצאת מערכת OPS_COSTS/);
+   assert.equal(await ev('[...document.querySelectorAll(".table--ops tbody tr")].map(r=>r.dataset.opsState).join()'),'NOT_COUNTED,FREE','only uncounted OPS costs are listed separately');
+   // Record an expense, a recurring charge and an income.
+   await ev('document.querySelector("[data-tx-add=EXPENSE]").click()');await wait(modal('tx-new'));
+   await fill('tx-new',{amount:'1,234.56',category:'פרסום',description:'קמפיין'});await submit('tx-new');
+   await wait('document.querySelector(".notice--ok")?.textContent==="התנועה נשמרה."');
+   assert.match(await ev('document.querySelector(".metric--expense .metric__value").textContent'),/^₪1,294\.56$/);
+   await ev('document.querySelector(".fin-actions [data-tx-add=RECURRING]").click()');await wait(modal('tx-new'));
+   assert.deepEqual(await ev('[document.querySelector("#tx-new h2").textContent,document.querySelector("#tx-new-recurring").checked,document.querySelector("#tx-new [data-tx-recurrence]").hidden]'),['הוספת חיוב קבוע',true,false]);
+   await fill('tx-new',{amount:'100',category:'Shopify',description:'Shopify Basic'});await submit('tx-new');
+   await wait('!!document.querySelector(".table--recurring tbody tr")');
+   assert.match(await ev('document.querySelector(".table--recurring tbody tr").textContent'),/Shopify Basic.*₪100\.00.*חודשי.*פעיל.*\d{2}\.\d{2}\.\d{4}/);
+   await ev('document.querySelector("[data-tx-add=INCOME]").click()');await wait(modal('tx-new'));
+   await fill('tx-new',{amount:'500',category:'מכירות Shopify'});await submit('tx-new');
+   await wait('document.querySelectorAll(".table--tx tbody tr").length===4');
+   // KPIs: profit is stated in words and money reads LTR inside RTL.
+   assert.deepEqual(await ev('[document.querySelector(".metric--loss .metric__value").textContent,document.querySelector(".metric--loss .fin-state").textContent.trim(),getComputedStyle(document.querySelector(".metric--loss .money")).direction]'),['−₪894.56','▼ הפסד','ltr']);
+   assert.match(await ev('document.querySelector(".metric--recurring .metric__value").textContent'),/^₪105\.00$/,'₪100 monthly + ₪60/12');
+   // Income vs expense rows differ by text and arrow, not only color.
+   assert.deepEqual(await ev('[...document.querySelectorAll(".table--tx tbody .tx-type")].map(e=>e.textContent.trim()).sort()'),['↑ הכנסה','↓ הוצאה','↓ הוצאה','↓ הוצאה']);
+   // Chart: 6 months × 2 bars, months laid out right to left (current month leftmost).
+   assert.equal(await ev('document.querySelectorAll(".chart__svg rect.chart__bar").length'),12);
+   assert.equal(await ev('(()=>{const l=[...document.querySelectorAll(".chart__label")].map(e=>e.getBBox().x);return l[0]>l[5];})()'),true);
+   assert.ok(await ev('document.querySelectorAll(".chart__month")[5].querySelector(".chart__bar--expense").getBBox().height>0'));
+   // A refused amount comes back in the open dialog with the field marked and the summary focused.
+   await ev('document.querySelector("[data-tx-add=EXPENSE]").click()');await wait(modal('tx-new'));
+   await fill('tx-new',{amount:'-5',category:'שונות'});await submit('tx-new');
+   await wait(modal('tx-new')+'&&!!document.querySelector("[data-error-summary]")');
+   assert.deepEqual(await ev('[document.querySelector("#tx-new-amount").getAttribute("aria-invalid"),document.activeElement.hasAttribute("data-error-summary")]'),['true',true]);
+   await ev('document.querySelector("#tx-new [data-dialog-cancel]").click()');await wait('!document.querySelector("#tx-new").open');
+   assert.equal(await ev('document.querySelectorAll(".table--tx tbody tr").length'),4);
+   // Edit (link → modal dialog prefilled), then delete with a confirmation that Cancel leaves untouched.
+   const row='[...document.querySelectorAll(".table--tx tbody tr")].find(r=>r.textContent.includes("קמפיין"))';
+   await ev(row+'.querySelector("a.icon-btn").click()');await wait(modal('tx-edit'));
+   assert.equal(await ev('document.querySelector("#tx-edit-amount").value'),'1234.56');
+   await fill('tx-edit',{amount:'1000'});await submit('tx-edit');
+   await wait('document.querySelector(".notice--ok")?.textContent==="התנועה עודכנה."');
+   assert.match(await ev(row+'.textContent'),/−₪1,000\.00/);
+   await ev(row+'.querySelector(".icon-btn--danger").click()');await wait(modal('delete-dialog'));
+   assert.equal(await ev('document.activeElement.hasAttribute("data-dialog-cancel")'),true,'focus starts on Cancel');
+   await ev('document.activeElement.click()');await wait('!document.querySelector("#delete-dialog").open');
+   assert.equal(await ev('location.search.includes("delete=")'),false);assert.ok(await ev('!!'+row));
+   await ev(row+'.querySelector(".icon-btn--danger").click()');await wait(modal('delete-dialog'));
+   await ev('document.querySelector("#delete-dialog .btn--danger").click()');
+   await wait('document.querySelector(".notice--ok")?.textContent==="התנועה נמחקה."');
+   assert.equal(await ev('!!'+row),false);
+   // Ranges and filters.
+   await ev('[...document.querySelectorAll(".fin-chart .segmented__item")].find(a=>a.textContent==="12 חודשים").click()');
+   await wait('location.search.includes("range=12m")&&document.querySelectorAll(".chart__svg rect.chart__bar").length===24');
+   await ev('document.querySelector("#fin-type").value="INCOME";document.querySelector(".filters--fin").requestSubmit()');
+   await wait('location.search.includes("type=INCOME")&&document.querySelectorAll(".table--tx tbody tr").length===1');
+   assert.equal(await ev('location.search.includes("range=12m")'),true,'the chart range is kept while filtering');
+   const offenders='JSON.stringify([innerWidth,document.documentElement.scrollWidth,...[...document.querySelectorAll("body *")].filter(e=>!e.closest(".chart-scroll,.table-wrap")&&(e.getBoundingClientRect().right>innerWidth+1||e.getBoundingClientRect().left<-1)).slice(0,5).map(e=>e.outerHTML.slice(0,80))])';
+   for(const width of [1280,1440,1920]){await size(width);assert.equal(await ev(overflow),false,'overflow at '+width+' '+await ev(offenders));}
+   await size(1440);await go('/admin/system');await shot('admin-finance');
+   // Mobile: KPI cards stack, the chart scrolls inside its card, table rows become cards, 44px targets, dialog fits.
+   await size(390,844);await go('/admin/system');
+   assert.equal(await ev(overflow),false,'no horizontal page overflow: '+await ev('JSON.stringify([innerWidth,document.documentElement.scrollWidth,...["main",".fin-grid",".fin-chart",".chart-scroll",".fin-recurring",".fin-ops",".table--recurring",".table--ops"].map(q=>{const e=document.querySelector(q);return q+":"+(e?Math.round(e.getBoundingClientRect().width)+"/"+e.scrollWidth:"-");})])'));
+   assert.equal(await ev('getComputedStyle(document.querySelector(".metrics--fin")).gridTemplateColumns.split(" ").length'),1);
+   assert.equal(await ev('document.querySelector(".chart-scroll").getBoundingClientRect().right<=innerWidth&&document.querySelector(".chart-scroll").getBoundingClientRect().left>=0'),true);
+   assert.equal(await ev('getComputedStyle(document.querySelector(".table--tx thead")).display'),'none');
+   assert.deepEqual(await ev('[...document.querySelectorAll("main .btn,main .icon-btn,main input:not([type=hidden]),main select,.topbar a,.topbar button")].filter(e=>e.offsetParent&&e.getBoundingClientRect().height<43.5).map(e=>e.outerHTML.slice(0,60))'),[]);
+   await shot('admin-mobile-finance');
+   await ev('document.querySelector("[data-tx-add=EXPENSE]").click()');await wait(modal('tx-new'));
+   assert.equal(await ev('(()=>{const r=document.querySelector("#tx-new").getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;})()'),true,'dialog fits the viewport');
+   assert.deepEqual(await ev('[...document.querySelectorAll("#tx-new .btn,#tx-new input:not([type=hidden]):not([type=radio]):not([type=checkbox]),#tx-new select,#tx-new .choice__item")].filter(e=>e.offsetParent&&e.getBoundingClientRect().height<43.5).map(e=>e.outerHTML.slice(0,60))'),[]);
+   if(shots){writeFileSync(join(shots,'admin-mobile-finance-dialog.png'),Buffer.from((await call('Page.captureScreenshot',{format:'png'})).data,'base64'));}
+   await key('Escape',27);await size(1440);
   });
 
   await t.test('mobile: stacked cards, no horizontal overflow, 44px targets',async()=>{

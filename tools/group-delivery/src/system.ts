@@ -8,7 +8,19 @@ import type {Queryable} from './db.js';
 export type SystemStatus='OPERATIONAL'|'DEGRADED'|'OFFLINE'|'MANUAL'|'POSTPONED';
 export type CheckReason='TIMEOUT'|'UNREACHABLE'|'BAD_RESPONSE'|'SLOW'|null;
 export interface CheckResult {status:'OPERATIONAL'|'DEGRADED'|'OFFLINE';reason:CheckReason;checkedAt:string;latencyMs:number|null;lastSuccessAt:string|null;lastFailureAt:string|null}
-export interface CostEntry {service:string;amountCents:number;currency:'USD'|'ILS';frequency:'MONTHLY'|'YEARLY';monthlyCents:number;note:string|null;system:string|null}
+// financeAgorot: the optional ILS amount the finance page records for this cost (financeAmountIls in OPS_COSTS), in
+// integer agorot. Never derived from another currency; null when not configured.
+export interface CostEntry {service:string;amountCents:number;currency:'USD'|'ILS';frequency:'MONTHLY'|'YEARLY';monthlyCents:number;note:string|null;system:string|null;financeAgorot:number|null}
+// financeAmountIls → agorot: a positive JSON number with at most two decimals, up to ₪1,000,000. Parsed from its
+// decimal text (no float arithmetic); anything else is null.
+export function financeAgorotOf(value:unknown):number|null{
+ if(typeof value!=='number'||!Number.isFinite(value))return null;
+ const text=String(value);
+ if(!/^\d{1,7}(\.\d{1,2})?$/.test(text))return null;
+ const [whole,fraction='']=text.split('.');
+ const agorot=Number(whole)*100+Number(fraction.padEnd(2,'0'));
+ return agorot>0&&agorot<=100000000?agorot:null;
+}
 export interface RenderService {id:string;name:string;url:string|null;healthPath:string;dashboardUrl:string|null;purpose:string|null;note:string|null;primary:boolean}
 export interface OpsConfig {
  shopifyAdminUrl:string|null;themeEditorUrl:string|null;storefrontUrl:string|null;storefrontCheck:boolean;
@@ -43,16 +55,21 @@ const slug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replac
 export function opsConfig(env:NodeJS.ProcessEnv=process.env):OpsConfig{
  const warnings:string[]=[];
  // Monthly costs: one JSON array, e.g. [{"service":"Render Group Delivery","amount":7,"currency":"USD","system":"render-group-delivery"}].
- const costs:CostEntry[]=[];let skipped=0;
+ const costs:CostEntry[]=[];let skipped=0,badFinance=0;
  const rawCosts=json(env,'OPS_COSTS',warnings);
  if(rawCosts!==undefined&&!Array.isArray(rawCosts))warnings.push('OPS_COSTS: ignored (expected a JSON array).');
  for(const entry of Array.isArray(rawCosts)?rawCosts.slice(0,50):[]){
   const service=text(entry?.service,60),amount=entry?.amount,currency=entry?.currency,frequency=entry?.frequency??'MONTHLY';
   if(!service||typeof amount!=='number'||!Number.isFinite(amount)||amount<0||amount>1000000||Math.abs(amount*100-Math.round(amount*100))>1e-6||!['USD','ILS'].includes(currency)||!['MONTHLY','YEARLY'].includes(frequency)){skipped++;continue;}
   const amountCents=Math.round(amount*100);
-  costs.push({service,amountCents,currency,frequency,monthlyCents:frequency==='YEARLY'?Math.round(amountCents/12):amountCents,note:text(entry?.note,200),system:text(entry?.system,40)});
+  // Optional ILS accounting amount. Invalid values are dropped (the cost itself stays) with a warning that never
+  // repeats the value.
+  const financeAgorot=entry?.financeAmountIls===undefined||entry?.financeAmountIls===null?null:financeAgorotOf(entry.financeAmountIls);
+  if(financeAgorot===null&&entry?.financeAmountIls!==undefined&&entry?.financeAmountIls!==null)badFinance++;
+  costs.push({service,amountCents,currency,frequency,monthlyCents:frequency==='YEARLY'?Math.round(amountCents/12):amountCents,note:text(entry?.note,200),system:text(entry?.system,40),financeAgorot});
  }
  if(skipped)warnings.push('OPS_COSTS: '+skipped+' invalid entr'+(skipped===1?'y':'ies')+' ignored (service, amount ≥ 0, currency USD/ILS, frequency MONTHLY/YEARLY).');
+ if(badFinance)warnings.push('OPS_COSTS: financeAmountIls ignored for '+badFinance+' entr'+(badFinance===1?'y':'ies')+' (expected a positive ILS number with at most 2 decimals, up to 1000000).');
  // Extra Render services: [{"name":"…","url":"https://…","healthPath":"/health","dashboardUrl":"https://dashboard.render.com/…"}].
  const services:RenderService[]=[{id:'render-group-delivery',name:'fankee-group-delivery',url:link(env,'OPS_RENDER_GROUP_DELIVERY_URL',warnings),healthPath:'/health',
   dashboardUrl:link(env,'OPS_RENDER_GROUP_DELIVERY_DASHBOARD_URL',warnings),purpose:null,note:null,primary:true}];

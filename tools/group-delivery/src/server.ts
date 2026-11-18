@@ -22,11 +22,13 @@ import {CardcomService,CardcomError,type CardcomGateway} from './cardcom.js';
 import {CARDCOM_WEBHOOK_PATH} from './payments-config.js';
 import {ShopifyOrders,type OrderGateway} from './shopify-orders.js';
 import {containsCardData} from './domain.js';
+import {Finance,FinanceInputError,listFilters,rangeOf,nextBilling,UUID} from './finance.js';
+import {financePage,formValues,valuesOf,recurringValuesOf,type DialogState,type ViewParams} from './finance-page.js';
 // deps: test seams for the operations page (outbound fetch and health-check timings) and for recovery email
 // (provider and limits; the default provider comes from cfg.recovery and is null when recovery is disabled).
 // cardcom/paymentsLog: test seams for the Cardcom gateway (default: the real CardcomService when payments are ENABLED,
 // none otherwise) and for payment log lines.
-export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>;cardcom?:CardcomGateway|null;paymentsLog?:(line:string)=>void;orders?:OrderGateway|null}={}){
+export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>;cardcom?:CardcomGateway|null;paymentsLog?:(line:string)=>void;orders?:OrderGateway|null;now?:()=>Date}={}){
  const app=express(),areas=new Areas(db,cfg);
  // Card reservation is required for new memberships whenever Cardcom is enabled (even if misconfigured: fail closed).
  const groups=new Groups(db,cfg,validator,areas,{paymentMode:()=>cfg.payments.state==='DISABLED'?'NONE':'CARDCOM'});
@@ -37,6 +39,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  groups.attachPayments(payments);app.locals.payments=payments;
  const auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator,payments);
  const systemHealth=new SystemHealth(db,cfg.ops,()=>cfg.origin,deps.fetch,deps.health);
+ // Business finance (/admin/system). deps.now: test seam for "today" (Israel time decides the current month).
+ const finance=new Finance(db,cfg.ops.costs,deps.now);
  const recovery=new Recovery(db,cfg.secret,deps.email!==undefined?deps.email:emailProvider(cfg.recovery),groups,{...RECOVERY_LIMITS,...deps.recoveryLimits});
  app.locals.recovery=recovery;
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
@@ -137,8 +141,109 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // Operations overview (מערכות האתר): safe configuration plus on-demand health checks; ?refresh=1 re-checks (rate floor).
  const systemData=async(req:express.Request)=>systemsView(cfg.ops,await systemHealth.results(req.query.refresh==='1'),cfg.origin,
   {state:deps.email!==undefined?(deps.email?'ENABLED':'DISABLED'):cfg.recovery.state,provider:deps.email?deps.email.name:cfg.recovery.provider,senderDomain:cfg.recovery.senderDomain});
- app.get('/admin/system',async(req,res)=>res.type('html').send(systemPage({...await systemData(req),csrf:csrfOf(res)})));
+ // The systems overview moved under /admin/system/services; /admin/system is the finance dashboard. Old refresh
+ // links keep working.
+ // The cost table also says how the finance page counts each cost (read only: no synchronization from this page).
+ app.get('/admin/system/services',async(req,res)=>res.type('html').send(systemPage({...await systemData(req),finance:await finance.opsCosts(),csrf:csrfOf(res)})));
  app.get('/admin/api/system',async(req,res)=>res.json(await systemData(req)));
+ // ---- Business finance ("כספים"). Admin session only (above); mutations also need Origin + CSRF (above), have their
+ // own rate limit and are audited with the change in one transaction (finance.ts). HTML forms redirect back to the
+ // same filters; a rejected form is shown again with its values and field errors.
+ const financeLimit=(req:express.Request)=>auth.limit(req,'admin-finance-write',120,600);
+ const viewParams=(source:any):ViewParams=>{const f=listFilters(source);return {range:rangeOf(source?.range),q:f.q,month:f.month,type:f.type,category:f.category,page:f.page};};
+ // The hidden "back" field: only the dashboard's own filter parameters survive (validated again by viewParams).
+ const backParams=(value:unknown)=>{const raw=typeof value==='string'&&value.length<=400?value:'';return viewParams(Object.fromEntries(new URLSearchParams(raw)));};
+ const backUrl=(p:ViewParams,notice:string)=>{
+  const search=new URLSearchParams();
+  if(p.range!=='6m')search.set('range',p.range);for(const key of ['q','month','type','category'] as const)if(p[key])search.set(key,p[key]);if(p.page>1)search.set('page',String(p.page));
+  search.set('notice',notice);return '/admin/system?'+search.toString();
+ };
+ const errorUrl=(p:ViewParams,code:string)=>{const url=new URL(backUrl(p,'x'),'http://x');url.searchParams.delete('notice');url.searchParams.set('error',code);return url.pathname+url.search;};
+ const renderFinance=async(res:express.Response,p:ViewParams,extra:{dialog?:DialogState|null;notice?:string;error?:string}={},status=200)=>{
+  // Record due billing dates once, then read (summary/list record again, which is then a no-op).
+  await finance.record();
+  const [summary,list,ops]=await Promise.all([finance.summary(p.range),finance.list(p),finance.opsCosts()]);
+  res.status(status).type('html').send(financePage({summary,list,ops,csrf:csrfOf(res),params:{...p,page:list.filters.page},...extra}));
+ };
+ const FINANCE_NOTICES=['tx_created','tx_updated','tx_deleted','tx_deactivated','rec_updated'];
+ const FINANCE_ERRORS=['delete_confirm','occurrence_locked','inactive','ops_managed'];
+ app.get('/admin/system',async(req,res)=>{
+  if(req.query.refresh==='1'){res.redirect(303,'/admin/system/services?refresh=1');return;}
+  const p=viewParams(req.query),today=finance.today();
+  let dialog:DialogState|null=null,error:string|undefined;
+  const add=req.query.add,edit=req.query.edit,remove=req.query.delete;
+  if(add==='INCOME'||add==='EXPENSE'||add==='RECURRING')dialog={mode:'create',kind:add,values:formValues(add,today),errors:{}};
+  else if(typeof edit==='string'||typeof remove==='string'){
+   const id=String(edit??remove);
+   let item=UUID.test(id)?await finance.find(id).catch(()=>null):null;
+   // A recorded billing date is history: "edit" opens its charge; "delete" is refused.
+   if(item?.kind==='transaction'&&item.transaction.recurringDefinitionId){
+    if(typeof edit==='string')item=await finance.find(item.transaction.recurringDefinitionId).catch(()=>null);else{item=null;error='occurrence_locked';}
+   }
+   if(!item)error??='not_found';
+   else if(item.kind==='recurring'&&typeof edit==='string'&&!item.recurring.active)error='inactive';
+   else if(typeof edit==='string')dialog=item.kind==='transaction'?{mode:'edit',kind:item.transaction.type,id,values:valuesOf(item.transaction),errors:{}}:
+    {mode:'edit',kind:'RECURRING',id:item.recurring.id,values:recurringValuesOf(item.recurring),errors:{},nextBilling:nextBilling(item.recurring,today),opsLocked:finance.opsLocked(item.recurring)};
+   // An OPS-managed charge is stopped by removing it from OPS_COSTS, not here.
+   else if(item.kind==='recurring'&&finance.opsLocked(item.recurring))error='ops_managed';
+   else dialog=item.kind==='transaction'?{mode:'delete',transaction:item.transaction}:{mode:'delete',recurring:item.recurring};
+  }
+  const notice=typeof req.query.notice==='string'&&FINANCE_NOTICES.includes(req.query.notice)?req.query.notice:undefined;
+  if(!error&&typeof req.query.error==='string'&&FINANCE_ERRORS.includes(req.query.error))error=req.query.error;
+  await renderFinance(res,p,{dialog,notice,error});
+ });
+ // Form values to show again after a refusal (strings only; the server never trusts them for anything else).
+ const formEcho=(body:any)=>{const v:Record<string,string>={};for(const key of ['type','amount','date','category','description','paymentMethod','source','notes','recurring','frequency','startDate','endDate'])v[key]=typeof body?.[key]==='string'?body[key].slice(0,1000):'';return v;};
+ const refused=async(res:express.Response,error:unknown,p:ViewParams,dialog:Omit<Extract<DialogState,{mode:'create'|'edit'|'import'}>,'errors'|'error'>)=>{
+  if(error instanceof FinanceInputError){await renderFinance(res,p,{dialog:{...dialog,errors:error.fields,error:error.message}},422);return true;}
+  return false;
+ };
+ app.post('/admin/system/transactions',async(req,res)=>{
+  await financeLimit(req);
+  const p=backParams(req.body?.back),values=formEcho(req.body);
+  try{await finance.create(req.body,res.locals.actor);}
+  catch(error){
+   if(await refused(res,error,p,{mode:'create',kind:values.recurring==='on'?'RECURRING':values.type==='INCOME'?'INCOME':'EXPENSE',values}))return;
+   throw error;
+  }
+  res.redirect(303,backUrl(p,'tx_created'));
+ });
+ app.post('/admin/system/transactions/:id',async(req,res)=>{
+  await financeLimit(req);
+  const p=backParams(req.body?.back),values=formEcho(req.body);
+  let result;
+  try{result=await finance.update(req.params.id,req.body,res.locals.actor);}
+  catch(error){
+   const item=error instanceof FinanceInputError?await finance.find(req.params.id).catch(()=>null):null;
+   if(await refused(res,error,p,{mode:'edit',kind:values.recurring==='on'?'RECURRING':values.type==='INCOME'?'INCOME':'EXPENSE',id:req.params.id,values,
+    opsLocked:item?.kind==='recurring'&&finance.opsLocked(item.recurring)}))return;
+   if(error instanceof ApiError&&(error.code==='RECURRING_OCCURRENCE'||error.code==='RECURRING_INACTIVE')){res.redirect(303,errorUrl(p,error.code==='RECURRING_INACTIVE'?'inactive':'occurrence_locked'));return;}
+   throw error;
+  }
+  res.redirect(303,backUrl(p,'recurring' in result?'rec_updated':'tx_updated'));
+ });
+ app.post('/admin/system/transactions/:id/delete',async(req,res)=>{
+  await financeLimit(req);
+  const p=backParams(req.body?.back);
+  if(req.body?.confirm!=='yes'){
+   await finance.remove(req.params.id,false,res.locals.actor).catch(()=>{});// audited as DENIED
+   res.redirect(303,errorUrl(p,'delete_confirm'));return;
+  }
+  let result;
+  try{result=await finance.remove(req.params.id,true,res.locals.actor);}
+  catch(error){if(error instanceof ApiError&&(error.code==='RECURRING_OCCURRENCE'||error.code==='OPS_MANAGED')){res.redirect(303,errorUrl(p,error.code==='OPS_MANAGED'?'ops_managed':'occurrence_locked'));return;}throw error;}
+  res.redirect(303,backUrl(p,'deactivated' in result?'tx_deactivated':'tx_deleted'));
+ });
+ // JSON API (same session; X-CSRF-Token for mutations). Amounts are integer agorot (amountAgorot) or a decimal
+ // shekel string (amount). 422 INVALID_TRANSACTION carries per-field messages in "fields".
+ app.get('/admin/api/finance/summary',async(req,res)=>res.json({summary:await finance.summary(req.query.range),opsCosts:await finance.opsCosts()}));
+ app.get('/admin/api/finance/transactions',async(req,res)=>res.json(await finance.list(req.query)));
+ // One id space: a one-off/recorded row answers {transaction}, a recurring charge {recurring}.
+ app.get('/admin/api/finance/transactions/:id',async(req,res)=>{const item=await finance.find(req.params.id);res.json(item.kind==='transaction'?{transaction:item.transaction}:{recurring:item.recurring});});
+ app.get('/admin/api/finance/recurring',async(_req,res)=>{await finance.record();res.json({recurring:await finance.recurring()});});
+ app.post('/admin/api/finance/transactions',async(req,res)=>{await financeLimit(req);res.status(201).json(await finance.create(req.body,res.locals.actor));});
+ app.post('/admin/api/finance/transactions/:id',async(req,res)=>{await financeLimit(req);res.json(await finance.update(req.params.id,req.body,res.locals.actor));});
+ app.post('/admin/api/finance/transactions/:id/delete',async(req,res)=>{await financeLimit(req);res.json(await finance.remove(req.params.id,req.body?.confirm===true,res.locals.actor));});
  app.get('/admin/audit',async(req,res)=>res.type('html').send(auditView({...await auditPage(db,req.query),csrf:csrfOf(res)})));
  // CSV exports (members, or one row per stored cart line). UTF-8 with BOM; formula-like cells neutralised in csv().
  const dateText=(iso:string)=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Jerusalem',dateStyle:'short',timeStyle:'medium'}).format(new Date(iso));
@@ -314,7 +419,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
    res.status(status).type('html').send(errorPage(status,message,res.locals.session?.csrf));return;
   }
   const details=error instanceof ApiError&&error.details&&Object.values(error.details).every(Number.isSafeInteger)?error.details:undefined;
-  res.status(status).json({error:message,code,...(details?{details}:{})});
+  res.status(status).json({error:message,code,...(details?{details}:{}),...(error instanceof FinanceInputError?{fields:error.fields}:{})});
  });
  return app;
 }
@@ -331,5 +436,6 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   // Recovery emails still being sent finish before the pool closes.
   const stop=()=>{server.close(()=>{void Promise.all([(app.locals.recovery as Recovery).idle(),(app.locals.payments as Payments).idle()]).then(()=>db!.end()).then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
- }catch{console.error('Group delivery startup failed. Check configuration and database connectivity.');await db?.end().catch(()=>{});process.exitCode=1;}
+ }catch {
+  console.error('Group delivery startup failed. Check configuration and database connectivity.'); }
 }
