@@ -1,0 +1,36 @@
+{% doc %}
+  Prints the handles of a product's category collections as ",handle-a,handle-b," (smallest collection first), or
+  ",," when it has none. Used to keep product suggestions related: two products are related when they share one of
+  these collections. Broad collections are not categories and are skipped: all/frontpage/best-sellers, the Theme
+  Settings catalog collection, sale/deal collections, and collections with fewer than 2 or more than 100 products.
+  Deterministic: the same catalog gives the same result.
+
+  @param {product} source_product - The product whose categories are listed.
+  @example
+  {%- capture cats -%}{% render 'category-collections', source_product: product %}{%- endcapture -%}
+{% enddoc %}
+{%- liquid
+  assign cc_catalog = settings.catalog_collection.handle | default: ''
+  assign cc_sorted = source_product.collections | sort: 'products_count'
+  assign cc_out = ','
+  for cc_collection in cc_sorted
+    assign cc_handle = cc_collection.handle
+    assign cc_skip = false
+    if cc_handle == 'all' or cc_handle == 'frontpage' or cc_handle == 'best-sellers' or cc_handle == cc_catalog
+      assign cc_skip = true
+    endif
+    if cc_handle contains 'sale' or cc_handle contains 'deal' or cc_handle contains 'מבצע'
+      assign cc_skip = true
+    endif
+    if cc_collection.products_count < 2 or cc_collection.products_count > 100
+      assign cc_skip = true
+    endif
+    unless cc_skip
+      assign cc_out = cc_out | append: cc_handle | append: ','
+    endunless
+  endfor
+  if cc_out == ','
+    assign cc_out = ',,'
+  endif
+  echo cc_out
+-%}

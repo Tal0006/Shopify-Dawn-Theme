@@ -86,6 +86,32 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
    assert.equal(await ev('document.querySelector("[data-review]").disabled'),true);
    assert.equal(await ev('document.querySelectorAll("[data-choose]").length'),0);
   });
+  await t.test('Unavailable candidates are shown apart, labelled, never selectable and never counted',async()=>{
+   // One matched line (₪31.80) plus an ambiguous line whose best-ranked candidate is out of stock.
+   await ev(`window.baseQuote=window.baseQuote||makeQuote;window.makeQuote=()=>{if(mode!=='mixed')return baseQuote();const off=id=>({...product(id),availableForSale:false});
+    const matched={requested:{originalText:'2 מוצר בדיקה',quantity:2},status:'matched',reason:'EXACT_TITLE_MATCH',bestMatch:product('1'),candidates:[product('1')]};
+    const mixed={requested:{originalText:'מרכך',quantity:2},status:'ambiguous',reason:'CUSTOMER_SELECTION_REQUIRED',candidates:[off('3'),product('2'),off('4'),product('5')]};
+    return {quoteId:'fixture-quote',revision:1,items:[matched,mixed],resolvedItems:[product('1')],subtotal:{amount:'31.80',currencyCode:'ILS'},canCheckout:false};};`);
+   await submit('mixed');
+   const view=await ev(`(()=>{const item=document.querySelectorAll('.shopping-assistant__item')[1];const group=item.querySelector('.shopping-assistant__unavailable');
+    return {order:[...item.querySelectorAll('.shopping-assistant__card')].map(c=>c.querySelector('strong').textContent),
+     choose:[...item.querySelectorAll('[data-choose]')].map(b=>b.dataset.variant.split('/').pop()),
+     heading:group&&group.querySelector('h4').textContent,labelledBy:group&&document.getElementById(group.getAttribute('aria-labelledby'))===group.querySelector('h4'),
+     grouped:group?[...group.querySelectorAll('.shopping-assistant__card')].map(c=>c.querySelector('strong').textContent):[],
+     labels:group?[...group.querySelectorAll('.shopping-assistant__unavailable-label')].map(e=>e.textContent):[],
+     groupText:group?group.textContent:'',afterChoices:group?!group.nextElementSibling||!group.nextElementSibling.matches('.shopping-assistant__card'):false,
+     total:document.querySelector('[data-total]').textContent};})()`);
+   assert.deepEqual(view.order,['מוצר בדיקה 2','מוצר בדיקה 5','מוצר בדיקה 3','מוצר בדיקה 4'],'in-stock choices first, then the unavailable group');
+   assert.deepEqual(view.choose,['2','5'],'only in-stock candidates can be chosen; nothing is preselected');
+   assert.equal(view.heading,'קיימים אצלנו אך לא זמינים כרגע');assert.equal(view.labelledBy,true);
+   assert.deepEqual(view.grouped,['מוצר בדיקה 3','מוצר בדיקה 4']);
+   assert.deepEqual(view.labels,['לא זמין כרגע','לא זמין כרגע']);
+   assert.ok(!/15\.90|31\.80/.test(view.groupText),'no price or line total on unavailable products');
+   assert.ok(view.total.includes('31.80')&&!view.total.includes('63.60'),'the total is the matched line only');
+   assert.equal(await ev('document.querySelector("[data-review]").disabled'),true);
+   assert.equal(await ev('[...document.querySelectorAll(".shopping-assistant__card--unavailable button")].length'),0);
+   await ev('window.makeQuote=baseQuote');
+  });
   await t.test('Not-found text supports item editing and removing the final item',async()=>{
    await submit('not_found');assert.ok((await ev('app.results.textContent')).includes(strings.not_found));
    await click('[data-edit-item]');assert.equal(await ev('app.form.hidden'),false);assert.equal(await ev('document.activeElement===app.input'),true);
@@ -93,11 +119,12 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
    // Item actions are two separate controls: distinct text and a visible gap, no overlap.
    const actions=await ev(`(()=>{const row=document.querySelector('.shopping-assistant__item .shopping-assistant__actions');
     const [a,b]=[...row.querySelectorAll('button')].map(x=>x.getBoundingClientRect());
-    return {text:row.textContent,gap:Math.max(b.left-a.right,a.left-b.right),footer:document.querySelector('[data-summary] .shopping-assistant__actions').textContent,
-     confirm:[...document.querySelector('[data-confirm]').childNodes].map(n=>n.textContent).join('|')};})()`);
-   assert.equal(actions.text,strings.edit_item+' '+strings.remove);assert.ok(actions.gap>=7.5,'gap '+actions.gap);
-   assert.equal(actions.footer,strings.checkout+' '+strings.edit);
-   assert.ok(actions.confirm.includes(strings.confirm+'| |'+strings.back),actions.confirm);
+    return {labels:[...row.querySelectorAll('button')].map(button=>button.textContent),gap:Math.max(b.left-a.right,a.left-b.right),footer:[...document.querySelectorAll('[data-summary] .shopping-assistant__actions button')].map(button=>button.textContent),
+     confirm:[...document.querySelectorAll('[data-confirm] button')].map(button=>button.textContent)};})()`);
+   // Two separately labelled buttons (the row has no text between them; the visible gap is checked below).
+   assert.deepEqual(actions.labels,[strings.edit_item,strings.remove]);assert.ok(actions.gap>=7.5,'gap '+actions.gap);
+   assert.deepEqual(actions.footer,[strings.checkout,strings.edit]);
+   assert.deepEqual(actions.confirm,[strings.confirm,strings.back]);
    await click('[data-remove]');
    assert.equal(await ev('app.input.value'),'');assert.equal(await ev('app.form.hidden'),false);
   });
@@ -276,6 +303,12 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
    await submit('matched');const before=await ev('calls.length');
    await click('[data-review]');assert.equal(await ev('calls.length'),before);
    assert.equal(await ev('app.confirmation.hidden'),false);
+   for(const width of [1280,390]){
+    await call('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<768});
+    const gap=await ev(`(()=>{const [c,b]=[...document.querySelectorAll('[data-confirm] button')].map(x=>x.getBoundingClientRect());return Math.abs(c.top-b.top)<2?Math.max(b.left-c.right,c.left-b.right):Math.max(b.top-c.bottom,c.top-b.bottom);})()`);
+    assert.ok(gap>=7.5,'confirmation buttons are visibly separated at '+width+'px: '+gap);
+   }
+   await call('Emulation.setDeviceMetricsOverride',{width:1280,height:900,deviceScaleFactor:1,mobile:false});
    await ev('mode="changed"');await click('[data-confirm-checkout]');await wait('!app.busy');
    assert.equal(await ev('app.quote.revision'),2);assert.equal(await ev('app.confirmation.hidden'),true);
    assert.equal(await ev('app.status.textContent'),strings.changed);

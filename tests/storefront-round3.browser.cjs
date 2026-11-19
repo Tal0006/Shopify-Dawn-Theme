@@ -44,7 +44,7 @@ test('Contract: settings, templates, fields and labels',()=>{
  assert.deepEqual(json('templates/page.group-delivery.json').order,['main','group_delivery_info']);
  // Global settings.
  const groups=Object.fromEntries(json('config/settings_schema.json').map(g=>[g.name,g]));
- assert.deepEqual(groups['t:business_details_editor.settings'].settings.filter(i=>i.id).map(i=>i.id),['business_legal_name','business_id','business_address','business_phone','business_email','business_hours','business_hours_schema']);
+ assert.deepEqual(groups['t:business_details_editor.settings'].settings.filter(i=>i.id).map(i=>i.id),['business_legal_name','business_id','business_address','business_phone','business_email','business_hours','customer_service_hours','business_hours_schema']);
  assert.deepEqual(groups['t:floating_whatsapp_editor.settings'].settings.map(i=>i.id),['floating_whatsapp_enabled','floating_whatsapp_number']);
  assert.match(read('sections/footer.liquid'),/{% render 'business-details' %}/);
  const data=json('config/settings_data.json');assert.equal(data.current.sections.footer.settings.show_payment_icons,true);assert.equal(data.current.floating_whatsapp_number,'972543966168');
@@ -62,7 +62,11 @@ test('Contract: settings, templates, fields and labels',()=>{
 let Liquid;try{({Liquid}=require('liquidjs'));}catch{Liquid=null;}
 const SKIP=Liquid?false:'liquidjs not resolvable (set NODE_PATH to an install to run)';
 function engine(){
- const liquid=new Liquid();
+ // Rendered snippets come from the theme (without {% doc %}/{% stylesheet %}); {% paginate %} renders its body.
+ const snippet=name=>strip(read('snippets/'+path.basename(name,'.liquid')+'.liquid'));
+ const liquid=new Liquid({fs:{exists:async()=>true,existsSync:()=>true,readFile:async f=>snippet(f),readFileSync:f=>snippet(f),resolve:(dir,file)=>file,contains:()=>true,sep:'/'},relativeReference:false,extname:'.liquid'});
+ liquid.registerTag('paginate',{parse(token,remain){this.tpls=[];const stream=this.liquid.parser.parseStream(remain).on('tag:endpaginate',()=>stream.stop()).on('template',t=>this.tpls.push(t)).on('end',()=>{throw Error('paginate not closed');});stream.start();},
+  *render(ctx,emitter){yield this.liquid.renderer.renderTemplates(this.tpls,ctx,emitter);}});
  liquid.registerFilter('t',(key,...args)=>{let v=key.split('.').reduce((a,k)=>a?.[k],he);if(typeof v!=='string')return key;for(const [k,val] of args.filter(Array.isArray))v=v.replace(new RegExp('{{\\s*'+k+'\\s*}}','g'),val);return v;});
  liquid.registerFilter('newline_to_br',v=>String(v).replace(/\n/g,'<br>\n'));
  return liquid;
@@ -99,7 +103,11 @@ test('Liquid: homepage grids, cart suggestions, business details, WhatsApp, Grou
   const snippet=strip(read('snippets/business-details.liquid'));
   assert.equal((await liquid.parseAndRender(snippet,{settings:{}})).trim(),'');
   const html=await liquid.parseAndRender(snippet,{settings:{business_legal_name:'פאנקי בע"מ',business_phone:'054-396 6168',business_hours:'א׳–ה׳ 09:00–18:00\nו׳ 09:00–13:00'}});
-  assert.match(html,/<a href="tel:0543966168" dir="ltr">054-396 6168<\/a>/);assert.match(html,/פאנקי בע&(quot|#34);מ/);assert.match(html,/09:00–18:00<br>/);
+  assert.match(html,/<a href="tel:0543966168" dir="ltr">054-396 6168<\/a>/);assert.match(html,/פאנקי בע&(quot|#34);מ/);
+  // The old free-text business_hours is no longer printed: online orders are 24/7 and service hours come only from
+  // customer_service_hours (tests/storefront-ux-batch1 covers the LTR ranges).
+  assert.match(html,/הזמנות באתר:<\/span> <bdi dir="ltr">24\/7<\/bdi>/);assert.doesNotMatch(html,/09:00–18:00|שירות לקוחות/);
+  assert.match(await liquid.parseAndRender(snippet,{settings:{customer_service_hours:'א׳–ה׳ 09:00–18:00'}}),/שירות לקוחות:<\/span><span class="business-details__hours-line">א׳–ה׳ <bdi dir="ltr">09:00–18:00<\/bdi><\/span>/);
   assert.doesNotMatch(html,/mailto|ח\.פ\.|כתובת:/);
  });
  await t.test('Floating WhatsApp: valid 8-15 digit number only, new tab, named',async()=>{

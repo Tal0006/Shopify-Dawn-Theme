@@ -62,9 +62,23 @@ test('Storefront accessibility browser checks', {timeout: 120000}, async t => {
       assert.equal(await ev('localStorage.getItem("accessibility-test-unrelated")'), 'keep'); await ev('localStorage.removeItem("accessibility-test-unrelated")');
     });
     await t.test('System reduced motion remains active after reset', async () => {
-      await call('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]}); await action('reset');
-      assert.equal(await ev('document.documentElement.hasAttribute("data-a11y-paused")'), true); assert.equal(await ev('window.jQuery.fx.off'), true);
-      await call('Emulation.setEmulatedMedia', {features: []});
+      // jQuery was removed (tests/legacy-js-removal.browser.cjs); the guarantee is the paused mode itself: every element
+      // has paused animations and instant transitions (assets/accessibility.css) and the motion scale is zero.
+      await call('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]});
+      try {
+        await action('reset');
+        assert.equal(await ev('localStorage.getItem("punky-accessibility-v1")'), null, 'the panel preferences were reset');
+        assert.equal(await ev('document.documentElement.hasAttribute("data-a11y-paused")'), true, 'system reduced motion still pauses motion');
+        const motion = await ev(`(() => { const sample = ['.a11y-launcher', '.storefront-hero-heading', 'main', 'body'].map(s => document.querySelector(s)).filter(Boolean);
+          return {count: sample.length, paused: sample.every(e => getComputedStyle(e).animationPlayState.split(',').every(v => v.trim() === 'paused')),
+            instant: sample.every(e => getComputedStyle(e).transitionDuration.split(',').every(v => v.trim() === '0s')),
+            scale: getComputedStyle(document.documentElement).getPropertyValue('--fk-motion-scale').trim()}; })()`);
+        assert.ok(motion.count >= 3, 'sampled elements exist');
+        assert.equal(motion.paused, true, 'animations are paused'); assert.equal(motion.instant, true, 'transitions are instant'); assert.equal(motion.scale, '0');
+      } finally { await call('Emulation.setEmulatedMedia', {features: []}); }
+      // Without the system preference (and with reset preferences) motion is no longer paused.
+      await ev('new Promise(r => setTimeout(r, 50))');
+      assert.equal(await ev('document.documentElement.hasAttribute("data-a11y-paused")'), false);
     });
     await t.test('Core pages have named controls, image alternatives and no overflow', async () => {
       for (const path of ['/',links.collection,links.product,'/cart','/search?q=*&type=product','/pages/contact']) {
@@ -75,9 +89,20 @@ test('Storefront accessibility browser checks', {timeout: 120000}, async t => {
         assert.deepEqual(unnamed.map(n=>n.role.value),[],path);
       }
     });
-    await t.test('Product thumbnails are native keyboard buttons', async () => {
-      await visit(links.product); assert.ok(await ev('document.querySelectorAll(".product-thumbnil-active button[aria-label]").length>0'));
-      await ev('document.querySelector(".product-thumbnil-active button").focus()'); await key('Enter','Enter',13); assert.ok(await ev('!!document.querySelector(".product-active .owl-item.active")'));
+    // Thumbnails render only for products with more than one image (sections/single-product.liquid). When the live
+    // catalog has none, the live check is skipped; tests/product-page.browser.cjs covers keyboard thumbnail selection
+    // with a fixture either way.
+    const multiImage = await ev('fetch("/products.json?limit=250").then(r => r.json()).then(d => (d.products.find(p => p.images.length > 1) || {}).handle || null).catch(() => null)');
+    await t.test('Product thumbnails are native keyboard buttons', {skip: multiImage ? false : 'live catalog has no product with more than one image; covered by tests/product-page.browser.cjs'}, async () => {
+      await visit('/products/' + multiImage);
+      const thumbs = await ev('[...document.querySelectorAll(".product-page__thumbnails button")].map(b => ({tag: b.tagName, type: b.type, label: b.getAttribute("aria-label"), pressed: b.getAttribute("aria-pressed"), controls: b.getAttribute("aria-controls")}))');
+      assert.ok(thumbs.length > 1, 'one native button per image');
+      for (const thumb of thumbs) { assert.equal(thumb.tag, 'BUTTON'); assert.equal(thumb.type, 'button'); assert.ok(thumb.label, 'named'); assert.ok(thumb.controls, 'controls its image'); }
+      assert.deepEqual(thumbs.map(thumb => thumb.pressed), ['true', ...thumbs.slice(1).map(() => 'false')]);
+      await ev('document.querySelectorAll(".product-page__thumbnails button")[1].focus()'); await key('Enter','Enter',13);
+      assert.equal(await ev('document.activeElement.getAttribute("aria-pressed")'), 'true', 'Enter selects the focused thumbnail');
+      assert.equal(await ev('document.querySelectorAll(".product-page__thumbnails button[aria-pressed=true]").length'), 1);
+      assert.equal(await ev('(() => { const image = document.getElementById(document.activeElement.getAttribute("aria-controls")); return !!image && !image.hidden; })()'), true, 'its image is shown');
     });
     await t.test('320px mobile menus, cart and text enlargement remain keyboard usable', async () => {
       await call('Emulation.setDeviceMetricsOverride',{width:320,height:844,deviceScaleFactor:1,mobile:true}); await visit('/');

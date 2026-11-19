@@ -58,6 +58,19 @@ test('Resolve validates candidate membership and reads Shopify prices instead of
  const resolved=await quotes.resolve({quoteId:q.quoteId,revision:1,itemIndex:0,variantId:shop.rows[0].variantId,price:'0.01',title:'Fake'});
  assert.equal(resolved.subtotal?.amount,'19.90');assert.equal(resolved.revision,2);assert.equal(resolved.canCheckout,true);assert.equal(shop.readCalls,1);
 });
+test('Unavailable candidates are never selectable and never reach the subtotal or checkout',async()=>{
+ const {shop,quotes,checkout}=setup();shop.rows.push(variant('2','מרכך מקסימה לבנדר'),{...variant('3','מרכך מקסימה ורד'),availableForSale:false});
+ const q=await quotes.create('מרכך מקסימה');
+ assert.equal(q.items[0].status,'ambiguous');assert.equal(q.subtotal,null,'nothing selected yet, nothing counted');
+ const unavailable=q.items[0].candidates.find(c=>!c.availableForSale)!;
+ assert.ok(unavailable,'the unavailable product is still reported');
+ await assert.rejects(quotes.resolve({quoteId:q.quoteId,revision:1,itemIndex:0,variantId:unavailable.variantId}),{code:'UNAVAILABLE_SELECTION'});
+ assert.equal(shop.readCalls,0,'refused before any Shopify read');
+ await assert.rejects(checkout.checkout({...confirmation(q),lines:[{variantId:unavailable.variantId,quantity:1}]}),{code:'UNRESOLVED_QUOTE'});
+ const chosen=await quotes.resolve({quoteId:q.quoteId,revision:1,itemIndex:0,variantId:shop.rows[0].variantId});
+ assert.equal(chosen.canCheckout,true);assert.deepEqual(chosen.resolvedItems.map(i=>i.variantId),[shop.rows[0].variantId]);
+ assert.equal(shop.cartCalls,0);
+});
 test('Explicit checkout creates once and returns Shopify checkoutUrl; browser subtotal ignored',async()=>{
  const {shop,quotes,checkout}=setup(),q=await quotes.create('2 '+name);
  await assert.rejects(checkout.checkout({...confirmation(q),confirmed:false}),{code:'CONFIRMATION_REQUIRED'});

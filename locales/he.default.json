@@ -557,6 +557,11 @@
     "follow": "נשארים בקשר",
     "contact": "יצירת קשר",
     "contact_intro": "איך אפשר לעזור?",
+    "contact_heading": "צרו קשר",
+    "contact_details": "פרטי התקשרות",
+    "contact_phone": "טלפון:",
+    "contact_whatsapp": "שליחת הודעה בוואטסאפ",
+    "contact_email": "דוא״ל:",
     "first_name": "שם פרטי",
     "last_name": "שם משפחה",
     "coming_soon": "בקרוב נפתחים",
@@ -710,6 +715,8 @@
     "choose": "בחירת מוצר",
     "available": "זמין לרכישה",
     "unavailable_short": "לא זמין לרכישה",
+    "unavailable_group": "קיימים אצלנו אך לא זמינים כרגע",
+    "unavailable_label": "לא זמין כרגע",
     "quantity": "כמות",
     "unit": "ליחידה",
     "subtotal": "סה״כ מוצרים",
@@ -1049,7 +1056,10 @@
     "address": "כתובת:",
     "phone": "טלפון:",
     "email": "אימייל:",
-    "hours": "שעות פעילות:"
+    "hours": "שעות פעילות:",
+    "orders_online": "הזמנות באתר:",
+    "orders_online_value": "24/7",
+    "service_hours": "שירות לקוחות:"
   },
   "floating_whatsapp": {
     "label": "צ׳אט בוואטסאפ עם {{ shop }}"
@@ -1085,5 +1095,12 @@
   },
   "breadcrumbs": {
     "home": "דף הבית"
+  },
+  "shipping_disclosure": {
+    "fee_html": "משלוח {{ fee }} ₪",
+    "free": "משלוח חינם",
+    "free_over_html": "חינם מעל {{ threshold }} ₪",
+    "delivery_time_html": "אספקה בדרך כלל תוך <bdi dir=\"ltr\">1–2</bdi> ימי עסקים",
+    "policy": "מדיניות משלוחים ואזורי חלוקה"
   }
 }

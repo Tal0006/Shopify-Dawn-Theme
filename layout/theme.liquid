@@ -53,6 +53,7 @@
     {{ 'theme.css' | asset_url | stylesheet_tag }}
     {{ 'storefront.css' | asset_url | stylesheet_tag }}
     {% render 'storefront-design' %}
+    {% render 'page-navigation' %}
     {% if request.page_type == 'index' or request.page_type == 'collection' or request.page_type == 'product' %}
       <script src="{{ 'storefront-motion.js' | asset_url }}" defer></script>
     {% endif %}

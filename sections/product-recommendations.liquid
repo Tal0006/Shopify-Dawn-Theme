@@ -1,8 +1,63 @@
-{% comment %}Native Shopify recommendations; reuses the shared purchase cards.{% endcomment %}
+{% comment %}
+  "אולי יעניין אותך גם" on the product page. Deterministic and lightweight, no hard-coded products:
+  1. Product page render: in-stock products from the product's own category collections (smallest category first;
+     see snippets/category-collections.liquid), excluding the current product. Shown immediately.
+  2. storefront.js then loads Shopify's Product Recommendations (intent=related) through this same section. That
+     render (recommendations.performed) lists only in-stock recommendations, each tagged with its category
+     collections; storefront.js keeps those that share a category with the current product, puts them first, fills
+     up with step 1's products, removes duplicates and the current product, and keeps product_limit cards.
+  So an unrelated suggestion (laundry conditioner → disposable plates) never shows, and sold-out products are not
+  shown. When the product has no category collection, Shopify's in-stock recommendations are used as they come.
+{% endcomment %}
 {% render 'product-discovery-styles' %}
-<section data-product-recommendations data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit={{ section.settings.product_limit }}&intent=related" class="catalog-section catalog-home container product-discovery" data-storefront-discovery {% unless recommendations.performed and recommendations.products_count > 0 %}hidden{% endunless %}>
-{% if recommendations.performed and recommendations.products_count > 0 %}<header class="catalog-section-header"><h2>{% if section.settings.heading != blank %}{{ section.settings.heading | escape }}{% else %}{{ 'storefront.product_recommendations' | t }}{% endif %}</h2></header><div class="product-discovery__grid" role="region" tabindex="0" aria-label="{{ 'storefront.product_recommendations' | t | escape }}">{% assign discovery_products = recommendations.products | uniq: 'id' %}{% for card_product in discovery_products %}{% unless card_product.id == product.id %}{% render 'product-card', card_product: card_product, refined_card: true, card_sizes: '(min-width: 992px) 260px, (min-width: 600px) 42vw, 78vw' %}{% endunless %}{% endfor %}</div>{% endif %}
-</section>
+{%- liquid
+  assign rec_limit = section.settings.product_limit
+-%}
+{%- if recommendations.performed -%}
+  {%- comment -%}Recommendations endpoint render: candidates only (storefront.js decides what is shown).{%- endcomment -%}
+  <section data-product-recommendations data-rec-candidates hidden>
+    {%- assign rec_products = recommendations.products | uniq: 'id' -%}
+    {%- for card_product in rec_products -%}
+      {%- if card_product.available -%}
+        {%- capture rec_cats -%}{% render 'category-collections', source_product: card_product %}{%- endcapture -%}
+        <div data-rec-id="{{ card_product.id }}" data-rec-collections="{{ rec_cats | strip | escape }}">{% render 'product-card', card_product: card_product, refined_card: true, card_sizes: '(min-width: 992px) 260px, (min-width: 600px) 42vw, 78vw' %}</div>
+      {%- endif -%}
+    {%- endfor -%}
+  </section>
+{%- else -%}
+  {%- capture rec_cats -%}{% render 'category-collections', source_product: product %}{%- endcapture -%}
+  {%- liquid
+    assign rec_cats = rec_cats | strip
+    assign rec_handles = rec_cats | split: ','
+    assign rec_seen = ',' | append: product.id | append: ','
+    assign rec_count = 0
+  -%}
+  {%- capture rec_cards -%}
+    {%- for rec_handle in rec_handles -%}
+      {%- if rec_handle != blank and rec_count < rec_limit -%}
+        {%- for card_product in collections[rec_handle].products limit: 24 -%}
+          {%- assign rec_key = ',' | append: card_product.id | append: ',' -%}
+          {%- if card_product.available and rec_count < rec_limit -%}
+            {%- unless rec_seen contains rec_key -%}
+              {%- assign rec_seen = rec_seen | append: card_product.id | append: ',' -%}
+              {%- assign rec_count = rec_count | plus: 1 -%}
+              {%- capture card_cats -%}{% render 'category-collections', source_product: card_product %}{%- endcapture -%}
+              <div data-rec-id="{{ card_product.id }}" data-rec-collections="{{ card_cats | strip | escape }}">{% render 'product-card', card_product: card_product, refined_card: true, card_sizes: '(min-width: 992px) 260px, (min-width: 600px) 42vw, 78vw' %}</div>
+            {%- endunless -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endcapture -%}
+  <section data-product-recommendations data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit=10&intent=related" data-rec-current="{{ product.id }}" data-rec-categories="{{ rec_cats | escape }}" data-rec-limit="{{ rec_limit }}" class="catalog-section catalog-home container product-discovery" data-storefront-discovery{% if rec_count == 0 %} hidden{% endif %}>
+    <header class="catalog-section-header"><h2>{% if section.settings.heading != blank %}{{ section.settings.heading | escape }}{% else %}{{ 'storefront.product_recommendations' | t }}{% endif %}</h2></header>
+    <div class="product-discovery__grid" role="region" tabindex="0" aria-label="{{ 'storefront.product_recommendations' | t | escape }}" data-rec-grid>{{ rec_cards }}</div>
+  </section>
+{%- endif -%}
+{% stylesheet %}
+.product-discovery__grid > [data-rec-id] { display: flex; }
+.product-discovery__grid > [data-rec-id] > .catalog-card { width: 100%; }
+{% endstylesheet %}
 {% schema %}
 {
   "name": "t:sections.related-products.name",

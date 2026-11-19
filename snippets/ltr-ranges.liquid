@@ -1,0 +1,47 @@
+{% doc %}
+  Prints one line of plain text (escaped) with every run of numbers, times and range dashes wrapped in an LTR isolate,
+  so ranges keep their order inside RTL text: "שישי: 06:00–14:00" never renders as "14:00–06:00", and
+  "09:00 - 17:00" stays one LTR run. Words are printed unchanged.
+
+  @param {string} text - One line of plain text.
+  @example {% render 'ltr-ranges', text: 'ראשון–חמישי: 09:00–17:00' %}
+{% enddoc %}
+{%- liquid
+  assign lr_tokens = text | strip | split: ' '
+  assign lr_run = ''
+  assign lr_out = ''
+  for lr_token in lr_tokens
+    assign lr_safe = lr_token | escape
+    assign lr_numeric = false
+    if lr_token == '-' or lr_token == '–' or lr_token == '—'
+      if lr_run != ''
+        assign lr_numeric = true
+      endif
+    else
+      for lr_digit in (0..9)
+        assign lr_digit_text = lr_digit | append: ''
+        if lr_token contains lr_digit_text
+          assign lr_numeric = true
+          break
+        endif
+      endfor
+    endif
+    if lr_numeric
+      if lr_run == ''
+        assign lr_run = lr_safe
+      else
+        assign lr_run = lr_run | append: ' ' | append: lr_safe
+      endif
+    else
+      if lr_run != ''
+        assign lr_out = lr_out | append: '<bdi dir="ltr">' | append: lr_run | append: '</bdi> '
+        assign lr_run = ''
+      endif
+      assign lr_out = lr_out | append: lr_safe | append: ' '
+    endif
+  endfor
+  if lr_run != ''
+    assign lr_out = lr_out | append: '<bdi dir="ltr">' | append: lr_run | append: '</bdi>'
+  endif
+  echo lr_out | strip
+-%}

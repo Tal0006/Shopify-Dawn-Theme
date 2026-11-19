@@ -14,7 +14,8 @@ test('Contract: Theme Settings, placement, cart value and no hard-coded threshol
  const group=JSON.parse(read('config/settings_schema.json')).find(item=>item.name==='t:free_shipping_editor.settings');
  assert.ok(group);
  const ids=Object.fromEntries(group.settings.filter(item=>item.id).map(item=>[item.id,item]));
- assert.deepEqual(Object.keys(ids),['free_shipping_enabled','free_shipping_threshold','free_shipping_remaining_text','free_shipping_success_text']);
+ // The group also holds the shipping-line settings (snippets/shipping-disclosure.liquid, tests/storefront-ux-batch1).
+ assert.deepEqual(Object.keys(ids),['free_shipping_enabled','free_shipping_threshold','free_shipping_remaining_text','free_shipping_success_text','shipping_disclosure_enabled','shipping_fee']);
  assert.equal(ids.free_shipping_enabled.default,true);assert.equal(ids.free_shipping_threshold.type,'number');assert.equal(ids.free_shipping_threshold.default,150);
  const schemaHe=JSON.parse(read('locales/he.schema.json')).free_shipping_editor;
  assert.match(schemaHe.threshold_info,/יש לוודא שסכום זה תואם להגדרת המשלוח החינם ב-Shopify\./);
@@ -22,9 +23,9 @@ test('Contract: Theme Settings, placement, cart value and no hard-coded threshol
  assert.equal(he.free_shipping.remaining,'עוד {{ amount }} למשלוח חינם');assert.equal(he.free_shipping.reached,'מגיע לך משלוח חינם!');
  // One reusable snippet, rendered in the drawer summary (before the total) and on the cart page.
  const drawer=read('snippets/cart-drawer.liquid'),cart=read('sections/main-cart.liquid');
- // Meter first in the summary, then the optional order note, then total and checkout.
- assert.match(drawer,/<footer class="cart-drawer__summary">\s*{% render 'free-shipping-meter', context: 'drawer' %}\s*<details class="cart-drawer__note"[\s\S]*?<\/details>\s*<p class="cart-drawer__total">/);
- assert.match(cart,/{% render 'free-shipping-meter', context: 'cart' %}\s*<p class="catalog-cart-total">/);
+ // Meter first in the summary, then the shipping line, the optional order note, then total and checkout.
+ assert.match(drawer,/<footer class="cart-drawer__summary">\s*{% render 'free-shipping-meter', context: 'drawer' %}\s*{% render 'shipping-disclosure', context: 'drawer' %}\s*<details class="cart-drawer__note"[\s\S]*?<\/details>\s*<p class="cart-drawer__total">/);
+ assert.match(cart,/{% render 'free-shipping-meter', context: 'cart' %}\s*{% render 'shipping-disclosure', context: 'cart' %}\s*<p class="catalog-cart-total">/);
  assert.match(drawer,/data-shipping-announcer/);
  assert.doesNotMatch(read('sections/header.liquid'),/free_shipping|shipping_threshold/,'old header threshold removed');
  assert.doesNotMatch(drawer,/cart-drawer__shipping|drawer_shipping/);

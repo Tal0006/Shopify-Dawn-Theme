@@ -1,4 +1,4 @@
-<div class="footer-area contact-page"><div class="footer-top"><div class="footer-wrap"><div class="row"><div class="col-lg-3"></div><div class="col-lg-6"><div class="contact-wrap"><div class="contact-title"><h1>{% if section.settings.title != blank %}{{ section.settings.title | escape }}{% else %}{{ 'storefront.contact' | t }}{% endif %}</h1><p>{% if section.settings.subtitle != blank %}{{ section.settings.subtitle | escape }}{% else %}{{ 'storefront.contact_intro' | t }}{% endif %}</p></div>
+<div class="footer-area contact-page"><div class="footer-top"><div class="footer-wrap"><div class="row"><div class="col-lg-3"></div><div class="col-lg-6"><div class="contact-wrap"><div class="contact-title"><h1>{% if section.settings.title != blank %}{{ section.settings.title | escape }}{% else %}{{ 'storefront.contact_heading' | t }}{% endif %}</h1><p>{% if section.settings.subtitle != blank %}{{ section.settings.subtitle | escape }}{% else %}{{ 'storefront.contact_intro' | t }}{% endif %}</p></div>
 {% assign contact_id = 'ContactForm-' | append: section.id %}{% form 'contact', id: contact_id, class: 'storefront-validated-form' %}
 <div class="row"><div class="col-lg-6 col-12 form-group"><label for="ContactFirst-{{ section.id }}">{{ 'storefront.first_name' | t }}</label><input type="text" id="ContactFirst-{{ section.id }}" name="contact[first_name]" autocomplete="given-name" value="{{ customer.first_name | escape }}"></div><div class="col-lg-6 col-12 form-group"><label for="ContactLast-{{ section.id }}">{{ 'storefront.last_name' | t }}</label><input type="text" id="ContactLast-{{ section.id }}" name="contact[last_name]" autocomplete="family-name" value="{{ customer.last_name | escape }}"></div>
 <div class="col-12 form-group"><label for="ContactEmail-{{ section.id }}">{{ 'templates.contact.form.email' | t }}</label><input type="email" id="ContactEmail-{{ section.id }}" name="contact[email]" autocomplete="email" value="{{ form.email | default: customer.email | escape }}" required {% if form.errors contains 'email' %}aria-invalid="true" aria-describedby="ContactErrors-{{ section.id }}"{% endif %}></div>
@@ -6,7 +6,29 @@
 <div class="col-12 form-group"><label for="ContactBody-{{ section.id }}">{{ 'templates.contact.form.comment' | t }}</label><textarea id="ContactBody-{{ section.id }}" name="contact[body]" required>{{ form.body | escape }}</textarea></div>
 <div class="col-12 form-group"><button type="submit" class="theme-btn">{{ 'templates.contact.form.send' | t }}</button></div></div>
 {% if form.posted_successfully? %}<p role="status">{{ 'templates.contact.form.post_success' | t }}</p>{% endif %}{% if form.errors %}<div id="ContactErrors-{{ section.id }}" role="alert">{{ 'templates.contact.form.error_heading' | t }}{{ form.errors | default_errors }}</div>{% endif %}
-{% endform %}{% if section.settings.compnay != blank or section.settings.address != blank %}<p>{{ section.settings.compnay | escape }}<br>{{ section.settings.address | escape }}</p>{% endif %}</div></div></div></div></div></div>
+{% endform %}
+{%- comment -%}Contact details already configured in Theme Settings (business details, floating WhatsApp); nothing is hard-coded.{%- endcomment -%}
+{%- liquid
+  assign cd_phone = settings.business_phone | strip
+  assign cd_tel = cd_phone | remove: ' ' | remove: '-' | remove: '(' | remove: ')' | remove: '.'
+  assign cd_email = settings.business_email | strip
+-%}
+{%- capture cd_whatsapp -%}{% render 'whatsapp-number' %}{%- endcapture -%}
+{%- assign cd_whatsapp = cd_whatsapp | strip -%}
+{%- if cd_phone != blank or cd_email != blank or cd_whatsapp != blank -%}
+<div class="contact-details" aria-labelledby="ContactDetails-{{ section.id }}"><h2 id="ContactDetails-{{ section.id }}">{{ 'storefront.contact_details' | t }}</h2><ul>
+  {%- if cd_phone != blank %}<li><span>{{ 'storefront.contact_phone' | t }}</span> <a href="tel:{{ cd_tel | escape }}" dir="ltr">{{ cd_phone | escape }}</a></li>{% endif -%}
+  {%- if cd_whatsapp != blank %}<li><a href="https://wa.me/{{ cd_whatsapp | escape }}" target="_blank" rel="noopener noreferrer">{{ 'storefront.contact_whatsapp' | t }}<span class="sr-only"> ({{ 'google_review.new_tab' | t }})</span></a></li>{% endif -%}
+  {%- if cd_email != blank %}<li><span>{{ 'storefront.contact_email' | t }}</span> <a href="mailto:{{ cd_email | escape }}" dir="ltr">{{ cd_email | escape }}</a></li>{% endif -%}
+</ul></div>
+{%- endif -%}
+{% if section.settings.compnay != blank or section.settings.address != blank %}<p>{{ section.settings.compnay | escape }}<br>{{ section.settings.address | escape }}</p>{% endif %}</div></div></div></div></div></div>
+{% stylesheet %}
+.contact-details { margin-block-start: 24px; }
+.contact-details h2 { margin: 0 0 8px; font-size: 18px; }
+.contact-details ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.contact-details a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; text-underline-offset: 3px; }
+{% endstylesheet %}
 {% schema %}
 {
   "name": "t:storefront_editor.contact",

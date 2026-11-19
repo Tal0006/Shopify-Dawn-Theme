@@ -44,6 +44,7 @@
         </div>
         <footer class="cart-drawer__summary">
           {% render 'free-shipping-meter', context: 'drawer' %}
+          {% render 'shipping-disclosure', context: 'drawer' %}
           <details class="cart-drawer__note"{% if cart.note != blank %} open{% endif %}>
             <summary>{{ 'sections.cart.note' | t }}</summary>
             <label class="sr-only" for="DrawerNote-{{ drawer_id }}">{{ 'sections.cart.note' | t }}</label>

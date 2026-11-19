@@ -1,8 +1,10 @@
 {% comment %}
   Section contract.
   Cart page product suggestions. With items in the cart: up to 4 in-stock products from Shopify's Product
-  Recommendations API (related to the first cart item), excluding products already in the cart; loaded by
-  storefront.js recommendations() through this same section, hidden when there is nothing to show.
+  Recommendations API (related to the first cart item), excluding products already in the cart and products that
+  share no category collection with any cart product (snippets/category-collections.liquid; this check is skipped
+  when no cart product has a category); loaded by storefront.js recommendations() through this same section, hidden
+  when there is nothing to show.
   With an empty cart: up to 4 in-stock products from the chosen best-sellers collection.
   @example
   <!-- templates/cart.json, after main-cart; choose a collection sorted by best selling -->
@@ -32,16 +34,36 @@
     </section>
   {%- endif -%}
 {%- else -%}
+  {%- capture rec_cart_cats -%}{%- for item in cart.items -%}{% render 'category-collections', source_product: item.product %}{%- endfor -%}{%- endcapture -%}
+  {%- assign rec_cart_cats = rec_cart_cats | strip -%}
+  {%- assign rec_cart_any = rec_cart_cats | remove: ',' | strip -%}
   {%- capture rec_cards -%}
     {%- if recommendations.performed -%}
       {%- assign rec_count = 0 -%}
       {%- for card_product in recommendations.products -%}
         {%- assign rec_key = ',' | append: card_product.id | append: ',' -%}
         {%- if card_product.available and rec_count < rec_limit -%}
-          {%- unless rec_in_cart contains rec_key -%}
+          {%- liquid
+            assign rec_related = true
+            if rec_cart_any != blank
+              assign rec_related = false
+              capture rec_card_cats
+                render 'category-collections', source_product: card_product
+              endcapture
+              assign rec_card_handles = rec_card_cats | strip | split: ','
+              for rec_handle in rec_card_handles
+                assign rec_handle_key = ',' | append: rec_handle | append: ','
+                if rec_handle != blank and rec_cart_cats contains rec_handle_key
+                  assign rec_related = true
+                  break
+                endif
+              endfor
+            endif
+          -%}
+          {%- if rec_related -%}{%- unless rec_in_cart contains rec_key -%}
             {%- assign rec_count = rec_count | plus: 1 -%}
             {% render 'product-card', card_product: card_product, refined_card: true, card_sizes: '(min-width: 992px) 260px, (min-width: 600px) 42vw, 78vw' %}
-          {%- endunless -%}
+          {%- endunless -%}{%- endif -%}
         {%- endif -%}
       {%- endfor -%}
     {%- endif -%}

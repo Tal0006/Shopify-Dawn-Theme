@@ -1,6 +1,9 @@
 {% doc %}
-  Business details from Theme Settings (legal name, business ID, address, phone, email, opening hours). Only
-  filled fields render; nothing renders when all are empty.
+  Business details from Theme Settings (legal name, business ID, address, phone, email) plus availability: online
+  orders are always open ("הזמנות באתר: 24/7"); customer-service hours come only from the "שעות שירות לקוחות" setting
+  and are not shown when it is empty (they are never invented). Nothing renders when no business detail is set. The older free-text "business_hours" setting mixed
+  online ordering with service hours ("ראשון–חמישי: 24 שעות"), so it is no longer displayed. Times and ranges are
+  wrapped LTR (ltr-ranges) so they keep their order in RTL.
   @example
   {% render 'business-details' %}
 {% enddoc %}
@@ -10,10 +13,10 @@
   assign biz_address = settings.business_address | strip
   assign biz_phone = settings.business_phone | strip
   assign biz_email = settings.business_email | strip
-  assign biz_hours = settings.business_hours | strip
+  assign biz_service = settings.customer_service_hours | strip
   assign biz_tel = biz_phone | remove: ' ' | remove: '-' | remove: '(' | remove: ')' | remove: '.'
 -%}
-{%- if biz_name != blank or biz_id != blank or biz_address != blank or biz_phone != blank or biz_email != blank or biz_hours != blank -%}
+{%- if biz_name != blank or biz_id != blank or biz_address != blank or biz_phone != blank or biz_email != blank or biz_service != blank -%}
 <div class="business-details">
   <h3 class="business-details__heading">{{ 'business_details.heading' | t }}</h3>
   <address class="business-details__list">
@@ -22,7 +25,16 @@
     {%- if biz_address != blank %}<p><span class="business-details__label">{{ 'business_details.address' | t }}</span> {{ biz_address | escape | newline_to_br }}</p>{% endif -%}
     {%- if biz_phone != blank %}<p><span class="business-details__label">{{ 'business_details.phone' | t }}</span> <a href="tel:{{ biz_tel | escape }}" dir="ltr">{{ biz_phone | escape }}</a></p>{% endif -%}
     {%- if biz_email != blank %}<p><span class="business-details__label">{{ 'business_details.email' | t }}</span> <a href="mailto:{{ biz_email | escape }}" dir="ltr">{{ biz_email | escape }}</a></p>{% endif -%}
-    {%- if biz_hours != blank %}<p><span class="business-details__label">{{ 'business_details.hours' | t }}</span> {{ biz_hours | escape | newline_to_br }}</p>{% endif -%}
+    <p data-business-orders><span class="business-details__label">{{ 'business_details.orders_online' | t }}</span> <bdi dir="ltr">{{ 'business_details.orders_online_value' | t }}</bdi></p>
+    {%- if biz_service != blank -%}
+      <p data-business-service><span class="business-details__label">{{ 'business_details.service_hours' | t }}</span>
+        {%- assign biz_service_lines = biz_service | newline_to_br | split: '<br />' -%}
+        {%- for biz_line in biz_service_lines -%}
+          {%- assign biz_line_text = biz_line | strip_newlines | strip -%}
+          {%- if biz_line_text != blank %}<span class="business-details__hours-line">{% render 'ltr-ranges', text: biz_line_text %}</span>{% endif -%}
+        {%- endfor -%}
+      </p>
+    {%- endif -%}
   </address>
 </div>
 {%- endif -%}
@@ -33,6 +45,7 @@
 .business-details__list p { margin: 0; }
 .business-details__name { font-weight: 600; color: #fff; }
 .business-details__label { color: #bdd7dc; }
+.business-details__hours-line { display: block; }
 .business-details__list a { display: inline-flex; align-items: center; min-height: 44px; color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 .business-details__list a:focus-visible { outline: 2px solid #b0e9ee; outline-offset: 3px; }
 {% endstylesheet %}

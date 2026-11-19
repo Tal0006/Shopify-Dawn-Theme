@@ -1,0 +1,58 @@
+{% doc %}
+  Compact shipping line near the purchase controls and in the cart: "משלוח 20 ₪ · חינם מעל 150 ₪ · אספקה בדרך כלל תוך
+  1–2 ימי עסקים". Information only: rates are charged by Shopify checkout (Settings → Shipping and delivery), so the
+  amounts here must match them. The fee is the Theme Settings "shipping_fee"; the free-shipping part uses the same
+  threshold as the free-shipping meter and is left out when that meter is disabled. Delivery areas are not claimed:
+  the line links to the shipping policy (delivery areas and terms) when one exists, and the cart keeps the existing
+  delivery-settlement eligibility step. Numeric ranges are wrapped LTR so "1–2" never renders as "2–1" in RTL.
+
+  @param {string} context - 'product', 'cart' or 'drawer'; used for the modifier class.
+  @example {% render 'shipping-disclosure', context: 'product' %}
+{% enddoc %}
+{%- liquid
+  assign sd_fee = settings.shipping_fee
+  assign sd_threshold = settings.free_shipping_threshold | default: 0
+  assign sd_show = settings.shipping_disclosure_enabled
+  if sd_fee == blank or sd_fee < 0
+    assign sd_show = false
+  endif
+-%}
+{%- if sd_show -%}
+  {%- liquid
+    # Whole shekels print without decimals; other amounts keep up to two decimals.
+    assign sd_fee_whole = sd_fee | floor
+    if sd_fee == sd_fee_whole
+      assign sd_fee_text = sd_fee_whole
+    else
+      assign sd_fee_text = sd_fee | round: 2
+    endif
+    assign sd_threshold_whole = sd_threshold | floor
+    if sd_threshold == sd_threshold_whole
+      assign sd_threshold_text = sd_threshold_whole
+    else
+      assign sd_threshold_text = sd_threshold | round: 2
+    endif
+    if sd_fee == 0
+      assign sd_fee_part = 'shipping_disclosure.free' | t
+    else
+      assign sd_fee_part = 'shipping_disclosure.fee_html' | t: fee: sd_fee_text
+    endif
+  -%}
+  <p class="shipping-disclosure shipping-disclosure--{{ context | default: 'product' }}" data-shipping-disclosure>
+    <span>{{ sd_fee_part }}</span>
+    {%- if settings.free_shipping_enabled and sd_threshold > 0 and sd_fee > 0 -%}
+      <span aria-hidden="true"> · </span><span>{{ 'shipping_disclosure.free_over_html' | t: threshold: sd_threshold_text }}</span>
+    {%- endif -%}
+    <span aria-hidden="true"> · </span><span>{{ 'shipping_disclosure.delivery_time_html' | t }}</span>
+    {%- if shop.shipping_policy.body != blank -%}
+      <span aria-hidden="true"> · </span><a href="{{ shop.shipping_policy.url }}">{{ 'shipping_disclosure.policy' | t }}</a>
+    {%- endif -%}
+  </p>
+{%- endif -%}
+{% stylesheet %}
+.shipping-disclosure { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: #36575d; }
+.shipping-disclosure bdi { unicode-bidi: isolate; }
+.shipping-disclosure a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.shipping-disclosure a:focus-visible { outline: 2px solid #0b6571; outline-offset: 2px; }
+.shipping-disclosure--drawer { margin-block: 4px 8px; font-size: 13px; }
+{% endstylesheet %}

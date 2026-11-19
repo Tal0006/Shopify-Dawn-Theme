@@ -33,7 +33,7 @@
       </footer>
     </div>
   </dialog>
-  <script type="application/json" data-strings>{ {% assign sa_keys = 'subtitle,label,placeholder,hint,submit,loading,waking,close,matched,ambiguous,unavailable,not_found,choose,available,unavailable_short,quantity,unit,subtotal,partial,blocked,edit,remove,edit_item,checkout,ready,confirm,back,error,changed,expired,uncertain,results,empty,no_image' | split: ',' %}{% for sa_key in sa_keys %}{% assign sa_translation_key = 'shopping_assistant.' | append: sa_key %}{{ sa_key | json }}: {{ sa_translation_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
+  <script type="application/json" data-strings>{ {% assign sa_keys = 'subtitle,label,placeholder,hint,submit,loading,waking,close,matched,ambiguous,unavailable,not_found,choose,available,unavailable_short,unavailable_group,unavailable_label,quantity,unit,subtotal,partial,blocked,edit,remove,edit_item,checkout,ready,confirm,back,error,changed,expired,uncertain,results,empty,no_image' | split: ',' %}{% for sa_key in sa_keys %}{% assign sa_translation_key = 'shopping_assistant.' | append: sa_key %}{{ sa_key | json }}: {{ sa_translation_key | t | json }}{% unless forloop.last %},{% endunless %}{% endfor %} }</script>
 </fankee-shopping-assistant>
 <script src="{{ 'shopping-assistant.js' | asset_url }}" defer></script>
 {% stylesheet %}
@@ -62,9 +62,17 @@ fankee-shopping-assistant :focus-visible { outline: 3px solid var(--sa-green); o
 .shopping-assistant__card > div { min-width: 0; flex: 1; }
 .shopping-assistant__card p { margin-block-end: 6px; font-size: 14px; }
 .shopping-assistant__card strong { display: block; overflow-wrap: anywhere; }
+.shopping-assistant__unavailable { margin-block-start: 14px; padding-block-start: 10px; border-block-start: 1px dashed var(--sa-border); }
+.shopping-assistant__unavailable h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #5b6b70; }
+.shopping-assistant__card--unavailable { background: #f6f7f7; border-style: dashed; color: #4a5a5f; }
+.shopping-assistant__card--unavailable img { opacity: .6; filter: grayscale(1); }
+.shopping-assistant__unavailable-label { display: inline-block; margin: 0; padding: 2px 8px; border-radius: 999px; background: #eceff0; color: #3f4f54; font-size: 13px; font-weight: 600; }
 .shopping-assistant__summary { padding: 12px 20px max(16px, env(safe-area-inset-bottom)); border-block-start: 1px solid var(--sa-border); background: #fff; max-height: 42%; overflow-y: auto; }
 .shopping-assistant__summary p { margin-block-end: 8px; font-size: 14px; }
 .shopping-assistant__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Confirmation buttons are spaced by CSS, not by markup whitespace (a theme sync can strip that whitespace). */
+fankee-shopping-assistant [data-confirm] > button { margin-block-start: 8px; }
+fankee-shopping-assistant [data-confirm] > button:not(:last-child) { margin-inline-end: 8px; }
 @media (max-width: 599px) {
  .shopping-assistant__dialog { inset-inline: 8px; inset-block-end: max(8px, env(safe-area-inset-bottom)); width: calc(100% - 16px); height: calc(100dvh - 24px - env(safe-area-inset-bottom)); max-height: calc(100dvh - 24px - env(safe-area-inset-bottom)); border-radius: 16px; }
  .shopping-assistant__header, .shopping-assistant__body { padding: 14px; }

@@ -1,0 +1,47 @@
+{% doc %}
+  Smoother same-site page navigation using native browser features only (no JavaScript, no router, no click
+  interception). Shopify's normal multi-page navigation is unchanged; unsupported browsers ignore both parts.
+
+  1. Cross-document View Transitions (@view-transition): a short cross-fade between same-origin pages. Off for
+     prefers-reduced-motion and for the accessibility panel's "pause animations" mode (html[data-a11y-paused]).
+     It never delays navigation: the browser skips the transition if the next page is slow.
+  2. Speculation Rules prefetch, "moderate" eagerness (the browser prefetches a link after a short hover or on
+     pointer down). Prefetch only, never prerender, so no page scripts or analytics run ahead of time. Only plain
+     same-origin storefront pages qualify: cart, checkout, account, admin, apps, services, tools, search and
+     password pages are excluded, as are links that open elsewhere, downloads, rel=nofollow and anything
+     marked data-no-prefetch. Prefetched GET pages are never cart mutations.
+
+  @example
+  {% render 'page-navigation' %}
+{% enddoc %}
+<style>
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; animation-timing-function: ease-out; }
+  @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+  html[data-a11y-paused]::view-transition-group(*),
+  html[data-a11y-paused]::view-transition-old(*),
+  html[data-a11y-paused]::view-transition-new(*) { animation: none !important; }
+</style>
+<script type="speculationrules" data-page-navigation>
+  {
+    "prefetch": [
+      {
+        "source": "document",
+        "where": {
+          "and": [
+            { "href_matches": "/*" },
+            { "not": { "href_matches": [
+              "/cart", "/cart/*", "/cart?*", "/*/cart", "/*/cart/*", "/*/cart?*",
+              "/checkout", "/checkout/*", "/checkout?*", "/checkouts/*", "/*/checkouts/*", "/*/checkout*",
+              "/account", "/account/*", "/account?*", "/*/account", "/*/account/*",
+              "/admin", "/admin/*", "/apps/*", "/*/apps/*", "/services/*", "/tools/*",
+              "/search", "/search?*", "/*/search*", "/password", "/password?*", "/challenge*"
+            ] } },
+            { "not": { "selector_matches": "[target]:not([target=_self]), [download], [rel~=nofollow], [rel~=external], [data-no-prefetch], [href*='/cart/'], [href*='checkout']" } }
+          ]
+        },
+        "eagerness": "moderate"
+      }
+    ]
+  }
+</script>

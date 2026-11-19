@@ -571,8 +571,37 @@
     else if (input.validity.typeMismatch && input.type === 'email') input.setCustomValidity(strings.invalidEmail);
     else if (input.type === 'number') input.setCustomValidity(strings.quantityError);
   }, true);
+  // Product page "אולי יעניין אותך": Shopify's in-stock recommendations that share a category collection with the
+  // current product come first, then the same-category products rendered with the page; duplicates and the current
+  // product are dropped and data-rec-limit cards are kept. Unrelated recommendations are never shown. Without
+  // category information (data-rec-categories ",,") Shopify's in-stock recommendations are used as they come.
+  const relatedRecommendations = async (section) => {
+    if (section.dataset.loaded) return;
+    section.dataset.loaded = 'true';
+    try {
+      const response = await fetch(section.dataset.url);
+      if (!response.ok) return;
+      const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const categories = (section.dataset.recCategories || '').split(',').filter(Boolean);
+      const current = section.dataset.recCurrent;
+      const related = (item) => !categories.length || (item.dataset.recCollections || '').split(',').some((handle) => handle && categories.includes(handle));
+      const fetched = [...doc.querySelectorAll('[data-rec-candidates] [data-rec-id]')].filter((item) => item.dataset.recId !== current && related(item));
+      if (!fetched.length) return;
+      const grid = section.querySelector('[data-rec-grid]');
+      const seen = new Set([current]), cards = [];
+      for (const item of [...fetched, ...grid.querySelectorAll(':scope > [data-rec-id]')]) {
+        if (seen.has(item.dataset.recId)) continue;
+        seen.add(item.dataset.recId);
+        cards.push(item);
+      }
+      grid.replaceChildren(...cards.slice(0, Number(section.dataset.recLimit) || 4));
+      section.hidden = false;
+      document.dispatchEvent(new CustomEvent('storefront:discovery:loaded', {detail: {section}}));
+    } catch { /* The same-category products rendered with the page stay as they are. */ }
+  };
   function recommendations(root) {
     root.querySelectorAll('[data-product-recommendations]').forEach(async (section) => {
+      if (section.hasAttribute('data-rec-current')) { relatedRecommendations(section); return; }
       if (section.dataset.loaded || !section.hidden) return;
       section.dataset.loaded = 'true';
       try {

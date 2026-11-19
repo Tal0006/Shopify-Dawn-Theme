@@ -1484,6 +1484,12 @@
       },
       {
         "type": "textarea",
+        "id": "customer_service_hours",
+        "label": "t:business_details_editor.service_hours",
+        "info": "t:business_details_editor.service_hours_info"
+      },
+      {
+        "type": "textarea",
         "id": "business_hours_schema",
         "label": "t:business_details_editor.hours_schema",
         "info": "t:business_details_editor.hours_schema_info"
@@ -1639,6 +1645,19 @@
         "id": "free_shipping_success_text",
         "label": "t:free_shipping_editor.success_text",
         "info": "t:free_shipping_editor.success_text_info"
+      },
+      {
+        "type": "checkbox",
+        "id": "shipping_disclosure_enabled",
+        "label": "t:free_shipping_editor.disclosure_enabled",
+        "default": true
+      },
+      {
+        "type": "number",
+        "id": "shipping_fee",
+        "label": "t:free_shipping_editor.shipping_fee",
+        "info": "t:free_shipping_editor.shipping_fee_info",
+        "default": 20
       }
     ]
   },

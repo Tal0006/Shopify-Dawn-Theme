@@ -187,7 +187,9 @@ test('Browser: validation, single native submission, success without personal da
   });
   await t.test('Optional fields empty: one native POST to Shopify contact with the request type; no marketing fields',async()=>{
    delay=300;
-   await click('.cancellation-request__submit');await click('.cancellation-request__submit');
+   // Both activations in one page evaluation, before the native POST can navigate: the second one always meets the
+   // page's double-submit guard (re-querying the button between clicks raced the redirect to the success page).
+   await ev(`(()=>{const button=document.querySelector('.cancellation-request__submit');button.scrollIntoView({block:'center'});button.click();button.click();})()`);
    await wait('location.search.includes("contact_posted=true")&&document.readyState==="complete"');delay=0;
    assert.equal(posts.length,1,'double click submits once');
    const post=posts[0];
@@ -241,5 +243,9 @@ test('Browser: validation, single native submission, success without personal da
    }
   });
   assert.deepEqual(errors,[]);
- }finally{ws?.close();chrome?.kill();server.close();await sleep(300);fs.rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
+ }finally{
+  // Best-effort cleanup (as in the other browser suites): on Windows Chrome can hold the temporary profile briefly
+  // after exit, and a leftover temp folder must not fail a run whose assertions all passed.
+  ws?.close();chrome?.kill();server.close();await sleep(300);try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}catch{}
+ }
 });

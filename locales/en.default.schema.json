@@ -3549,7 +3549,10 @@
     "remaining_text": "Text before the threshold",
     "remaining_text_info": "Use {{ amount }} for the remaining amount. Blank uses the translated default.",
     "success_text": "Text after reaching the threshold",
-    "success_text_info": "Blank uses the translated default."
+    "success_text_info": "Blank uses the translated default.",
+    "shipping_fee": "Shipping fee (₪)",
+    "shipping_fee_info": "Shown in the shipping line on product pages and in the cart. Must match the rate set in Shopify (Settings → Shipping and delivery). 0 = free shipping.",
+    "disclosure_enabled": "Show the shipping line on product pages and in the cart"
   },
   "business_details_editor": {
     "settings": "Business details",
@@ -3560,9 +3563,11 @@
     "phone": "Phone",
     "email": "Email",
     "hours": "Opening hours",
-    "hours_info": "One range per line.",
+    "hours_info": "No longer shown on the storefront (replaced by \"Customer service hours\" and \"Online orders: 24/7\"). Kept for compatibility only.",
     "hours_schema": "Opening hours for Google (structured)",
-    "hours_schema_info": "One range per line, e.g. Su-Th 09:00-18:00 or Fr 09:00-13:00. Used by the homepage business structured data."
+    "hours_schema_info": "One range per line, e.g. Su-Th 09:00-18:00 or Fr 09:00-13:00. Used by the homepage business structured data.",
+    "service_hours": "Customer service hours",
+    "service_hours_info": "One range per line, e.g. Su-Th 09:00-17:00. Shown in the footer under \"Customer service\", next to \"Online orders: 24/7\". Blank = only online orders are shown."
   },
   "floating_whatsapp_editor": {
     "settings": "Floating WhatsApp button",

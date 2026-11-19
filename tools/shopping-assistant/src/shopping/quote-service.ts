@@ -85,7 +85,11 @@ export class QuoteService {
   if(input.revision!==r.quote.revision)throw new ApiError(409,'STALE_QUOTE','יש להשתמש בגרסה העדכנית.');
   if(!Number.isInteger(input.itemIndex)||!r.quote.items[input.itemIndex])throw invalid();
   const item=r.quote.items[input.itemIndex],id=variantId(input.variantId);
-  if(item.status!=='ambiguous'||!item.candidates.some(c=>c.variantId===id))throw invalid('INVALID_SELECTION','יש לבחור מהאפשרויות שהוצגו.');
+  const shown=item.candidates.find(c=>c.variantId===id);
+  if(item.status!=='ambiguous'||!shown)throw invalid('INVALID_SELECTION','יש לבחור מהאפשרויות שהוצגו.');
+  // A candidate shown as unavailable is information only: it is never selectable (the storefront shows it apart,
+  // without a choose button), so it can never be added to the quote total or the checkout.
+  if(!purchasable(shown,item.requested.quantity))throw invalid('UNAVAILABLE_SELECTION','המוצר הזה אינו זמין כרגע. יש לבחור מוצר זמין.');
   r.state='pending';
   try{
    const current=(await this.shop.variants([id],buyer)).find(v=>v.variantId===id);

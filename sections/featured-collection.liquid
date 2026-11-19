@@ -11,12 +11,15 @@
   </header>
   {% if chosen_collection != blank %}
     {%- liquid
-      # Available products first (collection order kept), then at most max_sold_out sold-out products.
+      # In-stock products first (collection order kept). Sold-out products only fill a grid that has fewer than
+      # product_limit in-stock products, and at most max_sold_out of them: with enough stock none is shown.
+      # The scan covers the first 100 products (a plain loop would stop at Liquid's default of 50).
       assign grid_limit = section.settings.product_limit
       assign grid_sold_out_max = section.settings.max_sold_out
       assign grid_count = 0
       assign grid_sold_out = 0
     -%}
+    {%- paginate chosen_collection.products by 100 -%}
     <div class="catalog-grid">
       {%- for card_product in chosen_collection.products -%}
         {%- if card_product.available and grid_count < grid_limit -%}
@@ -35,6 +38,7 @@
       {%- endfor -%}
       {%- if grid_count == 0 -%}<p>{{ 'sections.collection_template.empty' | t }}</p>{%- endif -%}
     </div>
+    {%- endpaginate -%}
   {% elsif request.design_mode %}<p class="catalog-editor-note">{{ 'storefront.choose_collection' | t }}</p>{% endif %}
 </section>
 {% endif %}

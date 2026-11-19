@@ -241,6 +241,27 @@
       card.append(details);
       return card;
     }
+    // A product that exists in the catalog but cannot be bought now: name, image and a clear label only. No price,
+    // quantity, line total or choose button, so it never reads as a purchasable result.
+    unavailableCard(product) {
+      const card = this.element('div', '', 'shopping-assistant__card shopping-assistant__card--unavailable');
+      card.dataset.unavailableProduct = product.variantId;
+      try {
+        const url = new URL(product.imageUrl);
+        if (url.protocol === 'https:' && !url.username && !url.password) {
+          const image = this.element('img');
+          image.src = url.href; image.alt = ''; image.width = 64; image.height = 76; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer';
+          image.addEventListener('error', () => image.remove(), {once: true});
+          card.append(image);
+        }
+      } catch { /* An image is optional. */ }
+      const details = this.element('div');
+      details.append(this.element('strong', product.title));
+      if (product.variantTitle && product.variantTitle.toLowerCase() !== 'default title') details.append(this.element('p', product.variantTitle));
+      details.append(this.element('p', this.text('unavailable_label'), 'shopping-assistant__unavailable-label'));
+      card.append(details);
+      return card;
+    }
     renderQuote() {
       this.results.replaceChildren();
       this.quote.items.forEach((item, index) => {
@@ -249,7 +270,22 @@
         article.append(this.element('p', this.text(item.status)));
         if (item.status === 'matched' && item.bestMatch) article.append(this.productCard(item.bestMatch, index));
         else if (['ambiguous', 'unavailable'].includes(item.status)) {
-          (item.candidates || []).forEach(product => article.append(this.productCard(product, index, item.status === 'ambiguous')));
+          // In-stock choices first (the service's relevance order is kept within each group). Products that cannot be
+          // bought now go to a separate group below: never selectable and never part of any total (the total is the
+          // service's subtotal of matched items only).
+          const candidates = item.candidates || [];
+          const available = candidates.filter(product => this.purchasable(product));
+          const unavailable = candidates.filter(product => !this.purchasable(product)).slice(0, 3);
+          available.forEach(product => article.append(this.productCard(product, index, item.status === 'ambiguous')));
+          if (unavailable.length) {
+            const group = this.element('div', '', 'shopping-assistant__unavailable');
+            const heading = this.element('h4', this.text('unavailable_group'));
+            heading.id = 'shopping-assistant-unavailable-' + index;
+            group.setAttribute('role', 'group'); group.setAttribute('aria-labelledby', heading.id);
+            group.append(heading);
+            unavailable.forEach(product => group.append(this.unavailableCard(product)));
+            article.append(group);
+          }
         }
         if (item.status !== 'matched') {
           const actions = this.element('div', '', 'shopping-assistant__actions');

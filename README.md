@@ -68,6 +68,24 @@ shopify theme dev --store your-store.myshopify.com
 2. In your Shopify Admin, go to **Online Store → Themes → Add theme → Upload zip file**.
 3. Click **Customize** to open the Theme Editor and make it your own.
 
+## 🧪 Running the theme tests
+
+The theme tests are plain `node:test` files in `tests/` (Node 22+, Chrome installed).
+
+```bash
+# Run the browser suites one file at a time. Many of them start their own headless Chrome or share
+# the live preview's cart; run concurrently they compete for CPU and state and time out spuriously.
+node --test --test-concurrency=1 tests/*.cjs
+```
+
+- **Live-preview suites** (`accessibility`, `navigation`, `card-cart`) need `shopify theme dev` on
+  `127.0.0.1:9292` and a Chrome remote-debugging session on `127.0.0.1:9333`
+  (override with `ACCESSIBILITY_PREVIEW_URL` / `ACCESSIBILITY_DEBUG_URL`). Without them they fail with `fetch failed`.
+- **Liquid rendering tests** use `liquidjs`, which is intentionally not a repository dependency: point `NODE_PATH`
+  at any install (for example `npm install --prefix /tmp/liquid liquidjs@10` and
+  `NODE_PATH=/tmp/liquid/node_modules`). Without it those tests are skipped, not failed.
+- `CHROME_PATH` overrides the Chrome executable used by the fixture suites.
+
 ## 🎨 Customization
 
 Everything is configurable from **Online Store → Themes → Customize**:
