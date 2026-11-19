@@ -10,7 +10,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "migrate": "tsx --env-file=.env src/migrate.ts",
-    "test": "tsx --test tests/*.test.ts"
+    "test": "tsx --test tests/*.test.ts",
+    "cancellations:retention": "node dist/cancellation-retention.js"
   },
   "dependencies": {
     "express": "^5.1.0",

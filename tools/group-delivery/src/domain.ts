@@ -14,7 +14,12 @@ export const ADMIN_ERROR_CODES=['LOGIN_FAILED','ADMIN_AUTH_REQUIRED','CSRF_REQUI
  'INVALID_OPERATIONAL_STATUS','OPERATIONAL_TRANSITION_NOT_ALLOWED','COMPLETION_CONFIRMATION_REQUIRED',
  // Business finance (/admin/system).
  'INVALID_TRANSACTION','TRANSACTION_NOT_FOUND','TRANSACTION_EXISTS','DELETE_CONFIRMATION_REQUIRED','RECURRING_OCCURRENCE','RECURRING_INACTIVE','OPS_MANAGED'] as const;
-export type ErrorCode=typeof PUBLIC_ERROR_CODES[number]|typeof ADMIN_ERROR_CODES[number];
+// Cancellation requests (POST /api/v1/cancellations; sections/cancellation-request.liquid maps them). Kept apart from
+// PUBLIC_ERROR_CODES, which is the Group Delivery section's contract.
+export const CANCELLATION_ERROR_CODES=['INVALID_CANCELLATION','CANCELLATION_UNAVAILABLE','CANCELLATION_REQUEST_NOT_FOUND','CANCELLATION_TRANSITION_NOT_ALLOWED','CANCELLATION_PURGED'] as const;
+// Every code the public cancellation endpoint can answer (the storefront form must map each one).
+export const CANCELLATION_ENDPOINT_CODES=['INVALID_CANCELLATION','CANCELLATION_UNAVAILABLE','INVALID_INPUT','INVALID_ORIGIN','INVALID_HOST','RATE_LIMITED','BODY_TOO_LARGE','SERVICE_UNAVAILABLE','CARD_DATA_NOT_ACCEPTED','NOT_FOUND'] as const;
+export type ErrorCode=typeof PUBLIC_ERROR_CODES[number]|typeof ADMIN_ERROR_CODES[number]|typeof CANCELLATION_ERROR_CODES[number];
 // details: optional safe integers only (e.g. a re-validated amount in agorot), serialized next to code and message.
 export class ApiError extends Error {constructor(public status:number,public code:ErrorCode, message='לא ניתן להשלים את הבקשה. יש לבדוק את הפרטים ולנסות שוב.',public details?:Record<string,number>){super(message)}}
 export const hash=(value:string)=>createHash('sha256').update(value).digest('hex');

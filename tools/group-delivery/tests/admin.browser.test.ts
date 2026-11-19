@@ -309,7 +309,7 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    await wait('location.pathname==="/admin/system"&&!!document.querySelector(".metrics--fin")');
    assert.deepEqual(await ev('[document.querySelector("h1").textContent,document.documentElement.dir,document.querySelector(".topbar__nav a[aria-current=page]").textContent]'),['כספים','rtl','כספים']);
    assert.deepEqual(await ev('[...document.querySelectorAll(".metric--fin .metric__label")].map(e=>e.textContent)'),['הכנסות החודש','הוצאות החודש','רווח / הפסד','חיובים קבועים']);
-   assert.deepEqual(await ev('[...document.querySelectorAll(".topbar__nav a")].map(a=>a.textContent)'),['כספים','משלוחים קבוצתיים','אזורי משלוח','יומן פעולות','מערכות האתר']);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".topbar__nav a")].map(a=>a.textContent)'),['כספים','בקשות ביטול','משלוחים קבוצתיים','אזורי משלוח','יומן פעולות','מערכות האתר']);
    const modal=(id:string)=>'!!document.querySelector("#'+id+'")?.matches(":modal")';
    const submit=(id:string)=>ev('document.querySelector("#'+id+' form").requestSubmit(document.querySelector("#'+id+' button.btn--primary"))');
    const fill=(id:string,values:Record<string,string>)=>ev('(()=>{const d=document.querySelector("#'+id+'");'+Object.entries(values).map(([k,v])=>'d.querySelector("[name='+k+']").value='+JSON.stringify(v)+';').join('')+'})()');

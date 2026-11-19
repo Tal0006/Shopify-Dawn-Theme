@@ -48,7 +48,7 @@ function card(system:SystemView){
 }
 
 export function systemPage(data:{systems:SystemView[];postponed:SystemView[];quickLinks:SystemLink[];costs:{entries:CostEntry[];monthlyTotalsCents:Partial<Record<'USD'|'ILS',number>>};finance?:FinanceCostState[];
- checkedAt:string;cached:boolean;missing:string[];warnings:string[];csrf:string}){
+ checkedAt:string;cached:boolean;missing:string[];warnings:string[];cancellationWarnings?:string[];csrf:string}){
  const count=(status:string)=>data.systems.filter(s=>s.status===status).length;
  const problems=count('OFFLINE')+count('DEGRADED');
  const summary='<p class="sys-summary" role="status">'+count('OPERATIONAL')+' פעילים · '+count('MANUAL')+' בבדיקה ידנית · '+(problems?'<strong>'+problems+' דורשים תשומת לב</strong>':'אין תקלות שזוהו')+'</p>';
@@ -67,6 +67,8 @@ export function systemPage(data:{systems:SystemView[];postponed:SystemView[];qui
   '<p class="muted">בדיקה אחרונה: '+time(data.checkedAt)+(data.cached?' (תוצאה שמורה מהדקה האחרונה)':'')+'. הבדיקות רצות רק כשהדף נפתח, בלי ניטור רציף.</p>'+
   summary+
   (data.warnings.length?'<div class="notice notice--info" role="status"><strong>הגדרות שלא נקלטו:</strong><ul class="sys-warnings">'+data.warnings.map(w=>'<li dir="ltr">'+escape(w)+'</li>').join('')+'</ul></div>':'')+
+  // Cancellation requests: an unconfigured key or retention period is shown here too, not only on its own page.
+  (data.cancellationWarnings?.length?'<div class="notice notice--info" role="status" data-cancellation-warnings><strong>בקשות ביטול:</strong><ul class="sys-warnings">'+data.cancellationWarnings.map(w=>'<li>'+escape(w)+'</li>').join('')+'</ul><p><a href="/admin/cancellations">לעמוד בקשות הביטול</a></p></div>':'')+
   '<nav class="sys-quick" aria-label="קישורים מהירים">'+data.quickLinks.map(item=>anchor(item,'btn btn--quiet')).join('')+'</nav>'+
   '<section aria-labelledby="systems-title"><h2 id="systems-title" class="sys-section-title">שירותים</h2><div class="sys-grid">'+data.systems.map(card).join('')+'</div></section>'+
   '<section class="card" aria-labelledby="costs-title"><div class="section-head"><h2 id="costs-title">עלויות חודשיות</h2><a class="btn btn--quiet" href="/admin/system">לדף הכספים</a></div>'+costs+

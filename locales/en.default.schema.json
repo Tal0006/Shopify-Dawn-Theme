@@ -3595,7 +3595,9 @@
   "cancellation_editor": {
     "name": "Cancellation form",
     "page": "Transaction cancellation page",
-    "page_info": "The page that shows the cancellation form (page.cancellation template). The \"ביטול עסקה\" link is shown in the footer."
+    "page_info": "The page that shows the cancellation form (page.cancellation template). The \"ביטול עסקה\" link is shown in the footer.",
+    "service_url": "Cancellation request service URL",
+    "service_url_info": "The Fankee server that receives cancellation requests (default: the Group Delivery service on Render). The ID number is stored there encrypted; requests appear in the business admin under \"בקשות ביטול\"."
   },
   "group_delivery_info_editor": {
     "name": "Group Delivery guide",

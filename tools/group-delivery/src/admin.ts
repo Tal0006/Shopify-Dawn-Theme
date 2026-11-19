@@ -3,6 +3,7 @@
 // Customer contact details appear only on these authenticated pages, never in public HTML or browser storage.
 import {REACHABLE_STATUSES,dialable,type Page} from './admin-data.js';
 import {ils} from './finance.js';
+import {CANCELLATION_STATUS_LABELS} from './cancellations.js';
 export const escape=(value:unknown)=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]!));
 const TZ='Asia/Jerusalem';
 const money=(agorot:number)=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS'}).format(agorot/100);
@@ -16,7 +17,8 @@ const OPERATIONAL_ORDER=['NEW','IN_PROGRESS','READY_FOR_DELIVERY','OUT_FOR_DELIV
 const opChip=(status:string)=>'<span class="chip chip--op chip--op-'+escape(status.toLowerCase().replace(/_/g,'-'))+'">'+escape(OPERATIONAL_LABELS[status]||status)+'</span>';
 const ACTION_LABELS:Record<string,string>={'group.operational_status_change':'שינוי סטטוס משלוח','group.complete':'השלמת משלוח','login':'התחברות','logout':'התנתקות','group.approve':'אישור קבוצה','area.create':'הוספת אזור','area.update':'עדכון אזור','group.export':'ייצוא נתוני קבוצה','member.withdraw':'הסרת לקוח מהקבוצה',
  'group.charges_process':'שליחת חיובים','group.charges_reconcile':'בדיקת חיובים','finance.transaction_create':'רישום תנועה כספית','finance.transaction_update':'עדכון תנועה כספית','finance.transaction_delete':'מחיקת תנועה כספית',
- 'finance.recurring_create':'הוספת חיוב קבוע','finance.recurring_update':'עדכון חיוב קבוע','finance.recurring_deactivate':'הפסקת חיוב קבוע','finance.recurring_delete':'מחיקת חיוב קבוע'};
+ 'finance.recurring_create':'הוספת חיוב קבוע','finance.recurring_update':'עדכון חיוב קבוע','finance.recurring_deactivate':'הפסקת חיוב קבוע','finance.recurring_delete':'מחיקת חיוב קבוע',
+ 'cancellation.status_change':'שינוי שלב בבקשת ביטול','cancellation.note_update':'עדכון הערה בבקשת ביטול','cancellation.reveal_id':'הצגת מספר תעודת זהות בבקשת ביטול','cancellation.retention_purge':'מחיקת פרטי בקשת ביטול (תקופת שמירה)'};
 const RESULT_LABELS:Record<string,string>={OK:'הצליח',DENIED:'נדחה',FAILED:'נכשל'};
 const chip=(kind:'group'|'member',status:string)=>'<span class="chip chip--'+escape(status.toLowerCase())+'">'+escape((kind==='group'?GROUP_LABELS:MEMBER_LABELS)[status]||status)+'</span>';
 // Visible, specific labels ("העתקת טלפון"), so neighbouring copy buttons are never ambiguous.
@@ -41,6 +43,7 @@ export const ADMIN_SECTIONS:{key:string;label:string;href:string;enabled:boolean
  {key:'overview',label:'סקירה',href:'/admin/overview',enabled:false},
  {key:'finance',label:'כספים',href:'/admin/system',enabled:true},
  {key:'orders',label:'הזמנות',href:'/admin/orders',enabled:false},
+ {key:'cancellations',label:'בקשות ביטול',href:'/admin/cancellations',enabled:true},
  {key:'dashboard',label:'משלוחים קבוצתיים',href:'/admin',enabled:true},
  {key:'areas',label:'אזורי משלוח',href:'/admin/areas',enabled:true},
  {key:'audit',label:'יומן פעולות',href:'/admin/audit',enabled:true},
@@ -360,6 +363,12 @@ export function auditView(data:{events:any[];pagination:Page;csrf:string}){
    const text=e.result!=='OK'?'הבקשה לא בוצעה; לא נשמר שינוי.':label+(e.amountAgorot!==null?' · '+ils(e.amountAgorot):'');
    return '<span class="audit__desc">'+escape(text)+'</span>';
   }
+  // Cancellation requests: statuses and the request id only (the audit never holds the ID number, contact details or note).
+  if(e.action.startsWith('cancellation.')){
+   const label=(status:string)=>(CANCELLATION_STATUS_LABELS as Record<string,string>)[status]||status;
+   const text=e.result!=='OK'?'הבקשה לא בוצעה.':e.action==='cancellation.status_change'?label(e.previousStatus||'')+' ← '+label(e.newStatus||''):e.action==='cancellation.retention_purge'?'הפרטים האישיים נמחקו.':e.action==='cancellation.reveal_id'?'המספר המלא הוצג למנהל.':'';
+   return text?'<span class="audit__desc">'+escape(text)+'</span>':'';
+  }
   if(e.action!=='member.withdraw')return '';
   const text=e.result!=='OK'?'הבקשה לא בוצעה; הלקוח וההתחייבות לא שונו.':e.detail==='ALREADY_WITHDRAWN'?'הלקוח כבר הוסר קודם לכן. לא בוצע שינוי.':
    'הלקוח הוסר מהקבוצה.'+(e.amountAgorot!==null?' התחייבות של '+money(e.amountAgorot)+' הוסרה.':'');
@@ -553,6 +562,9 @@ fieldset{margin:0;padding:0;border:0;min-width:0}legend{padding:0;font-size:13px
 }
 @media (max-width:760px){.filters--fin{grid-template-columns:1fr 1fr}.filters--fin .field--wide,.filters--fin .filters__actions{grid-column:1/-1}.table th[scope=row]{display:block;padding:6px 0;border:0;font-weight:700}}
 @media (max-width:420px){.filters{grid-template-columns:1fr}.dialog__actions .btn,.danger-zone .btn{flex:1 1 100%}}
+.cx-inline{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}.cx-search{display:grid;gap:6px;margin:0 0 12px;max-width:560px}.cx-search input{flex:1 1 220px;min-width:0}
+.cx-reason{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.cx-id{font-family:ui-monospace,Consolas,monospace;font-size:17px;letter-spacing:.08em}.cx-reveal{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 4px}
+.cx-warnings ul{margin:6px 0 0;padding-inline-start:20px}
 @media print{.topbar,.filters,.actions,.pager{display:none}}
 `+Array.from({length:101},(_,i)=>`.meter__track .p${i}{width:${i}%}`).join("")+``;
 

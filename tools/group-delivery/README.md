@@ -50,6 +50,9 @@ For Render:
 | RESEND_API_KEY | Resend API key (sending access, restricted to the sending domain); server only, never in the theme, browser or database |
 | RECOVERY_EMAIL_FROM | Sender on a Resend-verified domain, e.g. `פאנקי <no-reply@mail.fanakee.com>` |
 | RECOVERY_EMAIL_REPLY_TO | Optional reply-to address |
+| CANCELLATION_ENCRYPTION_KEY | Dedicated 32-byte key (64 hex or base64) that encrypts Israeli ID numbers in cancellation requests. Refused if it equals any other secret. Unset or invalid: the cancellation form answers 503 and shoppers see the other channels |
+| CANCELLATION_RETENTION_DAYS | Days after a request is completed before its personal data is cleared (1-3650). Unset: nothing is deleted and the admin pages warn. No default: the merchant decides after legal/accounting advice |
+| CANCELLATION_NOTIFY_EMAIL | Optional internal address told about each new request (reference, time and admin link only), through the recovery email provider |
 
 With RECOVERY_EMAIL_PROVIDER=resend and a missing or invalid RESEND_API_KEY / RECOVERY_EMAIL_FROM, recovery fails closed (no code is generated or sent) and the startup log names the variable, never its value; the rest of the service starts normally. The operations page (/admin/system) shows the state and the sender domain only.
 
@@ -250,7 +253,40 @@ A Hebrew RTL finance dashboard for manually recorded income and expenses. ILS on
 - **Pages** (work without JavaScript; `/admin/app.js` opens the dialogs as modals): `GET /admin/system` (`range=6m|12m|year`, filters `q`, `month=YYYY-MM`, `type`, `category`, `page`; `?add=INCOME|EXPENSE|RECURRING`, `?edit=<id>`, `?delete=<id>`, `?import=<key>` render the dialogs), `POST /admin/system/transactions`, `POST /admin/system/transactions/:id`, `POST /admin/system/transactions/:id/delete` (`confirm=yes`). A refused form comes back (422/409) with the typed values and per-field errors. `/admin/system?refresh=1` redirects to the systems page.
 - **JSON** (same session; `X-CSRF-Token` for writes): `GET /admin/api/finance/summary?range=`, `GET /admin/api/finance/transactions` (same filters), `GET /admin/api/finance/transactions/:id`, `POST /admin/api/finance/transactions` (201), `POST /admin/api/finance/transactions/:id`, `POST /admin/api/finance/transactions/:id/delete` with `{"confirm":true}` (a charge answers `{deactivated}` or, with nothing recorded, `{deleted}`), `GET /admin/api/finance/recurring`. Creating with `recurring:true` answers `{recurring}`; other ids answer `{transaction}`. Amounts: `amountAgorot` (positive integer) or `amount` (shekel text such as `"1,234.56"`). 422 INVALID_TRANSACTION includes `fields` (field → Hebrew message); 404 TRANSACTION_NOT_FOUND; 400 DELETE_CONFIRMATION_REQUIRED.
 - **Chart**: server-rendered inline SVG grouped bars (no charting dependency; the admin CSP forbids inline styles, so only SVG attributes and classes are used). Months run right to left; expense bars are hatched so the two series differ without color; each bar has a `<title>`, and the same numbers are in an expandable table. On narrow screens the chart scrolls inside its card.
-- **Navigation**: `ADMIN_SECTIONS` in `src/admin.ts` lists כספים, משלוחים קבוצתיים, אזורי משלוח, יומן פעולות and מערכות האתר; "סקירה" and "הזמנות" are declared but disabled until their pages exist.
+- **Navigation**: `ADMIN_SECTIONS` in `src/admin.ts` lists כספים, בקשות ביטול, משלוחים קבוצתיים, אזורי משלוח, יומן פעולות and מערכות האתר; "סקירה" and "הזמנות" are declared but disabled until their pages exist.
+
+## Cancellation requests ("ביטול עסקה", `/admin/cancellations`)
+
+The storefront form (`sections/cancellation-request.liquid`) no longer uses Shopify's contact form, so requests are no
+longer delivered by email. It sends JSON to `POST /api/v1/cancellations`.
+
+- **Public endpoint:** JSON only, an exact `STOREFRONT_ORIGINS` origin, a 10 kB body, 10 requests per IP per hour on
+  top of the shared public-write budget. Fields: `name`, `idNumber`, `email` (required); `orderNumber`, `phone`,
+  `reason` (optional); `submissionKey` (random, from the form). Any other field is refused. Whitespace is normalised
+  and invisible formatting characters are removed; `<`, `>` and control characters are refused. The ID number needs
+  5-9 digits and a valid check digit. The answer is always `{ok, reference, message}` (201 new, 200 duplicate) or an
+  error code with field names only (`INVALID_CANCELLATION`), never the submitted values or whether an order exists.
+  The same submission key, or the same ID number, email and order number within 10 minutes, returns the first
+  reference (an advisory lock serialises submissions).
+- **Stored** (`migrations/015_cancellation_requests.sql`): reference (`CR-XXXX-XXXX`), status, timestamps, full name,
+  email, phone, order number, reason, the ID number sealed with AES-256-GCM (HKDF subkey of
+  `CANCELLATION_ENCRYPTION_KEY`, additional data bound to the row id), an HMAC fingerprint under a second subkey (for
+  duplicates only), the submission-key hash, an internal note, and who changed it last.
+- **Never** in logs, email, audit metadata, public responses, URLs or browser storage: the ID number and the request
+  content. The admin detail page shows the ID masked (`•••••••60`). The full number is shown only in the response to
+  an explicit `POST /admin/cancellations/:reference/reveal-id` (`confirm=yes`), which is audited.
+- **Admin:** list with status filter and exact search (reference, order number or email), detail, status
+  `NEW → IN_REVIEW → COMPLETED` (a completed request can be reopened), an internal note (up to 1000 characters).
+  Session, exact Origin, CSRF and a per-IP limit on every change; audited as `cancellation.*` with the request id and
+  statuses only. Statuses record handling, never a legal decision.
+- **Email notice:** with `CANCELLATION_NOTIFY_EMAIL` and the recovery email provider, each new request sends
+  "בקשת ביטול חדשה התקבלה": the reference, the time and the admin link. Nothing else.
+- **Retention:** with `CANCELLATION_RETENTION_DAYS`, requests completed more than that many days ago have every
+  personal column cleared (`purged_at`); the reference, status and dates remain, plus a `cancellation.retention_purge`
+  audit row. It runs at startup, every 6 hours, from the button on `/admin/cancellations`, or as
+  `npm run cancellations:retention` (for example a Render Cron Job). Open requests are never deleted. Without the
+  variable nothing is deleted, and `/admin/cancellations` and `/admin/system/services` show a warning. Database
+  backups (Neon point-in-time restore) keep earlier versions until their own window ends.
 
 ## Tests and limits
 

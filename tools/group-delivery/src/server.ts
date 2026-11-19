@@ -24,11 +24,13 @@ import {ShopifyOrders,type OrderGateway} from './shopify-orders.js';
 import {containsCardData} from './domain.js';
 import {Finance,FinanceInputError,listFilters,rangeOf,nextBilling,UUID} from './finance.js';
 import {financePage,formValues,valuesOf,recurringValuesOf,type DialogState,type ViewParams} from './finance-page.js';
+import {Cancellations,CancellationInputError} from './cancellations.js';
+import {cancellationsPage,cancellationPage,CANCELLATION_NOTICES,CANCELLATION_PAGE_ERRORS} from './cancellations-page.js';
 // deps: test seams for the operations page (outbound fetch and health-check timings) and for recovery email
 // (provider and limits; the default provider comes from cfg.recovery and is null when recovery is disabled).
 // cardcom/paymentsLog: test seams for the Cardcom gateway (default: the real CardcomService when payments are ENABLED,
 // none otherwise) and for payment log lines.
-export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>;cardcom?:CardcomGateway|null;paymentsLog?:(line:string)=>void;orders?:OrderGateway|null;now?:()=>Date}={}){
+export function createApp(db:Database,cfg:Config,validator:CartValidator=new Shopify(cfg),deps:{fetch?:(input:string,init?:RequestInit)=>Promise<Response>;health?:Partial<HealthOptions>;email?:EmailProvider|null;recoveryLimits?:Partial<RecoveryLimits>;cardcom?:CardcomGateway|null;paymentsLog?:(line:string)=>void;orders?:OrderGateway|null;now?:()=>Date;cancellationLog?:(line:string)=>void}={}){
  const app=express(),areas=new Areas(db,cfg);
  // Card reservation is required for new memberships whenever Cardcom is enabled (even if misconfigured: fail closed).
  const groups=new Groups(db,cfg,validator,areas,{paymentMode:()=>cfg.payments.state==='DISABLED'?'NONE':'CARDCOM'});
@@ -41,8 +43,13 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  const systemHealth=new SystemHealth(db,cfg.ops,()=>cfg.origin,deps.fetch,deps.health);
  // Business finance (/admin/system). deps.now: test seam for "today" (Israel time decides the current month).
  const finance=new Finance(db,cfg.ops.costs,deps.now);
- const recovery=new Recovery(db,cfg.secret,deps.email!==undefined?deps.email:emailProvider(cfg.recovery),groups,{...RECOVERY_LIMITS,...deps.recoveryLimits});
+ // One transactional email provider (RECOVERY_EMAIL_PROVIDER) for recovery codes and cancellation notices.
+ const mail=deps.email!==undefined?deps.email:emailProvider(cfg.recovery);
+ const recovery=new Recovery(db,cfg.secret,mail,groups,{...RECOVERY_LIMITS,...deps.recoveryLimits});
  app.locals.recovery=recovery;
+ // Cancellation requests ("בקשות ביטול"): public submission on /api/v1, admin pages under /admin/cancellations.
+ const cancellations=new Cancellations(db,cfg.cancellations,{email:mail,adminOrigin:()=>cfg.origin,log:deps.cancellationLog});
+ app.locals.cancellations=cancellations;
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
  app.use((_req,res,next)=>{
   res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
@@ -68,7 +75,11 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   await auth.limit(req,nearest?'area-nearest':read?'public-read':'public-write',nearest?10:read?120:20,600);
   next();
  });
+ // The cancellation form has its own, smaller body limit (parsed first; the general parser then skips it).
+ app.use('/api/v1/cancellations',express.json({limit:'10kb'}));
  app.use(express.json({limit:'24kb'}));
+ // Cancellation admin forms carry a note of up to 1000 characters (about 6 kB URL-encoded in Hebrew).
+ app.use('/admin/cancellations',express.urlencoded({extended:false,limit:'16kb'}));
  app.use(express.urlencoded({extended:false,limit:'4kb'}));
  // Card numbers, CVV and similar fields are refused on every public API before any handler sees them.
  app.use('/api/v1',(req,_res,next)=>{if(req.body&&typeof req.body==='object'&&containsCardData(req.body))throw new ApiError(400,'CARD_DATA_NOT_ACCEPTED','פרטי כרטיס אשראי מוזנים רק בעמוד המאובטח של קארדקום.');next();});
@@ -144,7 +155,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // The systems overview moved under /admin/system/services; /admin/system is the finance dashboard. Old refresh
  // links keep working.
  // The cost table also says how the finance page counts each cost (read only: no synchronization from this page).
- app.get('/admin/system/services',async(req,res)=>res.type('html').send(systemPage({...await systemData(req),finance:await finance.opsCosts(),csrf:csrfOf(res)})));
+ app.get('/admin/system/services',async(req,res)=>res.type('html').send(systemPage({...await systemData(req),finance:await finance.opsCosts(),cancellationWarnings:cancellations.warnings(),csrf:csrfOf(res)})));
  app.get('/admin/api/system',async(req,res)=>res.json(await systemData(req)));
  // ---- Business finance ("כספים"). Admin session only (above); mutations also need Origin + CSRF (above), have their
  // own rate limit and are audited with the change in one transaction (finance.ts). HTML forms redirect back to the
@@ -361,6 +372,51 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   res.json({previous:result.previous,status:result.status,changed:result.changed,group});
  });
  app.get('/admin/api/groups/:publicId/timeline',async(req,res)=>res.json({timeline:await admin.timeline(req.params.publicId)}));
+ // ---- Cancellation requests (admin session above; mutations also need Origin + CSRF). Status changes and notes are
+ // audited with the request id and statuses only. The full ID number is shown only in the response to an explicit
+ // POST (never in a URL), audited as cancellation.reveal_id.
+ const cancellationLimit=(req:express.Request)=>auth.limit(req,'admin-cancellation-write',120,600);
+ const cancellationBase=(reference:string)=>'/admin/cancellations/'+encodeURIComponent(reference);
+ const cancellationError=(error:unknown)=>error instanceof ApiError?error.code==='CANCELLATION_PURGED'?'purged':error.code==='CANCELLATION_TRANSITION_NOT_ALLOWED'?'transition':error.code==='INVALID_INPUT'?'note_invalid':error.code==='CANCELLATION_UNAVAILABLE'?'unavailable':null:null;
+ app.get('/admin/cancellations',async(req,res)=>{
+  const purged=typeof req.query.purged==='string'&&/^\d{1,6}$/.test(req.query.purged)?Number(req.query.purged):null;
+  res.type('html').send(cancellationsPage({list:await cancellations.list(req.query),warnings:cancellations.warnings(),retentionDays:cancellations.retentionDays,csrf:csrfOf(res),
+   notice:typeof req.query.notice==='string'&&Object.hasOwn(CANCELLATION_NOTICES,req.query.notice)?req.query.notice:undefined,purged}));
+ });
+ app.post('/admin/cancellations/retention',async(req,res)=>{
+  await cancellationLimit(req);
+  const result=await cancellations.purgeExpired(res.locals.actor);
+  res.redirect(303,'/admin/cancellations'+(result.configured?'?purged='+result.purged:''));
+ });
+ app.get('/admin/cancellations/:reference',async(req,res)=>{
+  const error=typeof req.query.error==='string'&&Object.hasOwn(CANCELLATION_PAGE_ERRORS,req.query.error)?req.query.error:undefined;
+  const notice=typeof req.query.notice==='string'&&Object.hasOwn(CANCELLATION_NOTICES,req.query.notice)?req.query.notice:undefined;
+  res.type('html').send(cancellationPage({request:await cancellations.detail(req.params.reference),csrf:csrfOf(res),notice,error}));
+ });
+ app.post('/admin/cancellations/:reference/status',async(req,res)=>{
+  await cancellationLimit(req);
+  const reference=req.params.reference;
+  try{await cancellations.setStatus(reference,req.body?.status,res.locals.actor);}
+  catch(error){const code=cancellationError(error);if(code){res.redirect(303,cancellationBase(reference)+'?error='+code);return;}throw error;}
+  res.redirect(303,cancellationBase(reference)+'?notice=status_updated');
+ });
+ app.post('/admin/cancellations/:reference/note',async(req,res)=>{
+  await cancellationLimit(req);
+  const reference=req.params.reference;
+  try{await cancellations.setNote(reference,req.body?.note,res.locals.actor);}
+  catch(error){const code=cancellationError(error);if(code){res.redirect(303,cancellationBase(reference)+'?error='+code);return;}throw error;}
+  res.redirect(303,cancellationBase(reference)+'?notice=note_saved');
+ });
+ // Answered directly (no redirect), so the number exists only in this one no-store response.
+ app.post('/admin/cancellations/:reference/reveal-id',async(req,res)=>{
+  await auth.limit(req,'admin-cancellation-reveal',30,600);
+  const reference=req.params.reference;
+  if(req.body?.confirm!=='yes'){await cancellations.detail(reference);res.redirect(303,cancellationBase(reference)+'?error=reveal_confirm');return;}
+  let revealedId:string;
+  try{revealedId=await cancellations.revealId(reference,res.locals.actor);}
+  catch(error){const code=cancellationError(error);if(code){res.redirect(303,cancellationBase(reference)+'?error='+code);return;}throw error;}
+  res.type('html').send(cancellationPage({request:await cancellations.detail(reference),csrf:csrfOf(res),revealedId}));
+ });
  app.post('/admin/logout',async(req,res)=>auth.logout(req,res));
  app.get('/admin/api/audit',async(req,res)=>res.json(await auditPage(db,req.query)));
  // Delivery areas: same admin session, Origin and CSRF checks as group approval. HTML forms redirect; JSON API returns data.
@@ -407,6 +463,15 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   await auth.limit(req,'recovery-verify',30,3600);
   res.json(await recovery.verify(req.params.publicId,req.body));
  });
+ // Cancellation request from the storefront form: JSON only, an allowed storefront Origin (both above), a 10 kB body
+ // and its own per-IP hourly limit besides the shared public-write budget. The answer never echoes what was sent and
+ // never says whether an order or customer exists.
+ app.post('/api/v1/cancellations',async(req,res)=>{
+  if(!cancellations.enabled)throw new ApiError(503,'CANCELLATION_UNAVAILABLE','לא ניתן לשלוח בקשת ביטול דרך האתר כרגע.');
+  await auth.limit(req,'cancellation-submit',10,3600);
+  const result=await cancellations.submit(req.body);
+  res.status(result.created?201:200).json({ok:true,reference:result.reference,message:'הבקשה התקבלה ונשלחה לטיפול.'});
+ });
  app.use((_req,res)=>res.status(404).json({error:'העמוד לא נמצא',code:'NOT_FOUND' satisfies ErrorCode}));
  app.use((error:any,_req:express.Request,res:express.Response,_next:express.NextFunction)=>{
   const status=error instanceof ApiError?error.status:error?.status===413?413:error?.status===400?400:500;
@@ -419,7 +484,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
    res.status(status).type('html').send(errorPage(status,message,res.locals.session?.csrf));return;
   }
   const details=error instanceof ApiError&&error.details&&Object.values(error.details).every(Number.isSafeInteger)?error.details:undefined;
-  res.status(status).json({error:message,code,...(details?{details}:{}),...(error instanceof FinanceInputError?{fields:error.fields}:{})});
+  res.status(status).json({error:message,code,...(details?{details}:{}),...(error instanceof FinanceInputError||error instanceof CancellationInputError?{fields:error.fields}:{})});
  });
  return app;
 }
@@ -432,9 +497,18 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   // Names variables only, never values. Card reservations fail closed (503) until fixed; joins still require a card.
   if(cfg.payments.state==='ENABLED'&&cfg.payments.chargingProblems.length)console.warn('Group delivery card groups cannot be approved or charged until configured: '+cfg.payments.chargingProblems.join(' '));
   if(cfg.payments.state==='MISCONFIGURED')console.warn('Group delivery card reservation is enabled but unavailable until configured: '+cfg.payments.problems.join(' '));
+  // Names variables only, never values.
+  if(cfg.cancellations.state!=='ENABLED')console.warn('Group delivery cancellation requests are refused until configured: '+cfg.cancellations.problems.join(' '));
+  if(cfg.cancellations.retentionProblem)console.warn('Group delivery cancellation retention: '+cfg.cancellations.retentionProblem);
+  else if(cfg.cancellations.retentionDays===null)console.warn('Group delivery cancellation retention is not configured (CANCELLATION_RETENTION_DAYS); no cancellation request is deleted.');
+  if(cfg.cancellations.notifyProblem)console.warn('Group delivery cancellation notices: '+cfg.cancellations.notifyProblem);
   const app=createApp(db,cfg),server=app.listen(cfg.port,'0.0.0.0',()=>console.info('Group delivery listening on port '+cfg.port));
+  // Retention: at startup (the instance wakes on demand) and every 6 hours while running. A no-op until configured.
+  const retention=()=>void (app.locals.cancellations as Cancellations).purgeExpired().then(result=>{if(result.purged)console.info('Group delivery cancellation retention removed personal data from '+result.purged+' request(s).');})
+   .catch(()=>console.error('Group delivery cancellation retention run failed.'));
+  if(cfg.cancellations.retentionDays!==null){retention();setInterval(retention,6*3600000).unref();}
   // Recovery emails still being sent finish before the pool closes.
-  const stop=()=>{server.close(()=>{void Promise.all([(app.locals.recovery as Recovery).idle(),(app.locals.payments as Payments).idle()]).then(()=>db!.end()).then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
+  const stop=()=>{server.close(()=>{void Promise.all([(app.locals.recovery as Recovery).idle(),(app.locals.payments as Payments).idle(),(app.locals.cancellations as Cancellations).idle()]).then(()=>db!.end()).then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
   process.on('SIGTERM',stop);process.on('SIGINT',stop);
  }catch {
   console.error('Group delivery startup failed. Check configuration and database connectivity.'); }

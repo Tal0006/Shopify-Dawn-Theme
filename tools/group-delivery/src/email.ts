@@ -1,7 +1,10 @@
 // Transactional email for membership recovery. The recovery logic depends only on EmailProvider; Resend is one
 // implementation. Errors never carry the provider's response, the API key, the recipient or the code.
 export interface RecoveryCodeMessage {to:string;code:string;expiresInMinutes:number;idempotencyKey?:string}
-export interface EmailProvider {readonly name:string;sendRecoveryCode(message:RecoveryCodeMessage):Promise<void>}
+// Internal notice about a new cancellation request: only the reference, the time and the admin link. Never the ID
+// number, name, email, phone, reason, order number, database ids or tokens.
+export interface CancellationNoticeMessage {to:string;reference:string;receivedAt:Date;adminUrl:string;idempotencyKey?:string}
+export interface EmailProvider {readonly name:string;sendRecoveryCode(message:RecoveryCodeMessage):Promise<void>;sendCancellationNotice?(message:CancellationNoticeMessage):Promise<void>}
 export class EmailDeliveryError extends Error {constructor(){super('Recovery email could not be delivered');this.name='EmailDeliveryError';}}
 
 export const RECOVERY_SUBJECT='קוד אימות לשחזור ההצטרפות שלך בפאנקי';
@@ -28,12 +31,42 @@ export function recoveryEmail(code:string,expiresInMinutes:number){
  return {subject:RECOVERY_SUBJECT,text,html};
 }
 
+export const CANCELLATION_NOTICE_SUBJECT='בקשת ביטול חדשה התקבלה';
+const NOTICE_REFERENCE=/^CR-[2-9A-HJKMNP-TV-Z]{4}-[2-9A-HJKMNP-TV-Z]{4}$/;
+// Every variable is checked (reference format, admin URL path, a valid date), so nothing needs HTML escaping and no
+// request content can reach the message.
+export function cancellationNoticeEmail(reference:string,receivedAt:Date,adminUrl:string){
+ let url:URL|null=null;try{url=new URL(adminUrl);}catch{}
+ if(!NOTICE_REFERENCE.test(reference)||!(receivedAt instanceof Date)||Number.isNaN(receivedAt.getTime())||!url||!['https:','http:'].includes(url.protocol)||url.username||url.password||url.search||url.hash||url.pathname!=='/admin/cancellations/'+reference)throw new EmailDeliveryError();
+ const when=new Intl.DateTimeFormat('he-IL',{timeZone:'Asia/Jerusalem',dateStyle:'short',timeStyle:'short'}).format(receivedAt);
+ const subject=CANCELLATION_NOTICE_SUBJECT+' · '+reference;
+ const text=['בקשת ביטול חדשה התקבלה.','','מספר בקשה: '+reference,'התקבלה: '+when,'','לצפייה ולטיפול (נדרשת התחברות לניהול):',url.href,'','מטעמי פרטיות, פרטי הבקשה מוצגים רק בניהול העסק.'].join('\n');
+ const html='<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>'+CANCELLATION_NOTICE_SUBJECT+'</title></head>'+
+  '<body style="margin:0;padding:0;background:#f3f8f9;font-family:Arial,Helvetica,sans-serif;color:#10343b;">'+
+  '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f8f9;padding:24px 12px;"><tr><td align="center">'+
+  '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #d5e8ec;border-radius:14px;">'+
+  '<tr><td dir="rtl" style="padding:28px 24px;text-align:right;font-size:16px;line-height:1.7;">'+
+  '<p style="margin:0 0 18px;font-size:20px;font-weight:bold;color:#086b7b;">פאנקי · ניהול העסק</p>'+
+  '<p style="margin:0 0 12px;">בקשת ביטול חדשה התקבלה.</p>'+
+  '<p style="margin:0 0 4px;">מספר בקשה: <strong dir="ltr">'+reference+'</strong></p>'+
+  '<p style="margin:0 0 20px;">התקבלה: '+when+'</p>'+
+  '<p style="margin:0 0 20px;"><a href="'+url.href+'" style="display:inline-block;padding:12px 18px;background:#0b5d66;color:#ffffff;border-radius:10px;text-decoration:none;font-weight:bold;">לצפייה בבקשה בניהול העסק</a></p>'+
+  '<p style="margin:0;color:#536975;font-size:14px;">מטעמי פרטיות, פרטי הבקשה מוצגים רק בניהול העסק, לאחר התחברות.</p>'+
+  '</td></tr></table></td></tr></table></body></html>';
+ return {subject,text,html};
+}
+
 // https://resend.com/docs/api-reference/emails/send-email. The API key is sent only in the Authorization header.
 export class ResendEmailProvider implements EmailProvider {
  readonly name='resend';
  constructor(private options:{apiKey:string;from:string;replyTo?:string|null;timeoutMs?:number},private request:(url:string,init:RequestInit)=>Promise<Response>=fetch){}
  async sendRecoveryCode({to,code,expiresInMinutes,idempotencyKey}:RecoveryCodeMessage){
-  const message=recoveryEmail(code,expiresInMinutes);
+  await this.post(to,recoveryEmail(code,expiresInMinutes),idempotencyKey);
+ }
+ async sendCancellationNotice({to,reference,receivedAt,adminUrl,idempotencyKey}:CancellationNoticeMessage){
+  await this.post(to,cancellationNoticeEmail(reference,receivedAt,adminUrl),idempotencyKey);
+ }
+ private async post(to:string,message:{subject:string;html:string;text:string},idempotencyKey?:string){
   let response:Response;
   try{
    response=await this.request('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(this.options.timeoutMs??10000),
@@ -54,6 +87,11 @@ export class MemoryEmailProvider implements EmailProvider {
  async sendRecoveryCode({to,code,expiresInMinutes}:RecoveryCodeMessage){
   if(this.fail){if(this.fail==='once')this.fail=false;throw new EmailDeliveryError();}
   this.sent.push({to,code,expiresInMinutes,...recoveryEmail(code,expiresInMinutes)});
+ }
+ readonly notices:{to:string;reference:string;subject:string;text:string;html:string}[]=[];
+ async sendCancellationNotice({to,reference,receivedAt,adminUrl}:CancellationNoticeMessage){
+  if(this.fail){if(this.fail==='once')this.fail=false;throw new EmailDeliveryError();}
+  this.notices.push({to,reference,...cancellationNoticeEmail(reference,receivedAt,adminUrl)});
  }
  last(to?:string){return [...this.sent].reverse().find(message=>!to||message.to===to);}
 }

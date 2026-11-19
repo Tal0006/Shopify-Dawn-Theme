@@ -1,141 +1,244 @@
 {% comment %}
   Section contract.
-  Transaction cancellation request ("ביטול עסקה") for the page.cancellation template. Submits only through Shopify's
-  native contact form (standard POST, no custom endpoint or fetch). Never prefills or echoes submitted values: the
-  success state replaces the fields, and the identity number is never rendered, stored client-side or put in a URL.
+  Transaction cancellation request ("ביטול עסקה") for the page.cancellation template. The form is sent as JSON, over
+  HTTPS, to the Fankee backend (tools/group-delivery, POST /api/v1/cancellations), which encrypts the Israeli ID number
+  at rest; nothing is sent through Shopify's contact form or by email. Without JavaScript the form stays hidden (a
+  native submission could never be built safely) and the other cancellation channels below are always shown, so
+  cancellation never depends on this script or on the backend being available.
+  Privacy: field values are never rendered back, prefilled, logged, put in a URL or kept in localStorage,
+  sessionStorage or cookies. After a successful request the fields are cleared and removed from the page; only the
+  request reference (non-personal) is shown.
   @example
   <!-- Online Store > Pages: create "ביטול עסקה", assign the "cancellation" template; select it in the footer settings -->
 {% endcomment %}
 {%- liquid
   assign cancellation_form_id = 'CancellationForm-' | append: section.id
   assign cancellation_field = 'Cancellation-' | append: section.id
+  assign cancellation_service = section.settings.service_url | default: 'https://fankee-group-delivery.onrender.com' | strip
+  assign cancellation_service_last = cancellation_service | slice: -1
+  if cancellation_service_last == '/'
+    assign cancellation_service = cancellation_service | remove_last: '/'
+  endif
+  assign cancellation_endpoint = cancellation_service | append: '/api/v1/cancellations'
+  assign biz_phone = settings.business_phone | strip
+  assign biz_tel = biz_phone | remove: ' ' | remove: '-' | remove: '(' | remove: ')' | remove: '.'
+  assign biz_email = settings.business_email | strip
+  assign biz_address = settings.business_address | strip
+  assign biz_name = settings.business_legal_name | strip | default: 'פאנקי מוצרי ניקיון'
+  assign biz_whatsapp = settings.floating_whatsapp_number | strip | remove: '+' | remove: ' ' | remove: '-'
 -%}
 <section class="catalog-section container cancellation-request" aria-labelledby="{{ cancellation_field }}-heading">
   <div class="cancellation-request__inner">
-    <h1 id="{{ cancellation_field }}-heading">{{ 'cancellation_request.heading' | t }}</h1>
-    {% form 'contact', id: cancellation_form_id, class: 'cancellation-request__form storefront-validated-form' %}
-      {%- if form.posted_successfully? -%}
-        <div class="cancellation-request__success" role="status" tabindex="-1" data-cancellation-success>
-          <h2>{{ 'cancellation_request.success_heading' | t }}</h2>
-          <p>{{ 'cancellation_request.success_text' | t }}</p>
-        </div>
-      {%- else -%}
-        <div class="cancellation-request__intro">
-          <p>{{ 'cancellation_request.intro' | t }}</p>
-          <p>{{ 'cancellation_request.support' | t }}</p>
-          <p class="cancellation-request__note">{{ 'cancellation_request.note' | t }}</p>
-        </div>
-        {%- if form.errors -%}
-          <div class="storefront-form-errors cancellation-request__errors" id="{{ cancellation_field }}-errors" role="alert" tabindex="-1" data-cancellation-errors>
-            <p>{{ 'cancellation_request.error_heading' | t }}</p>
-            {{ form.errors | default_errors }}
-          </div>
-        {%- endif -%}
-        {%- comment -%}Fixed request type for the merchant's inbox; not translated.{%- endcomment -%}
-        <input type="hidden" name="contact[סוג פנייה]" value="בקשת ביטול עסקה">
-        <div class="cancellation-request__field">
-          <label for="{{ cancellation_field }}-name">{{ 'cancellation_request.name' | t }} <span class="cancellation-request__required" aria-hidden="true">*</span></label>
-          <input type="text" id="{{ cancellation_field }}-name" name="contact[name]" autocomplete="name" maxlength="120" required aria-describedby="{{ cancellation_field }}-name-error" data-error-required="{{ 'cancellation_request.error_name' | t | escape }}">
-          <p class="cancellation-request__error" id="{{ cancellation_field }}-name-error" hidden></p>
-        </div>
-        <div class="cancellation-request__field">
-          <label for="{{ cancellation_field }}-id">{{ 'cancellation_request.id_number' | t }} <span class="cancellation-request__required" aria-hidden="true">*</span></label>
-          {%- comment -%}Text (not number) keeps leading zeros; autocomplete off and password-manager opt-outs keep it out of saved form data.{%- endcomment -%}
-          <input type="text" id="{{ cancellation_field }}-id" name="contact[מספר תעודת זהות]" inputmode="numeric" pattern="[0-9]{1,9}" maxlength="9" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" dir="ltr" required data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" aria-describedby="{{ cancellation_field }}-id-error" data-error-required="{{ 'cancellation_request.error_id_required' | t | escape }}" data-error-format="{{ 'cancellation_request.error_id_format' | t | escape }}" data-cancellation-id>
-          <p class="cancellation-request__error" id="{{ cancellation_field }}-id-error" hidden></p>
-        </div>
-        <div class="cancellation-request__field">
-          <label for="{{ cancellation_field }}-order">{{ 'cancellation_request.order' | t }} <span class="cancellation-request__optional">({{ 'cancellation_request.optional' | t }})</span></label>
-          <input type="text" id="{{ cancellation_field }}-order" name="contact[מספר הזמנה]" placeholder="#1058" maxlength="40" autocomplete="off" dir="ltr" aria-describedby="{{ cancellation_field }}-order-hint">
-          <p class="cancellation-request__hint" id="{{ cancellation_field }}-order-hint">{{ 'cancellation_request.order_hint' | t }}</p>
-        </div>
-        <div class="cancellation-request__field">
-          <label for="{{ cancellation_field }}-email">{{ 'cancellation_request.email' | t }} <span class="cancellation-request__required" aria-hidden="true">*</span></label>
-          <input type="email" id="{{ cancellation_field }}-email" name="contact[email]" autocomplete="email" maxlength="254" dir="ltr" required aria-describedby="{{ cancellation_field }}-email-error" data-error-required="{{ 'cancellation_request.error_email_required' | t | escape }}" data-error-format="{{ 'cancellation_request.error_email_format' | t | escape }}"{% if form.errors contains 'email' %} aria-invalid="true"{% endif %}>
-          <p class="cancellation-request__error" id="{{ cancellation_field }}-email-error" hidden></p>
-        </div>
-        <div class="cancellation-request__field">
-          <label for="{{ cancellation_field }}-phone">{{ 'cancellation_request.phone' | t }} <span class="cancellation-request__optional">({{ 'cancellation_request.optional' | t }})</span></label>
-          <input type="tel" id="{{ cancellation_field }}-phone" name="contact[phone]" autocomplete="tel" inputmode="tel" maxlength="30" dir="ltr">
-        </div>
-        <div class="cancellation-request__field">
-          <label for="{{ cancellation_field }}-reason">{{ 'cancellation_request.reason' | t }} <span class="cancellation-request__optional">({{ 'cancellation_request.optional' | t }})</span></label>
-          <p class="cancellation-request__hint" id="{{ cancellation_field }}-reason-hint">{{ 'cancellation_request.reason_hint' | t }}</p>
-          <textarea id="{{ cancellation_field }}-reason" name="contact[body]" rows="5" maxlength="2000" aria-describedby="{{ cancellation_field }}-reason-hint"></textarea>
-        </div>
-        <button type="submit" class="theme-btn cancellation-request__submit" data-sending="{{ 'cancellation_request.sending' | t | escape }}">{{ 'cancellation_request.submit' | t }}</button>
-      {%- endif -%}
-    {% endform %}
+    <h1 id="{{ cancellation_field }}-heading" tabindex="-1">{{ 'cancellation_request.heading' | t }}</h1>
+    <div class="cancellation-request__intro" data-cancellation-intro>
+      <p>{{ 'cancellation_request.intro' | t }}</p>
+      <p>{{ 'cancellation_request.support' | t }}</p>
+      <p class="cancellation-request__note">{{ 'cancellation_request.note' | t }}</p>
+    </div>
+    <noscript><p class="cancellation-request__noscript">{{ 'cancellation_request.noscript' | t }}</p></noscript>
+    <div class="cancellation-request__success" role="status" tabindex="-1" hidden data-cancellation-success>
+      <h2>{{ 'cancellation_request.success_heading' | t }}</h2>
+      <p>{{ 'cancellation_request.success_text' | t }}</p>
+      <p class="cancellation-request__reference">{{ 'cancellation_request.reference_label' | t }} <strong dir="ltr" data-cancellation-reference></strong></p>
+      <p>{{ 'cancellation_request.reference_hint' | t }}</p>
+    </div>
+    {%- comment -%}
+      method/action keep any non-scripted submission out of the URL; the script always sends JSON instead. The form is
+      hidden until the script is ready.
+    {%- endcomment -%}
+    <form id="{{ cancellation_form_id }}" class="cancellation-request__form" method="post" action="{{ cancellation_endpoint | escape }}" hidden data-endpoint="{{ cancellation_endpoint | escape }}"
+      data-error-fields="{{ 'cancellation_request.error_fields' | t | escape }}" data-error-card="{{ 'cancellation_request.error_card' | t | escape }}" data-error-rate="{{ 'cancellation_request.error_rate' | t | escape }}" data-error-unavailable="{{ 'cancellation_request.error_unavailable' | t | escape }}" data-waking="{{ 'cancellation_request.waking' | t | escape }}">
+      <div class="storefront-form-errors cancellation-request__errors" id="{{ cancellation_field }}-errors" role="alert" tabindex="-1" hidden data-cancellation-errors>
+        <p data-cancellation-error-text></p>
+        <p><a href="#{{ cancellation_field }}-other">{{ 'cancellation_request.other_link' | t }}</a></p>
+      </div>
+      <div class="cancellation-request__field">
+        <label for="{{ cancellation_field }}-name">{{ 'cancellation_request.name' | t }} <span class="cancellation-request__required" aria-hidden="true">*</span></label>
+        <input type="text" id="{{ cancellation_field }}-name" name="name" data-field="name" autocomplete="name" maxlength="120" required aria-describedby="{{ cancellation_field }}-name-error" data-error-required="{{ 'cancellation_request.error_name' | t | escape }}" data-error-format="{{ 'cancellation_request.error_name_format' | t | escape }}">
+        <p class="cancellation-request__error" id="{{ cancellation_field }}-name-error" hidden></p>
+      </div>
+      <div class="cancellation-request__field">
+        <label for="{{ cancellation_field }}-id">{{ 'cancellation_request.id_number' | t }} <span class="cancellation-request__required" aria-hidden="true">*</span></label>
+        {%- comment -%}Text (not number) keeps leading zeros; autocomplete off and password-manager opt-outs keep it out of saved form data.{%- endcomment -%}
+        <input type="text" id="{{ cancellation_field }}-id" name="idNumber" data-field="idNumber" inputmode="numeric" pattern="[0-9]{5,9}" maxlength="9" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" dir="ltr" required data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" aria-describedby="{{ cancellation_field }}-id-error" data-error-required="{{ 'cancellation_request.error_id_required' | t | escape }}" data-error-format="{{ 'cancellation_request.error_id_format' | t | escape }}" data-cancellation-id>
+        <p class="cancellation-request__error" id="{{ cancellation_field }}-id-error" hidden></p>
+      </div>
+      <div class="cancellation-request__field">
+        <label for="{{ cancellation_field }}-order">{{ 'cancellation_request.order' | t }} <span class="cancellation-request__optional">({{ 'cancellation_request.optional' | t }})</span></label>
+        <input type="text" id="{{ cancellation_field }}-order" name="orderNumber" data-field="orderNumber" placeholder="#1058" maxlength="30" autocomplete="off" dir="ltr" aria-describedby="{{ cancellation_field }}-order-hint {{ cancellation_field }}-order-error" data-error-format="{{ 'cancellation_request.error_order_format' | t | escape }}">
+        <p class="cancellation-request__hint" id="{{ cancellation_field }}-order-hint">{{ 'cancellation_request.order_hint' | t }}</p>
+        <p class="cancellation-request__error" id="{{ cancellation_field }}-order-error" hidden></p>
+      </div>
+      <div class="cancellation-request__field">
+        <label for="{{ cancellation_field }}-email">{{ 'cancellation_request.email' | t }} <span class="cancellation-request__required" aria-hidden="true">*</span></label>
+        <input type="email" id="{{ cancellation_field }}-email" name="email" data-field="email" autocomplete="email" maxlength="254" dir="ltr" required aria-describedby="{{ cancellation_field }}-email-error" data-error-required="{{ 'cancellation_request.error_email_required' | t | escape }}" data-error-format="{{ 'cancellation_request.error_email_format' | t | escape }}">
+        <p class="cancellation-request__error" id="{{ cancellation_field }}-email-error" hidden></p>
+      </div>
+      <div class="cancellation-request__field">
+        <label for="{{ cancellation_field }}-phone">{{ 'cancellation_request.phone' | t }} <span class="cancellation-request__optional">({{ 'cancellation_request.optional' | t }})</span></label>
+        <input type="tel" id="{{ cancellation_field }}-phone" name="phone" data-field="phone" autocomplete="tel" inputmode="tel" maxlength="30" dir="ltr" aria-describedby="{{ cancellation_field }}-phone-error" data-error-format="{{ 'cancellation_request.error_phone_format' | t | escape }}">
+        <p class="cancellation-request__error" id="{{ cancellation_field }}-phone-error" hidden></p>
+      </div>
+      <div class="cancellation-request__field">
+        <label for="{{ cancellation_field }}-reason">{{ 'cancellation_request.reason' | t }} <span class="cancellation-request__optional">({{ 'cancellation_request.optional' | t }})</span></label>
+        <p class="cancellation-request__hint" id="{{ cancellation_field }}-reason-hint">{{ 'cancellation_request.reason_hint' | t }}</p>
+        <textarea id="{{ cancellation_field }}-reason" name="reason" data-field="reason" rows="5" maxlength="2000" aria-describedby="{{ cancellation_field }}-reason-hint {{ cancellation_field }}-reason-error" data-error-format="{{ 'cancellation_request.error_reason_format' | t | escape }}"></textarea>
+        <p class="cancellation-request__error" id="{{ cancellation_field }}-reason-error" hidden></p>
+      </div>
+      {%- comment -%}Privacy notice (Israeli Privacy Protection Law, section 11), shown before the request is sent.{%- endcomment -%}
+      <section class="cancellation-request__privacy" id="{{ cancellation_field }}-privacy" aria-labelledby="{{ cancellation_field }}-privacy-heading">
+        <h2 id="{{ cancellation_field }}-privacy-heading">{{ 'cancellation_request.privacy_heading' | t }}</h2>
+        <ul>
+          <li>{{ 'cancellation_request.privacy_collected' | t }}</li>
+          <li>{{ 'cancellation_request.privacy_purpose' | t }}</li>
+          <li>{{ 'cancellation_request.privacy_controller' | t: business: biz_name }}</li>
+          <li>{{ 'cancellation_request.privacy_access' | t }}</li>
+          <li>{{ 'cancellation_request.privacy_required' | t }}</li>
+          <li>{{ 'cancellation_request.privacy_rights' | t }}{% if shop.privacy_policy %} <a href="{{ shop.privacy_policy.url }}">{{ 'cancellation_request.privacy_policy_link' | t }}</a>{% endif %}</li>
+        </ul>
+      </section>
+      <button type="submit" class="theme-btn cancellation-request__submit" aria-describedby="{{ cancellation_field }}-privacy-heading" data-sending="{{ 'cancellation_request.sending' | t | escape }}">{{ 'cancellation_request.submit' | t }}</button>
+      <p class="cancellation-request__status" role="status" aria-live="polite" data-cancellation-status></p>
+    </form>
+    <section class="cancellation-request__other" id="{{ cancellation_field }}-other" tabindex="-1" aria-labelledby="{{ cancellation_field }}-other-heading" data-cancellation-other>
+      <h2 id="{{ cancellation_field }}-other-heading">{{ 'cancellation_request.other_heading' | t }}</h2>
+      <p>{{ 'cancellation_request.other_intro' | t }}</p>
+      <ul>
+        {%- if biz_phone != blank %}<li>{{ 'cancellation_request.other_phone' | t }} <a href="tel:{{ biz_tel | escape }}" dir="ltr">{{ biz_phone | escape }}</a></li>{% endif -%}
+        {%- if biz_email != blank %}<li>{{ 'cancellation_request.other_email' | t }} <a href="mailto:{{ biz_email | escape }}" dir="ltr">{{ biz_email | escape }}</a></li>{% endif -%}
+        {%- if biz_whatsapp != blank %}<li>{{ 'cancellation_request.other_whatsapp' | t }} <a href="https://wa.me/{{ biz_whatsapp | escape }}" target="_blank" rel="noopener noreferrer">{{ 'cancellation_request.other_whatsapp_link' | t }}<span class="visually-hidden"> {{ 'cancellation_request.new_tab' | t }}</span></a></li>{% endif -%}
+        {%- if biz_address != blank %}<li>{{ 'cancellation_request.other_mail' | t }} {{ biz_address | escape }}</li>{% endif -%}
+      </ul>
+      <p class="cancellation-request__hint">{{ 'cancellation_request.other_id_hint' | t }}</p>
+    </section>
   </div>
 </section>
 <script>
 (() => {
-  // Progressive enhancement for this form only: inline Hebrew errors, one submission at a time. Field values are never
-  // read into storage, logs, requests or URLs; Shopify's native form POST is the only submission.
+  // Sends the request as JSON to the Fankee backend; nothing is stored in the browser. One request at a time; a retry
+  // after a network failure reuses the same submission key, so the backend never records the request twice.
   const form = document.getElementById({{ cancellation_form_id | json }});
-  if (!form || form.dataset.enhanced) return;
+  if (!form || form.dataset.enhanced || typeof fetch !== 'function' || typeof AbortController !== 'function') return;
   form.dataset.enhanced = 'true';
-  const url = new URL(location.href);
-  const keys = [...url.searchParams.keys()].filter(key => key.startsWith('contact['));
-  if (keys.length) { for (const key of keys) url.searchParams.delete(key); history.replaceState(history.state, '', url); }
-  // Shopify's redirect after posting adds the form's #id; that fragment navigation resets focus, so focus after it.
-  const focusTarget = form.querySelector('[data-cancellation-success], [data-cancellation-errors]');
-  const focusResult = () => setTimeout(() => { if (focusTarget?.isConnected) focusTarget.focus(); }, 0);
-  if (focusTarget) { if (document.readyState === 'complete') focusResult(); else window.addEventListener('load', focusResult, {once: true}); }
+  const section = form.closest('.cancellation-request');
+  const success = section.querySelector('[data-cancellation-success]');
+  const intro = section.querySelector('[data-cancellation-intro]');
+  const summary = form.querySelector('[data-cancellation-errors]');
+  const summaryText = form.querySelector('[data-cancellation-error-text]');
+  const status = form.querySelector('[data-cancellation-status]');
+  const button = form.querySelector('.cancellation-request__submit');
+  const label = button.textContent;
+  const fields = [...form.querySelectorAll('[data-field]')];
+  // Server error codes -> message group. Anything else (unavailable, timeout, network, unexpected answer) is
+  // "unavailable", which points to the other cancellation channels.
+  const ERRORS = {INVALID_CANCELLATION: 'fields', INVALID_INPUT: 'fields', BODY_TOO_LARGE: 'fields', CARD_DATA_NOT_ACCEPTED: 'card', RATE_LIMITED: 'rate',
+    CANCELLATION_UNAVAILABLE: 'unavailable', SERVICE_UNAVAILABLE: 'unavailable', INVALID_ORIGIN: 'unavailable', INVALID_HOST: 'unavailable', NOT_FOUND: 'unavailable',
+    REQUEST_TIMEOUT: 'unavailable', NETWORK_ERROR: 'unavailable', INVALID_RESPONSE: 'unavailable', DEFAULT: 'unavailable'};
+  const REFERENCE = /^CR-[2-9A-HJKMNP-TV-Z]{4}-[2-9A-HJKMNP-TV-Z]{4}$/;
+  const newKey = () => (crypto.randomUUID ? crypto.randomUUID() : [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join(''));
+  let submissionKey = newKey();
+  let sending = false;
+  form.hidden = false;
   const message = input => input.validity.valueMissing ? input.dataset.errorRequired || '' : !input.validity.valid ? input.dataset.errorFormat || input.dataset.errorRequired || '' : '';
-  function show(input) {
+  function mark(input, text) {
     const error = document.getElementById(input.id + '-error');
-    if (!error) return '';
-    const text = message(input);
-    error.textContent = text;
-    error.hidden = !text;
+    if (error) { error.textContent = text; error.hidden = !text; }
     if (text) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
-    return text;
   }
   form.addEventListener('invalid', event => {
     const input = event.target;
-    if (!(input instanceof HTMLInputElement)) return;
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return;
     input.setCustomValidity('');
-    const text = show(input);
+    const text = message(input);
+    mark(input, text);
     if (text) input.setCustomValidity(text);
   }, true);
+  // Any edit makes it a new submission (new key); a retry without edits keeps the key, so it is never recorded twice.
+  form.addEventListener('input', () => { if (!sending) submissionKey = newKey(); });
   form.addEventListener('input', event => {
     const input = event.target;
-    if (!(input instanceof HTMLInputElement) || !input.hasAttribute('aria-invalid')) return;
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) || !input.hasAttribute('aria-invalid')) return;
     input.setCustomValidity('');
-    show(input);
+    mark(input, message(input));
   });
   // Spaces and dashes are common when typing an ID; keep digits only.
   form.addEventListener('change', event => {
     const input = event.target;
     if (input instanceof HTMLInputElement && input.matches('[data-cancellation-id]')) input.value = input.value.replace(/[\s-]/g, '');
   });
-  const button = form.querySelector('.cancellation-request__submit');
-  const label = button?.textContent;
-  let sending = false;
-  form.addEventListener('submit', event => {
-    if (sending) { event.preventDefault(); return; }
-    sending = true;
-    button?.setAttribute('aria-disabled', 'true');
-    if (button?.dataset.sending) button.textContent = button.dataset.sending;
+  const setSending = value => {
+    sending = value;
+    if (value) { button.setAttribute('aria-disabled', 'true'); button.textContent = button.dataset.sending || label; }
+    else { button.removeAttribute('aria-disabled'); button.textContent = label; }
+  };
+  const fail = (code, fieldErrors) => {
+    const group = ERRORS[code] || 'unavailable';
+    let first = null;
+    if (group === 'fields' && fieldErrors && typeof fieldErrors === 'object') {
+      for (const input of fields) {
+        if (!Object.prototype.hasOwnProperty.call(fieldErrors, input.dataset.field)) continue;
+        mark(input, input.dataset.errorFormat || input.dataset.errorRequired || '');
+        first = first || input;
+      }
+    }
+    summaryText.textContent = form.dataset['error' + group[0].toUpperCase() + group.slice(1)] || form.dataset.errorUnavailable;
+    summary.hidden = false;
+    status.textContent = '';
+    summary.focus();
+  };
+  form.addEventListener('submit', async event => {
+    // Never a native submission: the request is always built here.
+    event.preventDefault();
+    if (sending) return;
+    setSending(true);
+    summary.hidden = true;
+    const body = {submissionKey};
+    for (const input of fields) body[input.dataset.field] = input.value;
+    const controller = new AbortController();
+    // The free hosting plan sleeps when idle; the first request can take up to a minute.
+    const wake = setTimeout(() => { status.textContent = form.dataset.waking || ''; }, 4000);
+    const timeout = setTimeout(() => controller.abort(), 70000);
+    let response = null, data = null, code = 'DEFAULT';
+    try {
+      response = await fetch(form.dataset.endpoint, {method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer',
+        headers: {'Content-Type': 'application/json', Accept: 'application/json'}, body: JSON.stringify(body), signal: controller.signal});
+      data = await response.json().catch(() => null);
+    } catch (error) {
+      code = controller.signal.aborted ? 'REQUEST_TIMEOUT' : 'NETWORK_ERROR';
+    } finally {
+      clearTimeout(wake); clearTimeout(timeout);
+      for (const key of Object.keys(body)) body[key] = '';
+    }
+    if (response && response.ok && data && data.ok === true && typeof data.reference === 'string' && REFERENCE.test(data.reference)) {
+      // Clear and remove every field, so no personal detail stays in the page (or in a back/forward cache restore).
+      for (const input of fields) input.value = '';
+      form.reset();
+      form.remove();
+      if (intro) intro.hidden = true;
+      success.querySelector('[data-cancellation-reference]').textContent = data.reference;
+      success.hidden = false;
+      success.focus();
+      return;
+    }
+    if (response) code = data && typeof data.code === 'string' ? data.code : 'INVALID_RESPONSE';
+    setSending(false);
+    fail(code, data && data.fields);
   });
   const idInput = form.querySelector('[data-cancellation-id]');
-  // The submission has already been built; clearing keeps the ID out of back/forward cache restores.
+  // Keeps the ID number out of back/forward cache restores.
   window.addEventListener('pagehide', () => { if (idInput) idInput.value = ''; });
-  window.addEventListener('pageshow', event => {
-    if (!event.persisted) return;
-    sending = false;
-    button?.removeAttribute('aria-disabled');
-    if (button && label) button.textContent = label;
-  });
+  window.addEventListener('pageshow', event => { if (event.persisted && form.isConnected) { setSending(false); submissionKey = newKey(); } });
 })();
 </script>
 {% stylesheet %}
 .cancellation-request__inner { box-sizing: border-box; max-width: 640px; min-width: 0; margin-inline: auto; text-align: start; }
 .cancellation-request__inner h1 { margin-block: 0 var(--space-md, 16px); overflow-wrap: anywhere; }
+.cancellation-request__inner h1:focus { outline: none; }
 .cancellation-request__intro p { margin-block: 0 10px; line-height: 1.7; overflow-wrap: anywhere; }
 .cancellation-request__note { padding: 10px 14px; border-inline-start: 3px solid var(--fk-accent); border-radius: var(--fk-radius-sm); background: var(--fk-cyan-50); color: var(--fk-text-muted); font-size: 14px; }
+.cancellation-request__noscript { padding: 12px 14px; border: 1px solid var(--fk-border); border-radius: var(--fk-radius-sm); background: var(--fk-cyan-50); line-height: 1.7; }
 .cancellation-request__form { display: grid; gap: 18px; min-width: 0; margin: 0; }
+.cancellation-request__form[hidden] { display: none; }
 .cancellation-request__field { display: grid; gap: 6px; min-width: 0; }
 .cancellation-request__field label { font-weight: 600; color: var(--fk-teal-900); }
 .cancellation-request__required { color: var(--fk-danger); }
@@ -148,17 +251,42 @@
 .cancellation-request__error { margin: 0; color: var(--fk-danger); font-size: 14px; font-weight: 600; }
 .cancellation-request__errors { padding: 12px 14px; }
 .cancellation-request__errors p { margin: 0 0 6px; font-weight: 700; }
-.cancellation-request__errors:focus-visible, .cancellation-request__success:focus-visible { outline: 3px solid var(--fk-teal-800); outline-offset: 2px; }
+.cancellation-request__errors p:last-child { margin: 0; font-weight: 400; }
+.cancellation-request__errors a, .cancellation-request__privacy a, .cancellation-request__other a { display: inline-flex; align-items: center; min-height: 44px; color: var(--fk-teal-900); text-decoration: underline; text-underline-offset: 3px; }
+.cancellation-request__errors a:focus-visible, .cancellation-request__privacy a:focus-visible, .cancellation-request__other a:focus-visible { outline: 3px solid var(--fk-teal-800); outline-offset: 2px; }
+.cancellation-request__errors:focus-visible, .cancellation-request__success:focus-visible, .cancellation-request__other:focus-visible { outline: 3px solid var(--fk-teal-800); outline-offset: 2px; }
+.cancellation-request__privacy { padding: 12px 16px; border: 1px solid var(--fk-border); border-radius: var(--fk-radius-md); background: #fff; font-size: 14px; line-height: 1.7; color: var(--fk-text); }
+.cancellation-request__privacy h2 { margin: 0 0 6px; font-size: 16px; color: var(--fk-teal-900); }
+.cancellation-request__privacy ul, .cancellation-request__other ul { margin: 0; padding-inline-start: 20px; }
+.cancellation-request__privacy li + li { margin-block-start: 4px; }
+.cancellation-request__privacy :is(li, p), .cancellation-request__other :is(li, p) { overflow-wrap: anywhere; }
 .cancellation-request__submit { justify-self: start; min-height: 48px; padding-inline: 24px; max-width: 100%; white-space: normal; }
 .cancellation-request__submit:focus-visible { outline: 3px solid var(--fk-teal-800); outline-offset: 3px; }
 .cancellation-request__submit[aria-disabled=true] { opacity: .7; cursor: progress; }
-.cancellation-request__success { padding: 16px 18px; border: 1px solid var(--fk-border); border-inline-start: 4px solid var(--fk-success); border-radius: var(--fk-radius-md); background: var(--fk-success-bg); }
+.cancellation-request__status { margin: 0; color: var(--fk-text-muted); font-size: 14px; line-height: 1.6; }
+.cancellation-request__status:empty { display: none; }
+.cancellation-request__success { margin-block-end: 18px; padding: 16px 18px; border: 1px solid var(--fk-border); border-inline-start: 4px solid var(--fk-success); border-radius: var(--fk-radius-md); background: var(--fk-success-bg); }
+.cancellation-request__success[hidden] { display: none; }
 .cancellation-request__success h2 { margin: 0 0 6px; font-size: 20px; color: var(--fk-success); }
-.cancellation-request__success p { margin: 0; line-height: 1.7; }
+.cancellation-request__success p { margin: 0 0 6px; line-height: 1.7; }
+.cancellation-request__success p:last-child { margin: 0; }
+.cancellation-request__reference strong { font-size: 18px; letter-spacing: .04em; }
+.cancellation-request__other { margin-block-start: 28px; padding-block-start: 18px; border-block-start: 1px solid var(--fk-border); line-height: 1.7; }
+.cancellation-request__other h2 { margin: 0 0 6px; font-size: 18px; color: var(--fk-teal-900); }
+.cancellation-request__other p { margin: 0 0 6px; }
+.cancellation-request__other .cancellation-request__hint { margin-block-start: 8px; }
 @media (max-width: 599px) { .cancellation-request__submit { justify-self: stretch; } }
 {% endstylesheet %}
 {% schema %}
 {
-  "name": "t:cancellation_editor.name"
+  "name": "t:cancellation_editor.name",
+  "settings": [
+    {
+      "type": "url",
+      "id": "service_url",
+      "label": "t:cancellation_editor.service_url",
+      "info": "t:cancellation_editor.service_url_info"
+    }
+  ]
 }
 {% endschema %}
