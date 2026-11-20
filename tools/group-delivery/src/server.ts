@@ -26,6 +26,8 @@ import {Finance,FinanceInputError,listFilters,rangeOf,nextBilling,UUID} from './
 import {financePage,formValues,valuesOf,recurringValuesOf,type DialogState,type ViewParams} from './finance-page.js';
 import {Cancellations,CancellationInputError} from './cancellations.js';
 import {cancellationsPage,cancellationPage,CANCELLATION_NOTICES,CANCELLATION_PAGE_ERRORS} from './cancellations-page.js';
+import {Feedback,FeedbackInputError,FEEDBACK_SUCCESS_MESSAGE} from './feedback.js';
+import {feedbackPage} from './feedback-page.js';
 // deps: test seams for the operations page (outbound fetch and health-check timings) and for recovery email
 // (provider and limits; the default provider comes from cfg.recovery and is null when recovery is disabled).
 // cardcom/paymentsLog: test seams for the Cardcom gateway (default: the real CardcomService when payments are ENABLED,
@@ -50,6 +52,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // Cancellation requests ("בקשות ביטול"): public submission on /api/v1, admin pages under /admin/cancellations.
  const cancellations=new Cancellations(db,cfg.cancellations,{email:mail,adminOrigin:()=>cfg.origin,log:deps.cancellationLog});
  app.locals.cancellations=cancellations;
+ // Post-purchase feedback from the Thank you page extension (public POST, admin page /admin/feedback).
+ const feedback=new Feedback(db,cfg.feedback);
  app.disable('x-powered-by');app.set('trust proxy',cfg.proxyHops);
  app.use((_req,res,next)=>{
   res.set({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'same-origin','X-Frame-Options':'DENY','Content-Security-Policy':"default-src 'self'; script-src 'none'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"});
@@ -66,7 +70,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   const allowed=[cfg.origin,...cfg.storefrontOrigins];
   if(origin&&!allowed.includes(origin))throw new ApiError(403,'INVALID_ORIGIN');
   if(origin){res.set('Access-Control-Allow-Origin',origin);res.vary('Origin');}
-  if(req.method==='OPTIONS'){res.set({'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600'});res.status(204).end();return;}
+  if(req.method==='OPTIONS'){res.set({'Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600'});res.status(204).end();return;}
   if(!['GET','HEAD'].includes(req.method)&&(!origin||!allowed.includes(origin)||!req.is('application/json')))throw new ApiError(403,'INVALID_ORIGIN');
   // Nearest-area lookups get their own small bucket so location attempts cannot use up the join budget (or vice versa).
   // The member read is a POST only to carry the bearer token; it changes nothing, so it shares the read budget.
@@ -75,6 +79,15 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   await auth.limit(req,nearest?'area-nearest':read?'public-read':'public-write',nearest?10:read?120:20,600);
   next();
  });
+ // Post-purchase feedback from the Thank you page checkout UI extension. The extension runs in a Web Worker whose origin
+ // Shopify does not guarantee, so CORS allows any origin with no cookies or credentials. Origin is never the proof: every
+ // submission needs a valid Shopify session token for this app and shop (Authorization: Bearer).
+ app.use('/api/post-purchase-feedback',(req,res,next)=>{
+  res.set({'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Access-Control-Max-Age':'600'});
+  if(req.method==='OPTIONS'){res.status(204).end();return;}
+  next();
+ });
+ app.use('/api/post-purchase-feedback',express.json({limit:'8kb'}));
  // The cancellation form has its own, smaller body limit (parsed first; the general parser then skips it).
  app.use('/api/v1/cancellations',express.json({limit:'10kb'}));
  app.use(express.json({limit:'24kb'}));
@@ -417,6 +430,9 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   catch(error){const code=cancellationError(error);if(code){res.redirect(303,cancellationBase(reference)+'?error='+code);return;}throw error;}
   res.type('html').send(cancellationPage({request:await cancellations.detail(reference),csrf:csrfOf(res),revealedId}));
  });
+ // "משוב לקוחות": summary, filters, the missing-products list and recent responses (read-only).
+ app.get('/admin/feedback',async(req,res)=>res.type('html').send(feedbackPage({...await feedback.dashboard(req.query),warnings:feedback.warnings(),
+  shopHandle:cfg.domain.replace(/\.myshopify\.com$/,''),csrf:csrfOf(res)})));
  app.post('/admin/logout',async(req,res)=>auth.logout(req,res));
  app.get('/admin/api/audit',async(req,res)=>res.json(await auditPage(db,req.query)));
  // Delivery areas: same admin session, Origin and CSRF checks as group approval. HTML forms redirect; JSON API returns data.
@@ -466,6 +482,16 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // Cancellation request from the storefront form: JSON only, an allowed storefront Origin (both above), a 10 kB body
  // and its own per-IP hourly limit besides the shared public-write budget. The answer never echoes what was sent and
  // never says whether an order or customer exists.
+ // One response per order. The answer is the same for a new and a repeated submission (never reveals other orders).
+ app.post('/api/post-purchase-feedback',async(req,res)=>{
+  if(!feedback.enabled)throw new ApiError(503,'FEEDBACK_UNAVAILABLE','לא ניתן לשלוח משוב כרגע.');
+  await auth.limit(req,'feedback-submit',30,600);
+  if(!req.is('application/json'))throw new ApiError(415,'INVALID_CONTENT_TYPE');
+  if(!feedback.authenticated(req.get('Authorization')))throw new ApiError(401,'FEEDBACK_AUTH_REQUIRED','לא ניתן לאמת את הבקשה.');
+  if(req.body&&typeof req.body==='object'&&containsCardData(req.body))throw new ApiError(400,'CARD_DATA_NOT_ACCEPTED','אין לכתוב פרטי כרטיס אשראי במשוב.');
+  await feedback.submit(req.body);
+  res.json({ok:true,message:FEEDBACK_SUCCESS_MESSAGE});
+ });
  app.post('/api/v1/cancellations',async(req,res)=>{
   if(!cancellations.enabled)throw new ApiError(503,'CANCELLATION_UNAVAILABLE','לא ניתן לשלוח בקשת ביטול דרך האתר כרגע.');
   await auth.limit(req,'cancellation-submit',10,3600);
@@ -484,7 +510,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
    res.status(status).type('html').send(errorPage(status,message,res.locals.session?.csrf));return;
   }
   const details=error instanceof ApiError&&error.details&&Object.values(error.details).every(Number.isSafeInteger)?error.details:undefined;
-  res.status(status).json({error:message,code,...(details?{details}:{}),...(error instanceof FinanceInputError||error instanceof CancellationInputError?{fields:error.fields}:{})});
+  res.status(status).json({error:message,code,...(details?{details}:{}),...(error instanceof FinanceInputError||error instanceof CancellationInputError||error instanceof FeedbackInputError?{fields:error.fields}:{})});
  });
  return app;
 }
@@ -501,6 +527,7 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   if(cfg.cancellations.state!=='ENABLED')console.warn('Group delivery cancellation requests are refused until configured: '+cfg.cancellations.problems.join(' '));
   if(cfg.cancellations.retentionProblem)console.warn('Group delivery cancellation retention: '+cfg.cancellations.retentionProblem);
   else if(cfg.cancellations.retentionDays===null)console.warn('Group delivery cancellation retention is not configured (CANCELLATION_RETENTION_DAYS); no cancellation request is deleted.');
+  if(cfg.feedback.state!=='ENABLED')console.warn('Post-purchase feedback is refused until configured: '+cfg.feedback.problems.join(' '));
   if(cfg.cancellations.notifyProblem)console.warn('Group delivery cancellation notices: '+cfg.cancellations.notifyProblem);
   const app=createApp(db,cfg),server=app.listen(cfg.port,'0.0.0.0',()=>console.info('Group delivery listening on port '+cfg.port));
   // Retention: at startup (the instance wakes on demand) and every 6 hours while running. A no-op until configured.

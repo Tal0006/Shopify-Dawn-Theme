@@ -253,7 +253,39 @@ A Hebrew RTL finance dashboard for manually recorded income and expenses. ILS on
 - **Pages** (work without JavaScript; `/admin/app.js` opens the dialogs as modals): `GET /admin/system` (`range=6m|12m|year`, filters `q`, `month=YYYY-MM`, `type`, `category`, `page`; `?add=INCOME|EXPENSE|RECURRING`, `?edit=<id>`, `?delete=<id>`, `?import=<key>` render the dialogs), `POST /admin/system/transactions`, `POST /admin/system/transactions/:id`, `POST /admin/system/transactions/:id/delete` (`confirm=yes`). A refused form comes back (422/409) with the typed values and per-field errors. `/admin/system?refresh=1` redirects to the systems page.
 - **JSON** (same session; `X-CSRF-Token` for writes): `GET /admin/api/finance/summary?range=`, `GET /admin/api/finance/transactions` (same filters), `GET /admin/api/finance/transactions/:id`, `POST /admin/api/finance/transactions` (201), `POST /admin/api/finance/transactions/:id`, `POST /admin/api/finance/transactions/:id/delete` with `{"confirm":true}` (a charge answers `{deactivated}` or, with nothing recorded, `{deleted}`), `GET /admin/api/finance/recurring`. Creating with `recurring:true` answers `{recurring}`; other ids answer `{transaction}`. Amounts: `amountAgorot` (positive integer) or `amount` (shekel text such as `"1,234.56"`). 422 INVALID_TRANSACTION includes `fields` (field → Hebrew message); 404 TRANSACTION_NOT_FOUND; 400 DELETE_CONFIRMATION_REQUIRED.
 - **Chart**: server-rendered inline SVG grouped bars (no charting dependency; the admin CSP forbids inline styles, so only SVG attributes and classes are used). Months run right to left; expense bars are hatched so the two series differ without color; each bar has a `<title>`, and the same numbers are in an expandable table. On narrow screens the chart scrolls inside its card.
-- **Navigation**: `ADMIN_SECTIONS` in `src/admin.ts` lists כספים, בקשות ביטול, משלוחים קבוצתיים, אזורי משלוח, יומן פעולות and מערכות האתר; "סקירה" and "הזמנות" are declared but disabled until their pages exist.
+- **Navigation**: `ADMIN_SECTIONS` in `src/admin.ts` lists כספים, בקשות ביטול, משוב לקוחות, משלוחים קבוצתיים, אזורי משלוח, יומן פעולות and מערכות האתר; "סקירה" and "הזמנות" are declared but disabled until their pages exist.
+
+## Post-purchase feedback ("משוב לקוחות", `/admin/feedback`)
+
+A short optional survey on the Shopify Thank you page, from the Fankee app's checkout UI extension
+(`tools/shopify-app/extensions/post-purchase-feedback`, target `purchase.thank-you.block.render`). Setup and deployment:
+`tools/shopify-app/README.md`.
+
+- **Public endpoint** `POST /api/post-purchase-feedback`: JSON only (415 otherwise), 8 kB body, 30 requests per IP per
+  10 minutes (counted before authentication). Authentication is the extension's Shopify session token
+  (`Authorization: Bearer`): HS256 signed with `SHOPIFY_CLIENT_SECRET`, `aud` = `SHOPIFY_CLIENT_ID`, `dest` =
+  `SHOPIFY_STORE_DOMAIN`, valid `exp`/`nbf`/`iat`. Anything else is 401 `FEEDBACK_AUTH_REQUIRED` with no reason given.
+  The extension runs in a Web Worker whose origin Shopify does not guarantee, so this path alone answers CORS with
+  `Access-Control-Allow-Origin: *` and no credentials; Origin is never treated as proof. Without the app credentials it
+  answers 503 `FEEDBACK_UNAVAILABLE`.
+- **Fields** (any other is refused): `orderId` (`gid://shopify/Order/<n>`), `confirmationNumber` (optional),
+  `rating` (integer 1-5), `missingProducts`, `encounteredProblem` (booleans), `missingProductsDetails` (≤ 500),
+  `problemDetails` (≤ 1000, only with the matching "yes"), `improvementFeedback` (≤ 1000), `version`. Text is
+  normalised (NFC, invisible formatting removed, spaces collapsed); markup, control characters and card numbers are
+  refused (400 `INVALID_FEEDBACK`, field names only).
+- **One response per order** (`UNIQUE (shopify_order_id)`, `ON CONFLICT DO NOTHING`): repeats and concurrent submissions
+  keep the first answer, and every accepted request gets the same `{ok:true,message}`, so nobody learns whether another
+  order has answered.
+- **Stored** (`migrations/016_post_purchase_feedback.sql`): order id, confirmation number, the answers, source and
+  version, timestamps. Never the customer's name, email, phone, address, payment or cart, and nothing from the token
+  (its optional `sub` is a customer id). Survey contents are never emailed or logged.
+- **No Google review request.** The endpoint, the table and the admin page have no review functionality; a review
+  request after confirmed delivery is a separate, future feature (see `tools/shopify-app/README.md`).
+- **Admin** `/admin/feedback` (session required, read-only): responses, average score, % who did not find a product,
+  % who hit a problem, the score distribution, filters (score, missing products, problem, Israel-time date range), the
+  "מוצרים שלקוחות חיפשו ולא מצאו" list (mentions split on commas, new lines, semicolons and slashes, grouped
+  ignoring case, spacing and edge punctuation, most mentioned first), and recent responses with a link to the order in
+  Shopify admin. There is no automatic deletion of responses yet (a merchant decision).
 
 ## Cancellation requests ("ביטול עסקה", `/admin/cancellations`)
 

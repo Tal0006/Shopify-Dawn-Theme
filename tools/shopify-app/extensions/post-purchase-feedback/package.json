@@ -1,0 +1,23 @@
+{
+  "name": "post-purchase-feedback",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
+    "test": "tsx --tsconfig tsconfig.test.json --test tests/*.test.tsx"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.3.0",
+    "@shopify/ui-extensions": "2026.10.x",
+    "preact": "^10.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "preact-render-to-string": "^6.6.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

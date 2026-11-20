@@ -4,7 +4,8 @@ import {opsConfig,type OpsConfig} from './system.js';
 import {recoveryConfig,type RecoveryConfig} from './email.js';
 import {paymentsConfig,type PaymentsConfig} from './payments-config.js';
 import {cancellationConfig,type CancellationConfig} from './cancellations.js';
-export interface Config {ops:OpsConfig;cancellations:CancellationConfig;recovery:RecoveryConfig;payments:PaymentsConfig;port:number;production:boolean;origin:string;storefrontOrigins:string[];databaseUrl:string;username:string;password:string;secret:string;domain:string;version:string;token:string;standardRadius:number;threshold:bigint;expiryDays:number;proxyHops:number;areaSuggestionRadius:number;storeLocation?:{lat:number;lng:number}}
+import {feedbackConfig,type FeedbackConfig} from './feedback.js';
+export interface Config {ops:OpsConfig;cancellations:CancellationConfig;feedback:FeedbackConfig;recovery:RecoveryConfig;payments:PaymentsConfig;port:number;production:boolean;origin:string;storefrontOrigins:string[];databaseUrl:string;username:string;password:string;secret:string;domain:string;version:string;token:string;standardRadius:number;threshold:bigint;expiryDays:number;proxyHops:number;areaSuggestionRadius:number;storeLocation?:{lat:number;lng:number}}
 export function config(env:NodeJS.ProcessEnv=process.env):Config{
  const required=(key:string)=>{const value=env[key]?.trim();if(!value)throw Error('Configure '+key);return value;};
  const integer=(key:string,fallback:number,min:number,max:number)=>{const value=Number(env[key]?.trim()||fallback);if(!Number.isInteger(value)||value<min||value>max)throw Error('Invalid '+key);return value;};
@@ -30,5 +31,8 @@ export function config(env:NodeJS.ProcessEnv=process.env):Config{
   payments:paymentsConfig(env,{production,origin:appOrigin,storefrontOrigins}),
   // Cancellation requests (CANCELLATION_ENCRYPTION_KEY, CANCELLATION_RETENTION_DAYS, CANCELLATION_NOTIFY_EMAIL). A missing
   // or invalid key refuses submissions only (fails closed); retention never deletes anything until it is configured.
-  cancellations:cancellationConfig(env)};
+  cancellations:cancellationConfig(env),
+  // Post-purchase feedback (Thank you page extension): authenticated with the app's session tokens (SHOPIFY_CLIENT_ID,
+  // SHOPIFY_CLIENT_SECRET). A problem refuses feedback only. No Google review request is part of it.
+  feedback:feedbackConfig(env,domain)};
 }

@@ -44,6 +44,7 @@ export const ADMIN_SECTIONS:{key:string;label:string;href:string;enabled:boolean
  {key:'finance',label:'כספים',href:'/admin/system',enabled:true},
  {key:'orders',label:'הזמנות',href:'/admin/orders',enabled:false},
  {key:'cancellations',label:'בקשות ביטול',href:'/admin/cancellations',enabled:true},
+ {key:'feedback',label:'משוב לקוחות',href:'/admin/feedback',enabled:true},
  {key:'dashboard',label:'משלוחים קבוצתיים',href:'/admin',enabled:true},
  {key:'areas',label:'אזורי משלוח',href:'/admin/areas',enabled:true},
  {key:'audit',label:'יומן פעולות',href:'/admin/audit',enabled:true},
@@ -565,6 +566,15 @@ fieldset{margin:0;padding:0;border:0;min-width:0}legend{padding:0;font-size:13px
 .cx-inline{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}.cx-search{display:grid;gap:6px;margin:0 0 12px;max-width:560px}.cx-search input{flex:1 1 220px;min-width:0}
 .cx-reason{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.cx-id{font-family:ui-monospace,Consolas,monospace;font-size:17px;letter-spacing:.08em}.cx-reveal{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0 4px}
 .cx-warnings ul{margin:6px 0 0;padding-inline-start:20px}
+[data-feedback-warnings] ul{margin:6px 0 0;padding-inline-start:20px}
+.fb-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:10px 12px;align-items:end;margin:0 0 12px}
+.fb-field{display:grid;gap:4px;min-width:0}.fb-field input{width:100%;min-width:0}.fb-actions{display:flex;flex-wrap:wrap;gap:8px}
+.fb-text{margin:4px 0 0;white-space:pre-line;overflow-wrap:anywhere;max-width:42ch}
+.fb-score{white-space:nowrap;font-weight:600}.fb-score--1,.fb-score--2{color:var(--bad)}.fb-score--4,.fb-score--5{color:var(--ok)}
+.fb-dist{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.fb-dist li{display:grid;grid-template-columns:minmax(0,9.5rem) minmax(60px,1fr) auto;align-items:center;gap:10px}
+.fb-dist .meter__track{margin:0}.fb-dist__count{font-variant-numeric:tabular-nums;color:var(--muted)}
+.fb-terms{margin:8px 0 12px;padding-inline-start:24px;display:grid;gap:6px}.fb-terms__text{font-weight:600;overflow-wrap:anywhere}
 @media print{.topbar,.filters,.actions,.pager{display:none}}
 `+Array.from({length:101},(_,i)=>`.meter__track .p${i}{width:${i}%}`).join("")+``;
 

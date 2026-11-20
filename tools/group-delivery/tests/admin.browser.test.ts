@@ -309,7 +309,7 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    await wait('location.pathname==="/admin/system"&&!!document.querySelector(".metrics--fin")');
    assert.deepEqual(await ev('[document.querySelector("h1").textContent,document.documentElement.dir,document.querySelector(".topbar__nav a[aria-current=page]").textContent]'),['כספים','rtl','כספים']);
    assert.deepEqual(await ev('[...document.querySelectorAll(".metric--fin .metric__label")].map(e=>e.textContent)'),['הכנסות החודש','הוצאות החודש','רווח / הפסד','חיובים קבועים']);
-   assert.deepEqual(await ev('[...document.querySelectorAll(".topbar__nav a")].map(a=>a.textContent)'),['כספים','בקשות ביטול','משלוחים קבוצתיים','אזורי משלוח','יומן פעולות','מערכות האתר']);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".topbar__nav a")].map(a=>a.textContent)'),['כספים','בקשות ביטול','משוב לקוחות','משלוחים קבוצתיים','אזורי משלוח','יומן פעולות','מערכות האתר']);
    const modal=(id:string)=>'!!document.querySelector("#'+id+'")?.matches(":modal")';
    const submit=(id:string)=>ev('document.querySelector("#'+id+' form").requestSubmit(document.querySelector("#'+id+' button.btn--primary"))');
    const fill=(id:string,values:Record<string,string>)=>ev('(()=>{const d=document.querySelector("#'+id+'");'+Object.entries(values).map(([k,v])=>'d.querySelector("[name='+k+']").value='+JSON.stringify(v)+';').join('')+'})()');
@@ -404,6 +404,29 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
     assert.deepEqual(small,[],'touch targets '+path);
     await shot(path==='/admin'?'admin-mobile-dashboard':'admin-mobile-group');
    }
+   await size(1440);
+  });
+
+  await t.test('feedback page: RTL, summary cards, labelled filters, missing products, desktop and mobile',async()=>{
+   await f.db.query(`INSERT INTO post_purchase_feedback(id,shopify_order_id,confirmation_number,rating,missing_products,missing_products_details,encountered_problem,problem_details,improvement_feedback)
+    VALUES(gen_random_uuid(),'5001','ABCD1234',5,false,NULL,false,NULL,NULL),(gen_random_uuid(),'5002','EFGH5678',2,true,'מגבונים לחים, אקונומיקה',true,'הכפתור לא הגיב בטלפון','משלוח מהיר יותר'),
+    (gen_random_uuid(),'5003',NULL,4,true,'מגבונים לחים',false,NULL,NULL)`);
+   await size(1440);await go('/admin');
+   await ev('[...document.querySelectorAll(".topbar__nav a")].find(a=>a.textContent==="משוב לקוחות").click()');
+   await wait('location.pathname==="/admin/feedback"&&!!document.querySelector("[data-feedback-metric]")');
+   assert.deepEqual(await ev('[document.documentElement.dir,document.documentElement.lang,document.querySelector("h1").textContent,document.querySelector(".topbar__nav a[aria-current=page]").textContent]'),['rtl','he','משוב לקוחות','משוב לקוחות']);
+   assert.deepEqual(await ev('[...document.querySelectorAll("[data-feedback-metric] .metric__value")].map(e=>e.textContent)'),['3','3.7 מתוך 5','66.7%','33.3%']);
+   // Every filter control has a visible label tied to it.
+   assert.deepEqual(await ev('[...document.querySelectorAll(".fb-filters select,.fb-filters input")].map(e=>document.querySelector("label[for="+e.id+"]")?.textContent)'),['ציון','לא מצאו מוצר','נתקלו בבעיה','מתאריך','עד תאריך']);
+   assert.equal(await ev('document.querySelector(".fb-terms li").textContent.startsWith("מגבונים לחים 2 פעמים")'),true);
+   assert.match(await ev('document.querySelector(".fb-table tbody tr td:nth-child(3)").textContent'),/^\d — /,'scores are written out, not only colored');
+   await ev('document.querySelector("#fb-rating").value="2";document.querySelector(".fb-filters").requestSubmit()');
+   await wait('new URLSearchParams(location.search).get("rating")==="2"&&!!document.querySelector("[data-feedback-metric]")');
+   assert.equal(await ev('document.querySelector("[data-feedback-metric=responses] .metric__value").textContent'),'1');
+   await size(390,844);await go('/admin/feedback');
+   assert.equal(await ev(overflow),false,'no horizontal overflow on mobile');
+   assert.deepEqual(await ev('[...document.querySelectorAll("main .btn,main input:not([type=hidden]),main select,.topbar a,.topbar button")].filter(e=>e.offsetParent&&e.getBoundingClientRect().height<43.5).map(e=>e.outerHTML.slice(0,60))'),[]);
+   await shot('admin-mobile-feedback');
    await size(1440);
   });
 

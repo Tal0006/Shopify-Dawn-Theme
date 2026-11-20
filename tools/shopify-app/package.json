@@ -1,0 +1,19 @@
+{
+  "name": "fankee-shopify-app",
+  "private": true,
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "extensions/*"
+  ],
+  "scripts": {
+    "build": "shopify app build",
+    "dev": "shopify app dev",
+    "info": "shopify app info",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm test --workspaces"
+  },
+  "devDependencies": {
+    "@shopify/cli": "^5.0.0"
+  }
+}

@@ -109,8 +109,8 @@ export class CancellationInputError extends ApiError {
 const FIELDS=['name','idNumber','orderNumber','email','phone','reason','submissionKey'];
 // Invisible formatting characters (bidirectional controls, zero-width characters, BOM) are removed; any other control
 // character, and < or >, is refused: the form accepts plain text only.
-const INVISIBLE=/[\u200B-\u200F\u202A-\u202E\u2060-\u2069\u061C\uFEFF]/g;
-const CONTROL=/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u2028\u2029]/;
+export const INVISIBLE=/[\u200B-\u200F\u202A-\u202E\u2060-\u2069\u061C\uFEFF]/g;
+export const CONTROL=/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u2028\u2029]/;
 export interface CancellationInput {name:string;idNumber:string;orderNumber:string|null;email:string;phone:string|null;reason:string|null;submissionKey:string|null}
 export function parseCancellation(body:unknown):CancellationInput{
  if(!body||typeof body!=='object'||Array.isArray(body))throw new ApiError(400,'INVALID_INPUT');
