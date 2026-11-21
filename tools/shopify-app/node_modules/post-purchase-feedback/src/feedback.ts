@@ -109,7 +109,6 @@ export function createSender(deps:{fetch:Fetch;sessionToken:()=>Promise<string>;
   const json = await response.json().catch(() => null);
   return json && json.ok === true ? 'ok' : 'failed';
 } catch (error) {
-  console.error('[feedback] submit failed', error);
   return 'failed';
 }
  };
