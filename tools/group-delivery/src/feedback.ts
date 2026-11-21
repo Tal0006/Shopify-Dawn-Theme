@@ -117,8 +117,10 @@ export function parseFeedback(body:unknown):FeedbackInput{
  const raw=body as Record<string,unknown>;
  if(Object.keys(raw).some(key=>!(FIELDS as readonly string[]).includes(key)))throw new ApiError(400,'INVALID_INPUT');
  const fields:FeedbackInputError['fields']={};
- const order=typeof raw.orderId==='string'?/^gid:\/\/shopify\/Order\/([1-9][0-9]{0,19})$/.exec(raw.orderId.trim()):null;
- if(raw.orderId===undefined||raw.orderId===null||raw.orderId==='')fields.orderId='REQUIRED';else if(!order)fields.orderId='INVALID';
+const order =
+  typeof raw.orderId === 'string'
+    ? /^gid:\/\/shopify\/(?:Order|OrderIdentity)\/([1-9][0-9]{0,19})$/.exec(raw.orderId.trim())
+    : null; if(raw.orderId===undefined||raw.orderId===null||raw.orderId==='')fields.orderId='REQUIRED';else if(!order)fields.orderId='INVALID';
  let confirmationNumber:string|null=null;
  if(raw.confirmationNumber!==undefined&&raw.confirmationNumber!==null&&raw.confirmationNumber!==''){
   const text=typeof raw.confirmationNumber==='string'?raw.confirmationNumber.trim().toUpperCase():'';
