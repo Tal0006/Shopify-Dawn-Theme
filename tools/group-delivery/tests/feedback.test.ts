@@ -5,10 +5,12 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac,randomUUID} from 'node:crypto';
 import {adminFixture} from './admin-fixture.js';
-import {parseFeedback,verifySessionToken,aggregateMissingProducts,feedbackConfig,feedbackFilters,FeedbackInputError,FEEDBACK_SUCCESS_MESSAGE} from '../src/feedback.js';
+import {parseFeedback,verifySessionToken,aggregateMissingProducts,feedbackConfig,feedbackAllowedShops,feedbackFilters,FeedbackInputError,FEEDBACK_SUCCESS_MESSAGE} from '../src/feedback.js';
 import {ApiError} from '../src/domain.js';
 
 const CLIENT_ID='fankee-test-client-id',SECRET='test-app-secret-not-real-0123456789',SHOP='example.myshopify.com';
+// A development store that may be allowed explicitly with SHOPIFY_FEEDBACK_ALLOWED_SHOPS (SHOP is the production store).
+const DEV_SHOP='example-dev.myshopify.com';
 // The token's optional customer id: it must never be stored or shown.
 const CUSTOMER_SUB='gid://shopify/Customer/987654321012';
 const REVIEW='https://g.page/r/fankee-test/review';
@@ -18,7 +20,7 @@ const sign=(claims:Record<string,unknown>,secret=SECRET,header:Record<string,unk
  const h=b64(header),p=b64(claims);return h+'.'+p+'.'+createHmac('sha256',secret).update(h+'.'+p).digest('base64url');
 };
 const claims=(over:Record<string,unknown>={})=>({dest:SHOP,aud:CLIENT_ID,exp:now()+300,nbf:now()-1,iat:now()-1,jti:randomUUID(),sub:CUSTOMER_SUB,...over});
-const settings={clientId:CLIENT_ID,clientSecret:SECRET,shop:SHOP};
+const settings={clientId:CLIENT_ID,clientSecret:SECRET,shops:[SHOP]};
 let orderSeq=7000000000;
 const valid=(over:Record<string,unknown>={})=>({orderId:'gid://shopify/Order/'+(++orderSeq),confirmationNumber:'X7K2P9QA',rating:4,missingProducts:false,encounteredProblem:false,version:1,...over});
 const fieldsOf=(body:unknown)=>{try{parseFeedback(body);return null;}catch(error){if(error instanceof FeedbackInputError)return error.fields;if(error instanceof ApiError)return error.code;throw error;}};
@@ -83,6 +85,44 @@ test('Session tokens: signature, audience, shop and time claims (unit)',()=>{
  assert.equal(verifySessionToken(h+'.'+b64(claims({aud:CLIENT_ID,dest:SHOP,exp:now()+3000}))+'.'+sig,settings),false,'tampered payload');
  assert.equal(verifySessionToken(h+'.'+token.split('.')[1]+'.',settings),false,'no signature');
  for(const bad of [undefined,null,'',42,'a.b','a.b.c.d','x'.repeat(5000),'@@@.@@@.@@@'])assert.equal(verifySessionToken(bad,settings),false);
+});
+
+test('Feedback shop allowlist: exact hostnames only, falls back to SHOPIFY_STORE_DOMAIN (unit)',()=>{
+ const creds={SHOPIFY_CLIENT_ID:CLIENT_ID,SHOPIFY_CLIENT_SECRET:SECRET};
+ // Missing or blank: only the store's own domain, exactly as before.
+ for(const value of [undefined,'','  '])assert.deepEqual(feedbackAllowedShops(value,SHOP),[SHOP],JSON.stringify(value));
+ assert.deepEqual(feedbackConfig(creds,SHOP).shops,[SHOP]);
+ // Trimmed, lowercased, deduplicated; empty entries (a trailing comma) are skipped.
+ assert.deepEqual(feedbackAllowedShops(' Example.MyShopify.com , example-dev.myshopify.com,example.myshopify.com, ',SHOP),[SHOP,DEV_SHOP]);
+ assert.equal(feedbackAllowedShops(',, ,',SHOP),null,'commas only: no entries, refused');
+ // The list replaces the default: the production store must be listed too.
+ assert.deepEqual(feedbackAllowedShops(DEV_SHOP,SHOP),[DEV_SHOP]);
+ // Malformed entries refuse the whole list (fail closed): feedback becomes MISCONFIGURED, and the value is never echoed.
+ for(const bad of ['*.myshopify.com','*','myshopify.com','.myshopify.com','https://'+DEV_SHOP,DEV_SHOP+'/admin',DEV_SHOP+':443','example-dev.myshopify.com.evil.example',
+  'evil.example','example dev.myshopify.com','-dev.myshopify.com','example_dev.myshopify.com','xn--d.myshopify.com.','sub.'+DEV_SHOP,SHOP+';'+DEV_SHOP,
+  Array.from({length:21},(_,i)=>'shop'+i+'.myshopify.com').join(',')]){
+  assert.equal(feedbackAllowedShops(SHOP+','+bad,SHOP),null,bad);
+  const cfg=feedbackConfig({...creds,SHOPIFY_FEEDBACK_ALLOWED_SHOPS:SHOP+','+bad},SHOP);
+  assert.equal(cfg.state,'MISCONFIGURED',bad);assert.deepEqual(cfg.shops,[]);assert.equal(cfg.clientSecret,null);
+  assert.ok(cfg.problems.some(p=>p.includes('SHOPIFY_FEEDBACK_ALLOWED_SHOPS')));
+  assert.ok(!cfg.problems.join(' ').includes('example-dev'),'never echoes a value');
+ }
+ // Token checks with an explicit allowlist: production and the listed dev store pass, anything else fails.
+ const both={clientId:CLIENT_ID,clientSecret:SECRET,shops:feedbackConfig({...creds,SHOPIFY_FEEDBACK_ALLOWED_SHOPS:SHOP+','+DEV_SHOP},SHOP).shops};
+ assert.equal(verifySessionToken(sign(claims()),both),true,'production shop accepted');
+ assert.equal(verifySessionToken(sign(claims({dest:DEV_SHOP})),both),true,'listed dev shop accepted');
+ assert.equal(verifySessionToken(sign(claims({dest:'https://'+DEV_SHOP})),both),true,'dest with a scheme');
+ assert.equal(verifySessionToken(sign(claims({dest:DEV_SHOP})),settings),false,'dev shop refused when not listed (fallback)');
+ for(const dest of ['evil.myshopify.com','EVIL.myshopify.com','https://evil.myshopify.com','example-dev.myshopify.com.evil.example','evil-example-dev.myshopify.com',
+  'sub.example-dev.myshopify.com','example-dev.myshopify.com:443','myshopify.com','*.myshopify.com','',null,42,[DEV_SHOP]])
+  assert.equal(verifySessionToken(sign(claims({dest})),both),false,'refused: '+JSON.stringify(dest));
+ // The allowlist widens nothing else: signature, audience and time checks still apply to the dev shop.
+ assert.equal(verifySessionToken(sign(claims({dest:DEV_SHOP}),'another-secret-of-a-different-app-0000'),both),false,'wrong secret');
+ assert.equal(verifySessionToken(sign(claims({dest:DEV_SHOP}),SECRET,{alg:'none'}),both),false,'alg none');
+ assert.equal(verifySessionToken(sign(claims({dest:DEV_SHOP,aud:'another-app'})),both),false,'other app');
+ assert.equal(verifySessionToken(sign(claims({dest:DEV_SHOP,exp:now()-10})),both),false,'expired');
+ assert.equal(verifySessionToken(sign(claims({dest:DEV_SHOP,nbf:now()+60})),both),false,'not yet valid');
+ assert.equal(verifySessionToken(sign(claims({dest:DEV_SHOP})),{...both,shops:[]}),false,'an empty list allows nothing');
 });
 
 test('Configuration, filters and missing-product aggregation (unit)',()=>{
@@ -260,4 +300,41 @@ test('Feedback without the app credentials: refused (503) while the admin page s
   assert.match(html,/data-feedback-warnings/);assert.match(html,/SHOPIFY_CLIENT_ID/);assert.doesNotMatch(html,/GOOGLE_REVIEW_URL/);
   assert.match(html,/עדיין לא התקבלו תשובות לשאלון/);
  }finally{await f.close();}
+});
+
+test('Feedback shop allowlist on the endpoint: listed dev store accepted, others refused, other config untouched',{timeout:180000},async t=>{
+ const post=(origin:string,dest:string)=>fetch(origin+'/api/post-purchase-feedback',{method:'POST',
+  headers:{'Content-Type':'application/json',Authorization:'Bearer '+sign(claims({dest}))},body:JSON.stringify(valid())});
+ await t.test('no allowlist: only SHOPIFY_STORE_DOMAIN',async()=>{
+  const f=await adminFixture({env:{SHOPIFY_CLIENT_ID:CLIENT_ID,SHOPIFY_CLIENT_SECRET:SECRET}});
+  try{
+   assert.equal((await post(f.cfg.origin,SHOP)).status,200,'production shop');
+   const refused=await post(f.cfg.origin,DEV_SHOP);
+   assert.equal(refused.status,401);assert.equal((await refused.json()).code,'FEEDBACK_AUTH_REQUIRED');
+   assert.equal((await post(f.cfg.origin,'evil.myshopify.com')).status,401);
+  }finally{await f.close();}
+ });
+ await t.test('explicit allowlist: production and dev accepted, evil refused; SHOPIFY_STORE_DOMAIN unchanged',async()=>{
+  const f=await adminFixture({env:{SHOPIFY_CLIENT_ID:CLIENT_ID,SHOPIFY_CLIENT_SECRET:SECRET,SHOPIFY_FEEDBACK_ALLOWED_SHOPS:' '+SHOP+', '+DEV_SHOP.toUpperCase()+' '}});
+  try{
+   assert.equal(f.cfg.domain,SHOP,'the global store domain (orders, payments, storefront) is not changed');
+   assert.deepEqual(f.cfg.feedback.shops,[SHOP,DEV_SHOP]);
+   assert.equal((await post(f.cfg.origin,SHOP)).status,200,'production shop');
+   const dev=await post(f.cfg.origin,DEV_SHOP);
+   assert.equal(dev.status,200);assert.equal((await dev.json()).ok,true,'listed dev shop');
+   for(const dest of ['evil.myshopify.com','sub.'+DEV_SHOP,DEV_SHOP+'.evil.example'])assert.equal((await post(f.cfg.origin,dest)).status,401,dest);
+   assert.equal((await f.db.query('SELECT count(*)::int AS n FROM post_purchase_feedback')).rows[0].n,2);
+  }finally{await f.close();}
+ });
+ await t.test('malformed allowlist: feedback refused (503), the rest of the service still starts',async()=>{
+  const f=await adminFixture({env:{SHOPIFY_CLIENT_ID:CLIENT_ID,SHOPIFY_CLIENT_SECRET:SECRET,SHOPIFY_FEEDBACK_ALLOWED_SHOPS:'*.myshopify.com'}});
+  try{
+   assert.equal(f.cfg.feedback.state,'MISCONFIGURED');assert.equal(f.cfg.domain,SHOP);
+   const response=await post(f.cfg.origin,SHOP);
+   assert.equal(response.status,503);assert.equal((await response.json()).code,'FEEDBACK_UNAVAILABLE');
+   const {cookie}=await f.login();
+   const html=await(await fetch(f.cfg.origin+'/admin/feedback',{headers:{Cookie:cookie}})).text();
+   assert.match(html,/SHOPIFY_FEEDBACK_ALLOWED_SHOPS/);assert.doesNotMatch(html,/\*\.myshopify|SHOPIFY_CLIENT_ID/,'the value is never shown');
+  }finally{await f.close();}
+ });
 });

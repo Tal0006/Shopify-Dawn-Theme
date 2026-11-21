@@ -24,9 +24,13 @@ export const EMPTY_DRAFT:Draft={rating:null,missingProducts:null,missingProducts
 export type DraftErrors=Partial<Record<'rating'|'missingProducts'|'encounteredProblem',true>>;
 
 /** gid://shopify/Order/123 -> "123"; anything else -> null (the survey is then not shown). */
-export function orderNumericId(gid:unknown):string|null{
- const match=typeof gid==='string'?/^gid:\/\/shopify\/Order\/([1-9][0-9]{0,19})$/.exec(gid):null;
- return match?match[1]:null;
+export function orderNumericId(gid: unknown): string | null {
+  const match =
+    typeof gid === 'string'
+      ? /^gid:\/\/shopify\/(?:Order|OrderIdentity)\/([1-9][0-9]{0,19})$/.exec(gid)
+      : null;
+
+  return match ? match[1] : null;
 }
 /** The three answers the form needs before it is sent (the texts are optional). */
 export function validateDraft(draft:Draft):DraftErrors{
@@ -70,15 +74,44 @@ export type SendResult='ok'|'failed';
 export function createSender(deps:{fetch:Fetch;sessionToken:()=>Promise<string>;endpoint?:string;timeoutMs?:number}){
  let inflight:Promise<SendResult>|null=null;
  const run=async(body:unknown):Promise<SendResult>=>{
-  try{
-   const token=await deps.sessionToken();
-   if(typeof token!=='string'||!token)return 'failed';
-   const response=await timed(deps.fetch,deps.endpoint||FEEDBACK_ENDPOINT,{method:'POST',
-    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)},deps.timeoutMs??SUBMIT_TIMEOUT_MS);
-   if(!response.ok)return 'failed';
-   const json=await response.json().catch(()=>null);
-   return json&&json.ok===true?'ok':'failed';
-  }catch{return 'failed';}
+  try {
+  console.log('[feedback] requesting session token');
+
+  const token = await deps.sessionToken();
+
+  console.log('[feedback] session token received');
+
+  if (typeof token !== 'string' || !token) {
+    console.error('[feedback] empty session token');
+    return 'failed';
+  }
+
+  console.log('[feedback] sending request to backend');
+
+  const response = await timed(
+    deps.fetch,
+    deps.endpoint || FEEDBACK_ENDPOINT,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
+      body: JSON.stringify(body),
+    },
+    deps.timeoutMs ?? SUBMIT_TIMEOUT_MS,
+  );
+
+  console.log('[feedback] backend status', response.status);
+
+  if (!response.ok) return 'failed';
+
+  const json = await response.json().catch(() => null);
+  return json && json.ok === true ? 'ok' : 'failed';
+} catch (error) {
+  console.error('[feedback] submit failed', error);
+  return 'failed';
+}
  };
  return {
   send(body:unknown):Promise<SendResult>{

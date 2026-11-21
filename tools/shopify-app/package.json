@@ -12,8 +12,5 @@
     "info": "shopify app info",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm test --workspaces"
-  },
-  "devDependencies": {
-    "@shopify/cli": "^5.0.0"
   }
 }

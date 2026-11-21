@@ -52,6 +52,7 @@ For Render:
 | RECOVERY_EMAIL_REPLY_TO | Optional reply-to address |
 | CANCELLATION_ENCRYPTION_KEY | Dedicated 32-byte key (64 hex or base64) that encrypts Israeli ID numbers in cancellation requests. Refused if it equals any other secret. Unset or invalid: the cancellation form answers 503 and shoppers see the other channels |
 | CANCELLATION_RETENTION_DAYS | Days after a request is completed before its personal data is cleared (1-3650). Unset: nothing is deleted and the admin pages warn. No default: the merchant decides after legal/accounting advice |
+| SHOPIFY_FEEDBACK_ALLOWED_SHOPS | Optional, post-purchase feedback only: comma-separated exact `*.myshopify.com` hostnames whose session tokens may submit the survey (e.g. the production store and a development store). Unset: SHOPIFY_STORE_DOMAIN only. When set it replaces that default, so list the production store too. No wildcards, schemes or paths; a malformed entry refuses feedback (503) and shows a warning on `/admin/feedback`. Never changes SHOPIFY_STORE_DOMAIN |
 | CANCELLATION_NOTIFY_EMAIL | Optional internal address told about each new request (reference, time and admin link only), through the recovery email provider |
 
 With RECOVERY_EMAIL_PROVIDER=resend and a missing or invalid RESEND_API_KEY / RECOVERY_EMAIL_FROM, recovery fails closed (no code is generated or sent) and the startup log names the variable, never its value; the rest of the service starts normally. The operations page (/admin/system) shows the state and the sender domain only.
@@ -263,8 +264,8 @@ A short optional survey on the Shopify Thank you page, from the Fankee app's che
 
 - **Public endpoint** `POST /api/post-purchase-feedback`: JSON only (415 otherwise), 8 kB body, 30 requests per IP per
   10 minutes (counted before authentication). Authentication is the extension's Shopify session token
-  (`Authorization: Bearer`): HS256 signed with `SHOPIFY_CLIENT_SECRET`, `aud` = `SHOPIFY_CLIENT_ID`, `dest` =
-  `SHOPIFY_STORE_DOMAIN`, valid `exp`/`nbf`/`iat`. Anything else is 401 `FEEDBACK_AUTH_REQUIRED` with no reason given.
+  (`Authorization: Bearer`): HS256 signed with `SHOPIFY_CLIENT_SECRET`, `aud` = `SHOPIFY_CLIENT_ID`, the `dest`
+  hostname exactly one of `SHOPIFY_FEEDBACK_ALLOWED_SHOPS` (unset: `SHOPIFY_STORE_DOMAIN` only), valid `exp`/`nbf`/`iat`. Anything else is 401 `FEEDBACK_AUTH_REQUIRED` with no reason given.
   The extension runs in a Web Worker whose origin Shopify does not guarantee, so this path alone answers CORS with
   `Access-Control-Allow-Origin: *` and no credentials; Origin is never treated as proof. Without the app credentials it
   answers 503 `FEEDBACK_UNAVAILABLE`.

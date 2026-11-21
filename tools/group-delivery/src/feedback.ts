@@ -24,16 +24,35 @@ export const RATING_LABELS:Record<number,string>={1:'לא נוח בכלל',2:'ל
 // ---- Configuration (names variables only, never values) ----
 export interface FeedbackConfig {
  state:'ENABLED'|'DISABLED'|'MISCONFIGURED';problems:string[];
- clientId:string|null;clientSecret:string|null;shop:string;
+ clientId:string|null;clientSecret:string|null;
+ /** Exact myshopify.com hostnames whose session tokens are accepted (feedback only). */
+ shops:string[];
 }
-export function feedbackConfig(env:NodeJS.ProcessEnv,shop:string):FeedbackConfig{
+/** One exact myshopify.com hostname: lowercase letters, digits and hyphens, then .myshopify.com. No wildcard, scheme, port or path. */
+const SHOP_HOST=/^[a-z0-9][a-z0-9-]{0,62}\.myshopify\.com$/;
+/**
+ * The shops allowed to submit feedback. SHOPIFY_FEEDBACK_ALLOWED_SHOPS (comma separated, exact hostnames) replaces the
+ * default; unset or blank, only the store's own SHOPIFY_STORE_DOMAIN is allowed. Entries are trimmed and lowercased; empty
+ * entries (a trailing comma) are skipped. Any malformed entry refuses the whole list (null), like the other feedback
+ * settings: feedback is then refused, nothing else is affected.
+ */
+export function feedbackAllowedShops(value:string|undefined,storeDomain:string):string[]|null{
+ const text=value?.trim()||'';
+ if(!text)return [storeDomain];
+ const entries=text.split(',').map(entry=>entry.trim().toLowerCase()).filter(Boolean);
+ if(!entries.length||entries.length>20||entries.some(entry=>!SHOP_HOST.test(entry)))return null;
+ return [...new Set(entries)];
+}
+export function feedbackConfig(env:NodeJS.ProcessEnv,storeDomain:string):FeedbackConfig{
  const clientId=env.SHOPIFY_CLIENT_ID?.trim()||'',clientSecret=env.SHOPIFY_CLIENT_SECRET?.trim()||'';
- const base={shop};
+ const allowed=feedbackAllowedShops(env.SHOPIFY_FEEDBACK_ALLOWED_SHOPS,storeDomain);
+ const base={shops:allowed??[]};
  if(!clientId&&!clientSecret)return {...base,state:'DISABLED',clientId:null,clientSecret:null,
   problems:['SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET (the Fankee app that owns the Thank you page extension) are not configured.']};
  const problems:string[]=[];
  if(!/^[A-Za-z0-9_-]{8,100}$/.test(clientId))problems.push('SHOPIFY_CLIENT_ID is missing or invalid.');
  if(clientSecret.length<16||clientSecret.length>200||/\s/.test(clientSecret))problems.push('SHOPIFY_CLIENT_SECRET is missing or invalid.');
+ if(!allowed)problems.push('SHOPIFY_FEEDBACK_ALLOWED_SHOPS must be a comma-separated list of exact *.myshopify.com hostnames (no wildcards, schemes, ports or paths).');
  if(problems.length)return {...base,state:'MISCONFIGURED',clientId:null,clientSecret:null,problems};
  return {...base,state:'ENABLED',clientId,clientSecret,problems:[]};
 }
@@ -43,10 +62,11 @@ const b64url=(text:string)=>/^[A-Za-z0-9_-]+$/.test(text)?Buffer.from(text,'base
 const json=(buffer:Buffer|null)=>{if(!buffer)return null;try{const value=JSON.parse(buffer.toString('utf8'));return value&&typeof value==='object'&&!Array.isArray(value)?value:null;}catch{return null;}};
 const hostOf=(value:unknown)=>typeof value==='string'?value.trim().toLowerCase().replace(/^https:\/\//,'').replace(/\/.*$/,''):'';
 /**
- * True only for a session token Shopify issued to this app's extension on this shop, valid now (5 s clock leeway).
+ * True only for a session token Shopify issued to this app's extension on one of the allowed shops (exact hostname
+ * match on `dest`), valid now (5 s clock leeway).
  * Never throws and never reports why a token was refused.
  */
-export function verifySessionToken(token:unknown,settings:{clientId:string;clientSecret:string;shop:string},nowSeconds=Math.floor(Date.now()/1000)):boolean{
+export function verifySessionToken(token:unknown,settings:{clientId:string;clientSecret:string;shops:readonly string[]},nowSeconds=Math.floor(Date.now()/1000)):boolean{
  if(typeof token!=='string'||token.length<20||token.length>4096)return false;
  const parts=token.split('.');if(parts.length!==3)return false;
  const header=json(b64url(parts[0])),payload=json(b64url(parts[1])),signature=b64url(parts[2]);
@@ -55,7 +75,7 @@ export function verifySessionToken(token:unknown,settings:{clientId:string;clien
  if(signature.length!==expected.length||!timingSafeEqual(signature,expected))return false;
  const audience=Array.isArray(payload.aud)?payload.aud:[payload.aud];
  if(!audience.includes(settings.clientId))return false;
- if(hostOf(payload.dest)!==settings.shop)return false;
+ if(!settings.shops.includes(hostOf(payload.dest)))return false;
  const leeway=5,num=(value:unknown)=>typeof value==='number'&&Number.isFinite(value);
  if(!num(payload.exp)||payload.exp<=nowSeconds-leeway||payload.exp>nowSeconds+3600)return false;
  if(payload.nbf!==undefined&&(!num(payload.nbf)||payload.nbf>nowSeconds+leeway))return false;
@@ -170,7 +190,7 @@ export class Feedback {
  /** Whether a request carries a valid session token from this app's extension on this shop. */
  authenticated(authorization:string|undefined,nowSeconds?:number){
   if(!this.enabled)return false;
-  return verifySessionToken(bearerToken(authorization),{clientId:this.cfg.clientId!,clientSecret:this.cfg.clientSecret!,shop:this.cfg.shop},nowSeconds);
+  return verifySessionToken(bearerToken(authorization),{clientId:this.cfg.clientId!,clientSecret:this.cfg.clientSecret!,shops:this.cfg.shops},nowSeconds);
  }
  /** Stores the first response for an order; later ones change nothing. created tells tests apart, never the client. */
  async submit(body:unknown):Promise<{created:boolean}>{
@@ -183,7 +203,9 @@ export class Feedback {
  /** Notes for the admin pages (names variables only). */
  warnings():string[]{
   const out:string[]=[];
-  if(this.cfg.state!=='ENABLED')out.push('המשוב מעמוד התודה לא נקלט עד שיוגדרו SHOPIFY_CLIENT_ID ו־SHOPIFY_CLIENT_SECRET של אפליקציית פאנקי (האפליקציה שמכילה את התוסף).');
+  const badShops=this.cfg.problems.some(problem=>problem.startsWith('SHOPIFY_FEEDBACK_ALLOWED_SHOPS'));
+  if(this.cfg.state!=='ENABLED'&&(!badShops||this.cfg.problems.length>1))out.push('המשוב מעמוד התודה לא נקלט עד שיוגדרו SHOPIFY_CLIENT_ID ו־SHOPIFY_CLIENT_SECRET של אפליקציית פאנקי (האפליקציה שמכילה את התוסף).');
+  if(badShops)out.push('המשוב מעמוד התודה לא נקלט: SHOPIFY_FEEDBACK_ALLOWED_SHOPS צריך להיות רשימה מופרדת בפסיקים של כתובות myshopify.com מדויקות (בלי כוכביות, https או נתיב).');
   return out;
  }
  private where(f:FeedbackFilters){

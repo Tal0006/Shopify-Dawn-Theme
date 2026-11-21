@@ -33,6 +33,6 @@ export function config(env:NodeJS.ProcessEnv=process.env):Config{
   // or invalid key refuses submissions only (fails closed); retention never deletes anything until it is configured.
   cancellations:cancellationConfig(env),
   // Post-purchase feedback (Thank you page extension): authenticated with the app's session tokens (SHOPIFY_CLIENT_ID,
-  // SHOPIFY_CLIENT_SECRET). A problem refuses feedback only. No Google review request is part of it.
+  // SHOPIFY_CLIENT_SECRET) from SHOPIFY_FEEDBACK_ALLOWED_SHOPS, else SHOPIFY_STORE_DOMAIN only. A problem refuses feedback only. No Google review request is part of it.
   feedback:feedbackConfig(env,domain)};
 }
