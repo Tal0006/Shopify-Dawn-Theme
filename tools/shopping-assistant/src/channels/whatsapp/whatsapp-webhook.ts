@@ -55,6 +55,38 @@ export function whatsappWebhook(config:WhatsAppConfig,adapter:WhatsAppAdapter){
   }
   let payload:unknown;try{payload=JSON.parse(req.body.toString('utf8'));}catch{return res.status(400).json({error:'Invalid payload'});}
   console.info('WhatsApp webhook: payload parsed');
+
+const diagnostic = (payload as any)?.entry?.flatMap(
+  (entry: any) => (entry.changes ?? []).map((change: any) => {
+    const value = change.value ?? {};
+    const incoming = Array.isArray(value.messages)
+      ? value.messages
+      : [];
+
+    return {
+      field: change.field,
+      phoneNumberIdMatches:
+        value.metadata?.phone_number_id === config.phoneNumberId,
+      messageCount: incoming.length,
+      statusCount: Array.isArray(value.statuses)
+        ? value.statuses.length
+        : 0,
+      messageTypes: incoming.map((m: any) => m.type),
+      timestampsValid: incoming.map((m: any) => {
+        const timestamp = Number(m.timestamp) * 1000;
+        return Number.isFinite(timestamp) &&
+          timestamp >= Date.now() - 86400000 &&
+          timestamp <= Date.now() + 300000;
+      })
+    };
+  })
+) ?? [];
+
+console.info(
+  'WhatsApp webhook diagnostic:',
+  JSON.stringify(diagnostic)
+);
+
   const messages=incomingMessages(payload,config.phoneNumberId);
   console.info('WhatsApp webhook: accepted inbound messages extracted',messages.length);
   for(const message of messages){
