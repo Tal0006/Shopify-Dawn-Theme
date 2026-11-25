@@ -9,19 +9,19 @@
     assign view_all_text = 'sections.featured_collection.view_all_label' | t: collection_name: chosen_collection.title
   endif
 -%}
-<section class="catalog-section catalog-home catalog-home--featured{% if section.settings.mobile_layout != 'grid' %} catalog-home--carousel{% endif %} container" {{ section.shopify_attributes }}>
+<section class="catalog-section catalog-home catalog-home--featured{% if section.settings.mobile_layout != 'grid' %} catalog-home--carousel{% endif %} container"{% if chosen_collection != blank and section.settings.subcategories != blank %} data-subcategory-root="{{ section.id }}" data-subcategory-mode="row" data-subcategory-section="category-products" data-subcategory-limit="{{ section.settings.product_limit }}"{% endif %} {{ section.shopify_attributes }}>
   {% assign heading = section.settings.heading | default: chosen_collection.title %}
   <header class="catalog-section-header">
     <div>
   {% if heading != blank %}<h2>{{ heading | escape }}</h2>{% endif %}
   {% if section.settings.subtitle != blank %}<p>{{ section.settings.subtitle | escape }}</p>{% endif %}
-  {% if section.settings.show_count and collection_total > 0 %}<p class="catalog-section-header__count">{{ 'sections.featured_collection.product_count' | t: count: collection_total }}</p>{% endif %}
+  {% if section.settings.show_count and collection_total > 0 %}<p class="catalog-section-header__count" data-subcategory-count>{{ 'sections.featured_collection.product_count' | t: count: collection_total }}</p>{% endif %}
     </div>
     {% if section.settings.show_view_all and chosen_collection != blank %}<a class="catalog-section-header__link" href="{{ chosen_collection.url }}">{{ view_all_text }}</a>{% endif %}
   </header>
-  {%- if section.settings.subcategories != blank -%}
+  {%- if chosen_collection != blank and section.settings.subcategories != blank -%}
     {%- assign chips_label = 'collection_page.subcategories' | t: collection_name: chosen_collection.title -%}
-    {% render 'category-chips', chips: section.settings.subcategories, chips_label: chips_label %}
+    {% render 'category-chips', chips: section.settings.subcategories, chips_label: chips_label, chips_parent: chosen_collection, chips_current: chosen_collection.handle %}
   {%- endif -%}
   {% if chosen_collection != blank %}
     {%- liquid
@@ -37,6 +37,7 @@
       assign grid_sizes = '(min-width: 992px) 260px, (min-width: 601px) calc(33vw - 24px), 160px'
     -%}
     {%- paginate chosen_collection.products by 100 -%}
+    <div id="SubcategoryResults-{{ section.id }}" data-subcategory-results>
     <div class="catalog-grid">
       {%- for grid_pass in (1..2) -%}
         {%- for card_product in chosen_collection.products -%}
@@ -72,6 +73,7 @@
       {%- endif -%}
       {%- if grid_count == 0 -%}<p>{{ 'sections.collection_template.empty' | t }}</p>{%- endif -%}
     </div>
+    </div>
     {%- endpaginate -%}
   {% elsif request.design_mode %}<p class="catalog-editor-note">{{ 'storefront.choose_collection' | t }}</p>{% endif %}
 </section>
@@ -79,6 +81,8 @@
 {% stylesheet %}
 /* The "more products" tile ends every row: it takes whatever columns the last row has left. */
 .catalog-more { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px 12px; min-height: 64px; padding: 12px; border: 1px dashed var(--fk-border-strong); border-radius: var(--fk-radius-lg); background: var(--fk-cyan-50); color: var(--fk-accent); text-align: center; text-decoration: none; }
+button.catalog-more { font: inherit; cursor: pointer; }
+button.catalog-more[aria-busy=true] { opacity: .6; cursor: progress; }
 .catalog-more__count { font-size: 18px; font-weight: 700; color: var(--fk-teal-900); }
 .catalog-more__text { font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
 .catalog-more:is(:hover, :focus-visible) { border-style: solid; border-color: var(--fk-accent); background: var(--fk-cyan-100); color: var(--fk-teal-900); }

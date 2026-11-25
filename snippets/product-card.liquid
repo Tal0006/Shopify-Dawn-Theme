@@ -4,12 +4,13 @@
   @param {boolean} [refined_card] - Show the homepage vendor detail.
   @param {string} [card_sizes] - Image sizes for a different layout. Defaults to the catalog grid (2 columns up to
     991px, 4 columns up to 1399px, 5 from 1400px, inside the 1200px content width).
+  @param {string} [card_heading] - Heading tag. Defaults to h2 on collection and search pages, otherwise h3.
   @example
   {% render 'product-card', card_product: product, refined_card: true %}
 {% enddoc %}
 {% if card_product != blank %}
   {% assign card_variant = card_product.selected_or_first_available_variant %}
-  {% assign card_heading_tag = 'h3' %}{% if request.page_type == 'collection' or request.page_type == 'search' %}{% assign card_heading_tag = 'h2' %}{% endif %}
+  {% assign card_heading_tag = 'h3' %}{% if request.page_type == 'collection' or request.page_type == 'search' %}{% assign card_heading_tag = 'h2' %}{% endif %}{% if card_heading != blank %}{% assign card_heading_tag = card_heading %}{% endif %}
   {% assign card_quantity_min = card_variant.quantity_rule.min | default: 1 %}
   {% assign card_quantity_increment = card_variant.quantity_rule.increment | default: 1 %}
   {% assign card_image_alt = card_product.featured_image.alt | default: card_product.title %}

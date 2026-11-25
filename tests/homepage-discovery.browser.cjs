@@ -72,7 +72,7 @@ test('Liquid: featured collection',{skip:SKIP},async t=>{
  await t.test('8 of 18 shown; count, view-all text and a "10 more products" tile, all to the collection',async()=>{
   const html=await featured(liquid,{collection:collection('כביסה',18,eighteen()),view_all_text:'לכל מוצרי הכביסה'});
   assert.equal(titles(html).length,8);
-  assert.match(html,/catalog-section-header__count">18 מוצרים</);
+  assert.match(html,/catalog-section-header__count" data-subcategory-count>18 מוצרים</);
   assert.match(html,/<a class="catalog-section-header__link" href="\/collections\/כביסה">לכל מוצרי הכביסה<\/a>/);
   assert.match(html,/<a class="catalog-more" href="\/collections\/כביסה"><span class="catalog-more__count">עוד 10 מוצרים<\/span> <span class="catalog-more__text">לכל מוצרי הכביסה<\/span><\/a>/);
   assert.equal((html.match(/data-card-cart/g)||[]).length,8,'every card keeps the AJAX form');
@@ -99,7 +99,8 @@ test('Liquid: featured collection',{skip:SKIP},async t=>{
  await t.test('Sub-category chips: labelled list, empty collections skipped, nothing when none is left',async()=>{
   const html=await featured(liquid,{collection:collection('כביסה',1,[product('x')]),subcategories:[collection("ג'ל כביסה",12),collection('ריק',0)]});
   assert.match(html,/<ul class="category-chips" role="list" aria-label="תתי־קטגוריות: כביסה">/);
-  assert.equal((html.match(/class="category-chip"/g)||[]).length,1);
+  assert.equal((html.match(/class="category-chip"/g)||[]).length,2,"all products + the one subcategory that has products");
+  assert.match(html,/<a class="category-chip" href="\/collections\/כביסה"[^>]* aria-label="כל המוצרים: כביסה" aria-current="page">כל המוצרים<\/a>/);
   assert.doesNotMatch(await featured(liquid,{collection:collection('כביסה',1,[product('x')]),subcategories:[collection('ריק',0)]}),/category-chips"/);
  });
  await t.test('Category tiles show the product count; empty collections stay out of the collection list',async()=>{
@@ -115,7 +116,7 @@ test('Liquid: collection page category links',{skip:SKIP},async()=>{
  const blocks=[{settings:{collection:laundry,subcategories:[gel,stain]}},{settings:{collection:cleaning,subcategories:[floors,stain]}},{settings:{}}];
  const nav=async(current,withBlocks=blocks)=>{const liquid=engine({settings:{catalog_collection:all},collection:current,routes:{}});
   return (await liquid.parseAndRender(read(SECTIONS[1]),{section:{id:'m',settings:{product_limit:24},blocks:withBlocks},collection:current,settings:{catalog_collection:all},cart:{items:[]},request:{page_type:'collection'},paginate:{pages:1}})).match(/<nav class="collection-page__nav"[\s\S]*?<\/nav>/)?.[0]||'';};
- const links=html=>[...html.matchAll(/href="\/collections\/([^"]+)"(?: aria-current="(\w+)")?/g)].map(m=>m[2]?m[1]+':'+m[2]:m[1]);
+ const links=html=>[...html.matchAll(/href="\/collections\/([^"]+)"[^>]*?(?: aria-current="(\w+)")?>/g)].map(m=>m[2]?m[1]+':'+m[2]:m[1]);
  assert.deepEqual(links(await nav(laundry)),['כביסה:page','ניקיון','הכול','כביסה:page','גל','מסיר'],'main category: its sub-categories, "all" current');
  assert.deepEqual(links(await nav(floors)),['כביסה','ניקיון:true','הכול','ניקיון','רצפות:page','מסיר'],'sub-category: its parent is marked and linked');
  assert.deepEqual(links(await nav(stain)),['כביסה:true','ניקיון','הכול','כביסה','גל','מסיר:page'],'listed twice: the first parent');

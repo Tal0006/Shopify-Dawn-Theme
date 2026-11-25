@@ -1,0 +1,31 @@
+{% comment %}
+  Section contract: the products of one collection for a homepage row's in-page subcategories
+  (assets/subcategory-filter.js). Rendered only through Shopify's Section Rendering API; the row shows a few cards at a time.
+  Order, as in the rows: discounted in stock, in stock, sold out. 48 products per request.
+  @example
+  /collections/softeners?section_id=category-products&page=2
+{% endcomment %}
+{%- if collection != blank -%}
+  {%- assign category_sizes = '(min-width: 992px) 260px, (min-width: 601px) calc(33vw - 24px), 160px' -%}
+  {%- paginate collection.products by 48 -%}
+    <div data-subcategory-results data-results-count="{{ collection.products_count }}" data-results-text="{{ 'sections.featured_collection.product_count' | t: count: collection.products_count }}"{% if paginate.next %} data-results-next="{{ paginate.next.url | escape }}"{% endif %}>
+      <div class="catalog-grid">
+        {%- for grid_pass in (1..2) -%}
+          {%- for card_product in collection.products -%}
+            {%- assign card_pass = 2 -%}
+            {%- if card_product.compare_at_price > card_product.price -%}{%- assign card_pass = 1 -%}{%- endif -%}
+            {%- if card_product.available and card_pass == grid_pass -%}
+              {% render 'product-card', card_product: card_product, refined_card: true, card_sizes: category_sizes, card_heading: 'h3' %}
+            {%- endif -%}
+          {%- endfor -%}
+        {%- endfor -%}
+        {%- for card_product in collection.products -%}
+          {%- unless card_product.available -%}
+            {% render 'product-card', card_product: card_product, refined_card: true, card_sizes: category_sizes, card_heading: 'h3' %}
+          {%- endunless -%}
+        {%- endfor -%}
+        {%- if collection.products_count == 0 -%}<p>{{ 'sections.collection_template.empty' | t }}</p>{%- endif -%}
+      </div>
+    </div>
+  {%- endpaginate -%}
+{%- endif -%}

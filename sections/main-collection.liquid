@@ -22,8 +22,17 @@
     endfor
   endfor
   assign nav_catalog = settings.catalog_collection
+  # In-page subcategories: the block being viewed. Its heading is replaced too, unless this page is the category itself.
+  assign nav_in_page = false
+  if nav_active > 0
+    assign nav_index = nav_active | minus: 1
+    assign nav_block = section.blocks[nav_index]
+    if nav_block.settings.subcategories != blank
+      assign nav_in_page = true
+    endif
+  endif
 -%}
-<section class="catalog-section container collection-page" data-storefront-collection>
+<section class="catalog-section container collection-page" data-storefront-collection{% if nav_in_page %} data-subcategory-root="{{ section.id }}" data-subcategory-mode="page" data-subcategory-section="{{ section.id }}"{% endif %}>
   {%- if section.blocks.size > 0 -%}
   <nav class="collection-page__nav" aria-label="{{ 'collection_page.navigation' | t }}">
     <ul class="category-chips" role="list">
@@ -35,15 +44,13 @@
       {%- endfor -%}
       {%- if nav_catalog != blank %}<li><a class="category-chip" href="{{ nav_catalog.url }}"{% if nav_catalog.handle == collection.handle %} aria-current="page"{% endif %}>{{ 'storefront.all_products' | t }}</a></li>{% endif -%}
     </ul>
-    {%- if nav_active > 0 -%}
-      {%- assign nav_index = nav_active | minus: 1 -%}
-      {%- assign nav_block = section.blocks[nav_index] -%}
+    {%- if nav_in_page -%}
       {%- assign chips_label = 'collection_page.subcategories' | t: collection_name: nav_block.settings.collection.title -%}
       {% render 'category-chips', chips: nav_block.settings.subcategories, chips_label: chips_label, chips_parent: nav_block.settings.collection, chips_current: collection.handle %}
     {%- endif -%}
   </nav>
   {%- endif -%}
-  <header class="collection-page__header{% if collection.image != blank %} collection-page__header--image{% endif %}">
+  <header class="collection-page__header{% if collection.image != blank %} collection-page__header--image{% endif %}"{% if nav_in_page and nav_block.settings.collection.handle != collection.handle %} data-subcategory-header{% endif %}>
     <div>
       <h1>{{ collection.title | escape }}</h1>
       {% if collection.description != blank %}
@@ -55,6 +62,7 @@
     </div>
     {% if collection.image != blank %}{{ collection.image | image_url: width: 480 | image_tag: class: 'collection-page__image', widths: '160, 320, 480', sizes: '(min-width: 992px) 180px, 88px', loading: 'eager', alt: collection.title }}{% endif %}
   </header>
+  <div id="SubcategoryResults-{{ section.id }}" data-subcategory-results data-results-count="{{ collection.products_count }}">
   <div class="collection-page__toolbar">
     <p class="collection-page__count">{{ 'products.facets.product_count' | t: product_count: collection.products_count, count: collection.all_products_count }}</p>
     {% render 'storefront-filters', results: collection, filter_url: collection.url, reset_url: collection.url, collection_mode: true, active_count: collection_active_count %}
@@ -75,6 +83,7 @@
     {% endif %}
     {% render 'catalog-pagination', paginate: paginate %}
   {% endpaginate %}
+  </div>
 </section>
 
 {% stylesheet %}

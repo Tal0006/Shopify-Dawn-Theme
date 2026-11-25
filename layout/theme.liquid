@@ -57,6 +57,9 @@
     {% if request.page_type == 'index' or request.page_type == 'collection' or request.page_type == 'product' %}
       <script src="{{ 'storefront-motion.js' | asset_url }}" defer></script>
     {% endif %}
+    {% if request.page_type == 'index' or request.page_type == 'collection' %}
+      <script src="{{ 'subcategory-filter.js' | asset_url }}" defer></script>
+    {% endif %}
     {% if request.page_type == 'customers/account'
       or request.page_type == 'customers/login'
       or request.page_type contains 'customers/'
