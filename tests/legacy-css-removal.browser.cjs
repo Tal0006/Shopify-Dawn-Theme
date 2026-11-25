@@ -115,7 +115,7 @@ test('Browser: icons, back-to-top stacking, local fadeInDown',{skip:Liquid?false
   const overlap=(a,b)=>a&&b&&a.l<b.r&&a.r>b.l&&a.t<b.b&&a.b>b.t;
   const controls=async()=>({btt:await ev(rect('.back-to-top')),wa:await ev(rect('.floating-whatsapp')),a11y:await ev(rect('.a11y-launcher')),assistant:await ev(rect('.shopping-assistant__launcher')),bar:await ev(rect('.product-sticky-atc'))});
   const showBack=async()=>{await ev('scrollTo(0,1400)');await wait('getComputedStyle(document.querySelector(".back-to-top")).display==="block"');await wait('document.querySelector(".back-to-top").getAnimations().length===0');};
-  const showBar=async()=>{await ev(`(()=>{const bar=document.querySelector('[data-sticky-atc]');bar.hidden=false;document.documentElement.setAttribute('data-sticky-atc-visible','');document.documentElement.style.setProperty('--sticky-atc-height',bar.offsetHeight+'px');})()`);await sleep(450);};
+  const showBar=async()=>{await ev(`(()=>{const bar=document.querySelector('[data-sticky-atc]');bar.hidden=false;document.documentElement.setAttribute('data-sticky-atc-visible','');document.documentElement.style.setProperty('--sticky-atc-height',bar.offsetHeight+'px');})()`);await sleep(450);await wait('[document.documentElement,...document.querySelectorAll(".back-to-top,.floating-whatsapp,.product-sticky-atc")].every(n=>n.getAnimations().every(a=>a.playState==="finished"))');};
 
   await t.test('Back-to-top sits centred above WhatsApp with a 10px gap and clears every other floating control',async()=>{
    for(const width of [360,390,768,1280]){

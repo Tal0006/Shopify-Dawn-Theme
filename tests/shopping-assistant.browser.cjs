@@ -150,6 +150,7 @@ test('Shopping Assistant browser flows',{timeout:90000},async t=>{
    const y=await ev('window.scrollY');await click('[data-launch]');
    for(let n=0;n<15;n++){await key('Tab','Tab',9);assert.equal(await ev('app.dialog.contains(document.activeElement)'),true,'Tab '+n+': '+await ev('document.activeElement.outerHTML.slice(0,100)'));}
    await key('Escape','Escape',27);await wait('!app.dialog.open');
+   await wait('document.activeElement===app.launcher'); // Focus returns in the dialog's close event, which is queued.
    assert.equal(await ev('document.activeElement===app.launcher'),true);assert.equal(await ev('window.scrollY'),y);
    assert.equal(await ev('(()=>{app.positionLauncher();const a=app.launcher.getBoundingClientRect(),b=document.querySelector(".a11y-launcher").getBoundingClientRect();return a.bottom<=b.top||a.right<=b.left||a.left>=b.right;})()'),true);
   });

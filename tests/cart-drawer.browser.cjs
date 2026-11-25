@@ -24,9 +24,11 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   call=(method,params={})=>new Promise((resolve,reject)=>{const n=++id;pending.set(n,{resolve,reject});ws.send(JSON.stringify({id:n,method,params}));});
   ev=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
   const wait=async expression=>{for(let i=0;i<120;i++){if(await ev(expression))return;await sleep(25);}throw Error('Timeout: '+expression);};
+  // A fixed delay can measure mid-animation when the browser draws few frames (for example on battery).
+  const settled=()=>wait('panel.getAnimations().every(a=>a.playState==="finished")');
   await call('Page.enable');await call('Page.bringToFront');await call('Emulation.setFocusEmulationEnabled',{enabled:true});await call('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
   await call('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/'});
-  await wait('document.readyState==="complete"');
+  await wait('location.href!=="about:blank"&&document.readyState==="complete"');
 
   await ev(`window.Shopify={routes:{root:'/he/'}};window.count=0;window.calls=[];window.failure='';window.noSection=false;
   window.items=()=>'<header class="cart-drawer__header"><h2 id="title">Cart ('+count+')</h2></header>'+(count?'<form class="cart-drawer__form" action="/cart"><div class="cart-drawer__lines"><article data-cart-line="1000:key" class="cart-drawer__item"><div class="cart-drawer__image"></div><div class="cart-drawer__details"><h3>Product</h3><p class="cart-drawer__price">'+(count*15.9).toFixed(2)+'</p><div class="cart-drawer__quantity"><button type="button" data-cart-delta="-1" '+(count===1?'disabled':'')+'>-</button><input data-cart-quantity name="updates[]" type="number" min="1" step="1" value="'+count+'"><button type="button" data-cart-delta="1">+</button></div><a href="/remove" data-cart-remove>Remove</a></div></article></div><footer class="cart-drawer__summary"><p class="cart-drawer__total">'+(count*15.9).toFixed(2)+'</p><button name="checkout">Checkout</button><a href="/he/cart">Cart</a></footer></form>':'<p class="empty">Empty</p><button data-cart-continue>Continue</button>');
@@ -76,12 +78,12 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   await t.test('Mobile RTL drawer is right aligned without overflow; close and header reopen work',async()=>{
     await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
     await ev('document.querySelector(".cart-toggle-btn").click()');await wait('panel.open');
-    await sleep(250);
+    await settled();
     const rect=await ev('(()=>{const r=panel.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,overflow:panel.scrollWidth>panel.clientWidth};})()');
     assert.equal(rect.right,390);assert.ok(rect.width<=390);assert.equal(rect.overflow,false,JSON.stringify(await ev('({client:panel.clientWidth,scroll:panel.scrollWidth,items:[...panel.querySelectorAll("*")].filter(e=>e.scrollWidth>e.clientWidth).map(e=>({tag:e.tagName,cls:e.className,w:e.getBoundingClientRect().width,left:e.getBoundingClientRect().left}))})')));
     await ev('panel.querySelector(".mini-cart-close").click()');await wait('!panel.open');
     await ev('document.querySelector(".cart-toggle-btn").click()');await wait('panel.open');assert.equal(await ev('document.querySelector(".cart-toggle-btn").getAttribute("aria-expanded")'),'true');
-    await sleep(250);
+    await settled();
     if (process.env.CART_SCREENSHOT_PATH) { const image = await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.CART_SCREENSHOT_PATH,Buffer.from(image.data,'base64')); }
     await ev('panel.querySelector(".mini-cart-close").click()');
   });
@@ -94,7 +96,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
   });
   await t.test('Backdrop closes, and Theme Editor reload does not duplicate mutation listeners',async()=>{
     await call('Emulation.setDeviceMetricsOverride',{width:1280,height:800,deviceScaleFactor:1,mobile:false});
-    await ev('document.querySelector(".cart-toggle-btn").click()');await sleep(250);
+    await ev('document.querySelector(".cart-toggle-btn").click()');await settled();
     assert.deepEqual(await ev('({right:panel.getBoundingClientRect().right,width:panel.getBoundingClientRect().width})'),{right:1280,width:420});
     await ev('window.clickLog=[];document.addEventListener("click",e=>clickLog.push({tag:e.target.tagName,cls:e.target.className,x:e.clientX,y:e.clientY}),true)');
     await call('Input.dispatchMouseEvent',{type:'mousePressed',x:50,y:400,button:'left',clickCount:1});
