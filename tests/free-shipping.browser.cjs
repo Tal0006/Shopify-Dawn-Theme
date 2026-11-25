@@ -17,9 +17,9 @@ test('Contract: Theme Settings, placement, cart value and no hard-coded threshol
  // The group also holds the shipping-line settings (snippets/shipping-disclosure.liquid, tests/storefront-ux-batch1).
  assert.deepEqual(Object.keys(ids),['free_shipping_enabled','free_shipping_threshold','free_shipping_remaining_text','free_shipping_success_text','shipping_disclosure_enabled','shipping_fee']);
  assert.equal(ids.free_shipping_enabled.default,true);assert.equal(ids.free_shipping_threshold.type,'number');assert.equal(ids.free_shipping_threshold.default,150);
- const schemaHe=JSON.parse(read('locales/he.schema.json')).free_shipping_editor;
+ const schemaHe=JSON.parse(read('locales/he.schema.json').replace(/^\s*\/\*[\s\S]*?\*\//,'')).free_shipping_editor;
  assert.match(schemaHe.threshold_info,/יש לוודא שסכום זה תואם להגדרת המשלוח החינם ב-Shopify\./);
- for(const locale of ['he.schema.json','en.default.schema.json']){const keys=JSON.parse(read('locales/'+locale)).free_shipping_editor;for(const item of [group,...group.settings])for(const value of [item.name,item.label,item.info,item.content].filter(Boolean))assert.ok(keys[value.replace('t:free_shipping_editor.','')],locale+' '+value);}
+ for(const locale of ['he.schema.json','en.default.schema.json']){const keys=JSON.parse(read('locales/'+locale).replace(/^\s*\/\*[\s\S]*?\*\//,'')).free_shipping_editor;for(const item of [group,...group.settings])for(const value of [item.name,item.label,item.info,item.content].filter(Boolean))assert.ok(keys[value.replace('t:free_shipping_editor.','')],locale+' '+value);}
  assert.equal(he.free_shipping.remaining,'עוד {{ amount }} למשלוח חינם');assert.equal(he.free_shipping.reached,'מגיע לך משלוח חינם!');
  // One reusable snippet, rendered in the drawer summary (before the total) and on the cart page.
  const drawer=read('snippets/cart-drawer.liquid'),cart=read('sections/main-cart.liquid');

@@ -2,6 +2,57 @@
   "sections": {
     "main": {
       "type": "main-collection",
+      "blocks": {
+        "laundry": {
+          "type": "category",
+          "settings": {
+            "collection": "כביסה",
+            "subcategories": [
+              "גל-כביסה",
+              "אבקת-כביסה",
+              "מרכך-כביסה",
+              "מסיר-כתמים"
+            ]
+          }
+        },
+        "cleaning": {
+          "type": "category",
+          "settings": {
+            "collection": "ניקיון-כללי",
+            "subcategories": [
+              "רצפות-1",
+              "ניקוי-כלים"
+            ]
+          }
+        },
+        "toiletries": {
+          "type": "category",
+          "settings": {
+            "collection": "טואלטיקה",
+            "subcategories": [
+              "תרחיץ-פנים",
+              "דאודורנט",
+              "נקה-7",
+              "כיף",
+              "אל-סבון",
+              "בייבי-וילדים",
+              "החלקה"
+            ]
+          }
+        },
+        "disposables": {
+          "type": "category",
+          "settings": {
+            "collection": "חד-פעמי-1"
+          }
+        }
+      },
+      "block_order": [
+        "toiletries",
+        "laundry",
+        "cleaning",
+        "disposables"
+      ],
       "settings": {}
     }
   },

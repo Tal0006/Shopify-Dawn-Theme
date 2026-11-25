@@ -331,7 +331,15 @@
     },
     "featured_collection": {
       "view_all": "View all",
-      "view_all_label": "View all products in the {{ collection_name }} collection"
+      "view_all_label": "View all products in the {{ collection_name }} collection",
+      "product_count": {
+        "one": "1 product",
+        "other": "{{ count }} products"
+      },
+      "more_products": {
+        "one": "1 more product",
+        "other": "{{ count }} more products"
+      }
     },
     "collection_list": {
       "view_all": "View all"
@@ -761,6 +769,9 @@
     "secure": "Secure payment"
   },
   "collection_page": {
+    "navigation": "Browse categories",
+    "subcategories": "Subcategories: {{ collection_name }}",
+    "all": "All",
     "description": "About this collection",
     "no_matches": "No products match your selected filters",
     "clear": "Clear filters",

@@ -1,47 +1,104 @@
 {% assign chosen_collection = section.settings.collection %}
 {% if chosen_collection != blank or request.design_mode %}
-<section class="catalog-section catalog-home container" {{ section.shopify_attributes }}>
+{%- liquid
+  assign collection_total = chosen_collection.products_count | default: 0
+  assign view_all_text = section.settings.view_all_text | strip
+  if view_all_text != blank
+    assign view_all_text = view_all_text | escape
+  elsif chosen_collection != blank
+    assign view_all_text = 'sections.featured_collection.view_all_label' | t: collection_name: chosen_collection.title
+  endif
+-%}
+<section class="catalog-section catalog-home catalog-home--featured{% if section.settings.mobile_layout != 'grid' %} catalog-home--carousel{% endif %} container" {{ section.shopify_attributes }}>
   {% assign heading = section.settings.heading | default: chosen_collection.title %}
   <header class="catalog-section-header">
     <div>
   {% if heading != blank %}<h2>{{ heading | escape }}</h2>{% endif %}
   {% if section.settings.subtitle != blank %}<p>{{ section.settings.subtitle | escape }}</p>{% endif %}
+  {% if section.settings.show_count and collection_total > 0 %}<p class="catalog-section-header__count">{{ 'sections.featured_collection.product_count' | t: count: collection_total }}</p>{% endif %}
     </div>
-    {% if section.settings.show_view_all and chosen_collection != blank %}<a class="catalog-section-header__link" href="{{ chosen_collection.url }}">{{ 'sections.featured_collection.view_all' | t }}</a>{% endif %}
+    {% if section.settings.show_view_all and chosen_collection != blank %}<a class="catalog-section-header__link" href="{{ chosen_collection.url }}">{{ view_all_text }}</a>{% endif %}
   </header>
+  {%- if section.settings.subcategories != blank -%}
+    {%- assign chips_label = 'collection_page.subcategories' | t: collection_name: chosen_collection.title -%}
+    {% render 'category-chips', chips: section.settings.subcategories, chips_label: chips_label %}
+  {%- endif -%}
   {% if chosen_collection != blank %}
     {%- liquid
-      # In-stock products first (collection order kept). Sold-out products only fill a grid that has fewer than
+      # In-stock products first, and among them the ones on promotion (compare-at price above the price, or the optional
+      # promotion tag); collection order is kept inside each group. Sold-out products only fill a grid that has fewer than
       # product_limit in-stock products, and at most max_sold_out of them: with enough stock none is shown.
       # The scan covers the first 100 products (a plain loop would stop at Liquid's default of 50).
       assign grid_limit = section.settings.product_limit
       assign grid_sold_out_max = section.settings.max_sold_out
       assign grid_count = 0
       assign grid_sold_out = 0
+      assign grid_promotion_tag = section.settings.promotion_tag | strip
+      assign grid_sizes = '(min-width: 992px) 260px, (min-width: 601px) calc(33vw - 24px), 160px'
     -%}
     {%- paginate chosen_collection.products by 100 -%}
     <div class="catalog-grid">
-      {%- for card_product in chosen_collection.products -%}
-        {%- if card_product.available and grid_count < grid_limit -%}
-          {%- assign grid_count = grid_count | plus: 1 -%}
-          {% render 'product-card', card_product: card_product, refined_card: true %}
-        {%- endif -%}
+      {%- for grid_pass in (1..2) -%}
+        {%- for card_product in chosen_collection.products -%}
+          {%- if card_product.available and grid_count < grid_limit -%}
+            {%- liquid
+              assign card_pass = 2
+              if card_product.compare_at_price > card_product.price
+                assign card_pass = 1
+              endif
+              if grid_promotion_tag != blank and card_product.tags contains grid_promotion_tag
+                assign card_pass = 1
+              endif
+            -%}
+            {%- if card_pass == grid_pass -%}
+              {%- assign grid_count = grid_count | plus: 1 -%}
+              {% render 'product-card', card_product: card_product, refined_card: true, card_sizes: grid_sizes %}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endfor -%}
       {%- endfor -%}
       {%- for card_product in chosen_collection.products -%}
         {%- unless card_product.available -%}
           {%- if grid_count < grid_limit and grid_sold_out < grid_sold_out_max -%}
             {%- assign grid_count = grid_count | plus: 1 -%}
             {%- assign grid_sold_out = grid_sold_out | plus: 1 -%}
-            {% render 'product-card', card_product: card_product, refined_card: true %}
+            {% render 'product-card', card_product: card_product, refined_card: true, card_sizes: grid_sizes %}
           {%- endif -%}
         {%- endunless -%}
       {%- endfor -%}
+      {%- assign grid_remaining = collection_total | minus: grid_count -%}
+      {%- if section.settings.show_view_all and grid_count > 0 and grid_remaining > 0 -%}
+        <a class="catalog-more" href="{{ chosen_collection.url }}"><span class="catalog-more__count">{{ 'sections.featured_collection.more_products' | t: count: grid_remaining }}</span> <span class="catalog-more__text">{{ view_all_text }}</span></a>
+      {%- endif -%}
       {%- if grid_count == 0 -%}<p>{{ 'sections.collection_template.empty' | t }}</p>{%- endif -%}
     </div>
     {%- endpaginate -%}
   {% elsif request.design_mode %}<p class="catalog-editor-note">{{ 'storefront.choose_collection' | t }}</p>{% endif %}
 </section>
 {% endif %}
+{% stylesheet %}
+/* The "more products" tile ends every row: it takes whatever columns the last row has left. */
+.catalog-more { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px 12px; min-height: 64px; padding: 12px; border: 1px dashed var(--fk-border-strong); border-radius: var(--fk-radius-lg); background: var(--fk-cyan-50); color: var(--fk-accent); text-align: center; text-decoration: none; }
+.catalog-more__count { font-size: 18px; font-weight: 700; color: var(--fk-teal-900); }
+.catalog-more__text { font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+.catalog-more:is(:hover, :focus-visible) { border-style: solid; border-color: var(--fk-accent); background: var(--fk-cyan-100); color: var(--fk-teal-900); }
+.catalog-more:focus-visible { outline: 2px solid var(--fk-accent); outline-offset: 2px; }
+@media (min-width: 992px) {
+ .catalog-home--featured .catalog-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+ .catalog-more:nth-child(4n + 1) { grid-column: 1 / -1; flex-direction: row; }
+ .catalog-more:nth-child(4n + 2) { grid-column: span 3; }
+ .catalog-more:nth-child(4n + 3) { grid-column: span 2; }
+}
+@media (min-width: 601px) and (max-width: 991px) {
+ .catalog-more:nth-child(3n + 1) { grid-column: 1 / -1; flex-direction: row; }
+ .catalog-more:nth-child(3n + 2) { grid-column: span 2; }
+}
+@media (max-width: 600px) {
+ .catalog-home--featured:not(.catalog-home--carousel) .catalog-more:nth-child(2n + 1) { grid-column: 1 / -1; }
+ .catalog-home--carousel .catalog-grid { position: relative; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: max(150px, 43%); overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: inline proximity; scroll-padding-inline: 8px; margin-inline: -8px; padding: 8px 8px 14px; }
+ .catalog-home--carousel .catalog-grid > * { scroll-snap-align: start; }
+}
+{% endstylesheet %}
 {% schema %}
 {
   "name": "t:storefront_editor.featured_collection",
@@ -85,6 +142,47 @@
       "id": "show_view_all",
       "label": "t:storefront_editor.view_all",
       "default": true
+    },
+    {
+      "type": "text",
+      "id": "view_all_text",
+      "label": "t:storefront_editor.view_all_text",
+      "info": "t:storefront_editor.view_all_text_info"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_count",
+      "label": "t:storefront_editor.show_count",
+      "default": true
+    },
+    {
+      "type": "collection_list",
+      "id": "subcategories",
+      "label": "t:storefront_editor.subcategories",
+      "info": "t:storefront_editor.subcategories_info",
+      "limit": 8
+    },
+    {
+      "type": "text",
+      "id": "promotion_tag",
+      "label": "t:storefront_editor.promotion_tag",
+      "info": "t:storefront_editor.promotion_tag_info"
+    },
+    {
+      "type": "select",
+      "id": "mobile_layout",
+      "label": "t:storefront_editor.mobile_layout",
+      "options": [
+        {
+          "value": "carousel",
+          "label": "t:storefront_editor.mobile_layout_carousel"
+        },
+        {
+          "value": "grid",
+          "label": "t:storefront_editor.mobile_layout_grid"
+        }
+      ],
+      "default": "carousel"
     }
   ],
   "presets": [

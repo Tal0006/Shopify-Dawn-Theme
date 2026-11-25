@@ -14,7 +14,7 @@ test('Product cards: sold-out text once, named add button, image link out of tab
  assert.match(card,/{% if card_product\.available == false %}\s*{% render 'back-in-stock-trigger', bis_product: card_product %}/,'sold-out cards offer a back-in-stock request instead of a dead button');
  assert.match(card,/<a href="{{ card_product\.url }}" class="catalog-card__image" tabindex="-1" aria-hidden="true">/);
  assert.doesNotMatch(card,/class="catalog-card__image"[^>]*aria-label/);
- assert.match(card,/name="add" aria-label="{{ 'storefront\.add_to_cart_label' \| t: title: card_product\.title \| escape }}"/);
+ assert.match(card,/name="add" aria-label="{{ 'storefront\.add_to_cart_label' \| t: title: card_product\.title \| escape_once }}"/);
  assert.equal(he.storefront.add_to_cart_label,'הוספה לסל: {{ title }}');
  assert.ok(he.storefront.add_to_cart_label.startsWith(he.products.product.add_to_cart),'accessible name starts with the visible label');
  // The card image keeps a meaningful alt (image alt, else product title).

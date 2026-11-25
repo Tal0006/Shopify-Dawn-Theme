@@ -34,7 +34,7 @@ test('Contracts: navigation is native-only, settings exist, placements and strin
  assert.deepEqual([setting('shipping_fee').type,setting('shipping_fee').default],['number',20]);
  assert.deepEqual([setting('shipping_disclosure_enabled').type,setting('shipping_disclosure_enabled').default],['checkbox',true]);
  assert.equal(setting('customer_service_hours').type,'textarea');assert.equal(setting('customer_service_hours').default,undefined,'no invented hours');
- for(const file of ['locales/he.schema.json','locales/en.default.schema.json']){const l=JSON.parse(read(file));
+ for(const file of ['locales/he.schema.json','locales/en.default.schema.json']){const l=JSON.parse(read(file).replace(/^\s*\/\*[\s\S]*?\*\//,'')); // Shopify adds a comment header when it syncs these files.
   for(const key of ['shipping_fee','shipping_fee_info','disclosure_enabled'])assert.equal(typeof l.free_shipping_editor[key],'string',file+' '+key);
   for(const key of ['service_hours','service_hours_info'])assert.equal(typeof l.business_details_editor[key],'string',file+' '+key);}
  // Shipping line near the purchase controls and in both carts.

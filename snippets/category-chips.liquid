@@ -1,0 +1,38 @@
+{% doc %}
+  A row of links to collections: wraps on desktop, scrolls sideways on phones. Empty collections are skipped, except the
+  current one. Prints nothing when no link would be shown.
+
+  @param chips - Collections to link to (a collection_list setting).
+  @param {string} chips_label - Accessible name of the list.
+  @param {collection} [chips_parent] - Adds a first "all" link to this collection.
+  @param {string} [chips_current] - Handle of the collection being viewed.
+  @example
+  {% render 'category-chips', chips: section.settings.subcategories, chips_label: label %}
+{% enddoc %}
+{%- capture chip_items -%}
+  {%- for chip in chips -%}
+    {%- if chip.products_count > 0 or chip.handle == chips_current -%}
+      <li><a class="category-chip" href="{{ chip.url }}"{% if chip.handle == chips_current %} aria-current="page"{% endif %}>{{ chip.title | escape }}</a></li>
+    {%- endif -%}
+  {%- endfor -%}
+{%- endcapture -%}
+{%- if chip_items != blank -%}
+  <ul class="category-chips" role="list" aria-label="{{ chips_label | strip | escape_once }}">
+    {%- if chips_parent != blank %}<li><a class="category-chip" href="{{ chips_parent.url }}"{% if chips_parent.handle == chips_current %} aria-current="page"{% endif %}>{{ 'collection_page.all' | t }}</a></li>{% endif -%}
+    {{- chip_items -}}
+  </ul>
+{%- endif -%}
+
+{% stylesheet %}
+.category-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.category-chips li { margin: 0; flex: 0 0 auto; }
+.category-chip { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 16px; border: 1px solid var(--fk-border); border-radius: 999px; background: #fff; color: var(--fk-accent); font-size: 14px; font-weight: 600; line-height: 1.4; text-decoration: none; white-space: nowrap; }
+.category-chip:is(:hover, :focus-visible) { border-color: var(--fk-border-strong); background: var(--fk-cyan-50); color: var(--fk-teal-900); }
+.category-chip:focus-visible { outline: 2px solid var(--fk-accent); outline-offset: 2px; }
+.category-chip[aria-current] { border-color: var(--fk-primary); background: var(--fk-primary); color: #fff; }
+.catalog-home > .category-chips { margin-block-end: 16px; }
+@media (max-width: 600px) {
+ .category-chips { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain; margin-inline: -4px; padding: 4px; scrollbar-width: none; }
+ .category-chips::-webkit-scrollbar { display: none; }
+}
+{% endstylesheet %}

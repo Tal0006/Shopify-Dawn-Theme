@@ -16,7 +16,7 @@
   endif
   assign bis_contact = pages['contact'].url | default: routes.root_url
 -%}
-<button type="button" class="theme-btn back-in-stock-trigger {{ bis_class }}" data-back-in-stock data-product-title="{{ bis_title | escape }}" data-product-url="{{ bis_url | escape }}" aria-haspopup="dialog" aria-controls="BackInStockDialog" aria-label="{{ 'back_in_stock.button_label' | t: title: bis_title | escape }}">{{ 'back_in_stock.button' | t }}</button>
+<button type="button" class="theme-btn back-in-stock-trigger {{ bis_class }}" data-back-in-stock data-product-title="{{ bis_title | escape }}" data-product-url="{{ bis_url | escape }}" aria-haspopup="dialog" aria-controls="BackInStockDialog" aria-label="{{ 'back_in_stock.button_label' | t: title: bis_title | escape_once }}">{{ 'back_in_stock.button' | t }}</button>
 <noscript><a class="back-in-stock-trigger" href="{{ bis_contact }}">{{ 'back_in_stock.button' | t }}</a></noscript>
 {% stylesheet %}
 .back-in-stock-trigger { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; text-align: center; }

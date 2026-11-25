@@ -1,5 +1,5 @@
 <script src="{{ 'predictive-search.js' | asset_url }}" defer></script>
-<header id="header" class="storefront-header" data-cart-section="{{ section.id }}">
+<header id="header" class="storefront-header{% if section.settings.menu.links.size > 4 %} storefront-header--nav-row{% endif %}" data-cart-section="{{ section.id }}">
 <div class="site-header header-style-1"><nav class="navigation navbar navbar-expand-lg navbar-light"><div class="container-fluid"><div class="row">
   <a class="navbar-brand storefront-menu-logo" href="{{ routes.root_url }}">
     {% assign header_logo = section.settings.logo | default: settings.logo %}{% assign header_logo_alt = header_logo.alt | default: shop.name %}
@@ -68,6 +68,27 @@ html[data-header-compact] .storefront-menu-logo img { max-height: 40px; max-widt
  html[data-header-compact] .storefront-header .row:has(fankee-predictive-search:focus-within) > fankee-predictive-search { grid-column: 1 / -1; grid-row: 2; }
 }
 .cart-toggle-btn__icon { display: block; color: var(--fk-teal-900, #0a3f47); }
+/* A top-level category with sub-links: its name is a link and the arrow beside it opens the list. */
+.storefront-header #navbar .nav-disclosure--linked { display: flex; align-items: center; }
+.storefront-header #navbar .nav-disclosure--linked > .nav-mega-trigger { justify-content: center; width: 32px; }
+@media (min-width: 992px) {
+ .storefront-header #navbar .nav-disclosure--flat > .nav-mega-panel { width: min(440px, calc(100vw - 48px)); }
+ .storefront-header #navbar .nav-disclosure--flat .nav-mega-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
+ .storefront-header #navbar .nav-disclosure--flat .nav-mega-group-heading { margin: 0; padding: 0; border: 0; }
+ .storefront-header #navbar .nav-disclosure--flat .nav-mega-group-heading > a { font-size: 15px; font-weight: 500; }
+ /* More than 4 menu items do not fit beside the search: the menu gets its own row under it. */
+ .storefront-header--nav-row .storefront-header-secondary { display: contents; }
+ .storefront-header--nav-row .storefront-header-tools { grid-column: 3; grid-row: 1; justify-self: end; }
+ .storefront-header--nav-row #navbar { grid-column: 1 / -1; grid-row: 2; min-inline-size: 0; }
+ .storefront-header--nav-row #navbar .navbar-nav { flex-wrap: wrap; justify-content: center; width: 100%; row-gap: 0; }
+ .storefront-header--nav-row .site-header #navbar > ul > li { padding-block: 0; }
+}
+@media (max-width: 991px) {
+ .storefront-header #navbar .nav-disclosure--linked { flex-wrap: wrap; }
+ .storefront-header #navbar .nav-disclosure--linked > .nav-mega-link { flex: 1; min-width: 0; min-height: 48px; display: flex; align-items: center; font-size: 16px; font-weight: 600; }
+ .storefront-header #navbar .nav-disclosure--linked > .nav-mega-trigger { flex: none; width: 48px; }
+ .storefront-header #navbar .nav-disclosure--linked > .nav-mega-panel { flex: 0 0 100%; }
+}
 @media (prefers-reduced-motion: reduce) { html[data-header-compact] .storefront-header .container-fluid > .row, .storefront-menu-logo img, html[data-sticky-header] .header-section > .storefront-header { transition: none; } }
 html[data-a11y-paused] .storefront-menu-logo img, html[data-a11y-paused] .storefront-header .container-fluid > .row, html[data-a11y-paused][data-sticky-header] .header-section > .storefront-header { transition: none; }
 {% endstylesheet %}

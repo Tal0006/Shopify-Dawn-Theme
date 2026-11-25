@@ -15,13 +15,16 @@
     assign deals_heading = 'deals.heading' | t
   endif
 -%}
+{%- comment -%}Paginated only to scan past Liquid's default of 50 products; at most deals_limit cards are printed.{%- endcomment -%}
 {%- capture deals_cards -%}
+  {%- paginate deals_source.products by 250 -%}
   {%- for card_product in deals_source.products -%}
     {%- if card_product.available and deals_count < deals_limit and card_product.price_varies == false and card_product.compare_at_price_varies == false and card_product.compare_at_price > card_product.price -%}
       {%- assign deals_count = deals_count | plus: 1 -%}
       {% render 'product-card', card_product: card_product, refined_card: true %}
     {%- endif -%}
   {%- endfor -%}
+  {%- endpaginate -%}
 {%- endcapture -%}
 {%- if deals_count > 0 -%}
 <section class="catalog-section catalog-home container deals" aria-labelledby="DealsHeading-{{ section.id }}" {{ section.shopify_attributes }}>

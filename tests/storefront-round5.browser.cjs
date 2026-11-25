@@ -53,6 +53,8 @@ function engine(globals={}){
  liquid.registerTag('doc',ignore('enddoc'));liquid.registerTag('stylesheet',ignore('endstylesheet'));liquid.registerTag('schema',ignore('endschema'));
  liquid.registerTag('form',{parse(token,remain){this.id=(token.args.match(/id: (\w+)/)||[])[1];this.tpls=[];const stream=this.liquid.parser.parseStream(remain);stream.on('tag:endform',()=>stream.stop()).on('template',tpl=>this.tpls.push(tpl)).on('end',()=>{throw Error('endform missing');});stream.start();},
   *render(ctx,emitter){const id=this.id?yield this.liquid.evalValue(this.id,ctx):'';emitter.write(`<form method="post" action="/cart/add" id="${id}" class="catalog-card__form" data-card-cart>`);yield this.liquid.renderer.renderTemplates(this.tpls,ctx,emitter);emitter.write('</form>');}});
+ // {% paginate %} only limits the page in Shopify; here the body renders over the whole array.
+ liquid.registerTag('paginate',{parse(token,remain){this.tpls=[];const stream=this.liquid.parser.parseStream(remain);stream.on('tag:endpaginate',()=>stream.stop()).on('template',tpl=>this.tpls.push(tpl)).on('end',()=>{throw Error('endpaginate missing');});stream.start();},*render(ctx,emitter){yield this.liquid.renderer.renderTemplates(this.tpls,ctx,emitter);}});
  const lookup=key=>key.split('.').reduce((a,k)=>a?.[k],he);
  liquid.registerFilter('t',(key,...args)=>{let v=lookup(key);if(typeof v!=='string')return key;for(const [k,val] of args.filter(Array.isArray))v=v.replace(new RegExp('{{\\s*'+k+'\\s*}}','g'),val);return v;});
  liquid.registerFilter('money',c=>'₪'+(Number(c)/100).toFixed(2));

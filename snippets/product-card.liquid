@@ -40,19 +40,19 @@
           {%- assign card_cart_lines = cart.items | where: 'variant_id', card_variant.id -%}
           {%- assign card_in_cart = card_cart_lines | map: 'quantity' | sum -%}
           <div class="catalog-card__buy" data-card-buy{% if card_in_cart > 0 %} hidden{% endif %}>
-            <div class="catalog-card__stepper" data-quantity-controls role="group" aria-label="{{ 'products.product.quantity.input_label' | t: product: card_product.title | escape }}">
-              <button type="button" data-quantity-change="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: card_product.title | escape }}">−</button>
-              <input type="number" name="quantity" value="1" min="1" step="1" inputmode="numeric" aria-label="{{ 'products.product.quantity.input_label' | t: product: card_product.title | escape }}"{% if card_variant.quantity_rule.max != blank %} max="{{ card_variant.quantity_rule.max }}" data-inventory-original-max="{{ card_variant.quantity_rule.max }}"{% endif %}>
-              <button type="button" data-quantity-change="1" aria-label="{{ 'products.product.quantity.increase' | t: product: card_product.title | escape }}">+</button>
+            <div class="catalog-card__stepper" data-quantity-controls role="group" aria-label="{{ 'products.product.quantity.input_label' | t: product: card_product.title | escape_once }}">
+              <button type="button" data-quantity-change="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: card_product.title | escape_once }}">−</button>
+              <input type="number" name="quantity" value="1" min="1" step="1" inputmode="numeric" aria-label="{{ 'products.product.quantity.input_label' | t: product: card_product.title | escape_once }}"{% if card_variant.quantity_rule.max != blank %} max="{{ card_variant.quantity_rule.max }}" data-inventory-original-max="{{ card_variant.quantity_rule.max }}"{% endif %}>
+              <button type="button" data-quantity-change="1" aria-label="{{ 'products.product.quantity.increase' | t: product: card_product.title | escape_once }}">+</button>
             </div>
-            <button type="submit" class="theme-btn" name="add" aria-label="{{ 'storefront.add_to_cart_label' | t: title: card_product.title | escape }}" aria-describedby="{{ card_form_id }}-Feedback" data-pending-label="{{ 'storefront.cart_adding' | t | escape }}">{{ 'products.product.add_to_cart' | t }}</button>
+            <button type="submit" class="theme-btn" name="add" aria-label="{{ 'storefront.add_to_cart_label' | t: title: card_product.title | escape_once }}" aria-describedby="{{ card_form_id }}-Feedback" data-pending-label="{{ 'storefront.cart_adding' | t | escape }}">{{ 'products.product.add_to_cart' | t }}</button>
           </div>
           <div class="catalog-card__in-cart" data-card-in-cart data-variant-id="{{ card_variant.id }}" data-updated="{{ 'product_cards.cart_updated' | t: count: '__COUNT__' | escape }}" data-removed="{{ 'product_cards.cart_removed' | t | escape }}"{% if card_in_cart == 0 %} hidden{% endif %}>
             <span class="catalog-card__in-cart-label" aria-hidden="true">{{ 'product_cards.in_cart' | t }}</span>
-            <div class="catalog-card__stepper" role="group" aria-label="{{ 'product_cards.in_cart_label' | t: product: card_product.title | escape }}">
-              <button type="button" data-card-line-change="-1" aria-label="{{ 'product_cards.cart_decrease' | t: product: card_product.title | escape }}">−</button>
+            <div class="catalog-card__stepper" role="group" aria-label="{{ 'product_cards.in_cart_label' | t: product: card_product.title | escape_once }}">
+              <button type="button" data-card-line-change="-1" aria-label="{{ 'product_cards.cart_decrease' | t: product: card_product.title | escape_once }}">−</button>
               <span class="catalog-card__in-cart-count" data-card-in-cart-count>{{ card_in_cart }}</span>
-              <button type="button" data-card-line-change="1" aria-label="{{ 'product_cards.cart_increase' | t: product: card_product.title | escape }}">+</button>
+              <button type="button" data-card-line-change="1" aria-label="{{ 'product_cards.cart_increase' | t: product: card_product.title | escape_once }}">+</button>
             </div>
           </div>
           <p id="{{ card_form_id }}-Feedback" class="catalog-card-feedback" role="status" aria-live="polite" aria-atomic="true" data-card-feedback data-success="{{ 'storefront.cart_added' | t | escape }}" data-error="{{ 'storefront.cart_add_error' | t | escape }}" data-refresh-error="{{ 'storefront.cart_refresh_error' | t | escape }}"></p>

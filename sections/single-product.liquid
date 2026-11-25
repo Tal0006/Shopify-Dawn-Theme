@@ -52,9 +52,9 @@
           <div class="product-page__quantity-field">
             <label for="Quantity-{{ section.id }}">{{ 'products.product.quantity.label' | t }}</label>
             <div class="catalog-quantity" data-quantity-controls>
-              <button type="button" data-quantity-change="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: product.title | escape }}" disabled>−</button>
+              <button type="button" data-quantity-change="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: product.title | escape_once }}" disabled>−</button>
               <input id="Quantity-{{ section.id }}" name="quantity" type="number" min="{{ selected_variant.quantity_rule.min | default: 1 }}" step="{{ selected_variant.quantity_rule.increment | default: 1 }}" value="{{ selected_variant.quantity_rule.min | default: 1 }}" {% if selected_variant.quantity_rule.max != blank %}max="{{ selected_variant.quantity_rule.max }}"{% endif %} required>
-              <button type="button" data-quantity-change="1" aria-label="{{ 'products.product.quantity.increase' | t: product: product.title | escape }}" {% if selected_variant.quantity_rule.max != blank and selected_variant.quantity_rule.max <= selected_variant.quantity_rule.min %}disabled{% endif %}>+</button>
+              <button type="button" data-quantity-change="1" aria-label="{{ 'products.product.quantity.increase' | t: product: product.title | escape_once }}" {% if selected_variant.quantity_rule.max != blank and selected_variant.quantity_rule.max <= selected_variant.quantity_rule.min %}disabled{% endif %}>+</button>
             </div>
             {% if selected_variant.quantity_rule.min > 1 %}<small>{{ 'products.product.quantity.minimum_of' | t: quantity: selected_variant.quantity_rule.min }}</small>{% endif %}
             {% if selected_variant.quantity_rule.increment > 1 %}<small>{{ 'products.product.quantity.multiples_of' | t: quantity: selected_variant.quantity_rule.increment }}</small>{% endif %}
@@ -76,7 +76,7 @@
             {% for availability in pickup_locations %}<p>{% if availability.available %}{{ 'products.product.pickup_availability.pick_up_available_at_html' | t: location_name: availability.location.name }} — {{ availability.pick_up_time | escape }}{% else %}{{ 'products.product.pickup_availability.pick_up_unavailable_at_html' | t: location_name: availability.location.name }}{% endif %}</p>{% endfor %}
           </aside>
         {% endif %}
-        <a class="product-page__whatsapp" data-product-whatsapp data-message="{{ 'storefront.product_whatsapp_message' | t: title: product.title | escape }}" hidden>{{ 'storefront.product_whatsapp_question' | t }}</a>
+        <a class="product-page__whatsapp" data-product-whatsapp data-message="{{ 'storefront.product_whatsapp_message' | t: title: product.title | escape_once }}" hidden>{{ 'storefront.product_whatsapp_question' | t }}</a>
       </div>
       {% if product.description != blank or section.settings.shipping_text != blank or shop.shipping_policy.body != blank or section.settings.pickup_text != blank or pickup_locations.size > 0 or section.settings.usage_text != blank or section.settings.additional_text != blank %}
       <div class="product-page__accordions">

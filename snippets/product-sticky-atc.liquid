@@ -14,7 +14,7 @@
     <p class="product-sticky-atc__price"><bdi>{{ sticky_variant.price | money }}</bdi>{% if sticky_variant.compare_at_price > sticky_variant.price %} <s><bdi>{{ sticky_variant.compare_at_price | money }}</bdi></s>{% endif %}</p>
   </div>
   {%- if sticky_variant.available -%}
-    <button type="button" class="theme-btn product-sticky-atc__add" data-sticky-atc-add aria-label="{{ 'storefront.add_to_cart_label' | t: title: sticky_product.title | escape }}">{{ 'products.product.add_to_cart' | t }}</button>
+    <button type="button" class="theme-btn product-sticky-atc__add" data-sticky-atc-add aria-label="{{ 'storefront.add_to_cart_label' | t: title: sticky_product.title | escape_once }}">{{ 'products.product.add_to_cart' | t }}</button>
   {%- else -%}
     {% render 'back-in-stock-trigger', bis_product: sticky_product, bis_variant: sticky_variant, bis_class: 'product-sticky-atc__add' %}
   {%- endif -%}

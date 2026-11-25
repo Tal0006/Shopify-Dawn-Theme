@@ -10,13 +10,16 @@
           <span class="catalog-category__media{% if category.image == blank %} catalog-category__media--product{% endif %}" aria-hidden="true">
             {% if category_image != blank %}{{ category_image | image_url: width: 600 | image_tag: loading: 'lazy', widths: '180, 300, 360, 450, 600', sizes: '(min-width: 1200px) 268px, (min-width: 992px) 23vw, calc(50vw - 20px)', alt: '' }}{% endif %}
           </span>
-          <span>{{ category.title | escape }}</span>
+          <span>{{ category.title | escape }}{% if category.products_count > 0 %} <small class="catalog-category__count">{{ 'sections.featured_collection.product_count' | t: count: category.products_count }}</small>{% endif %}</span>
         </a>
       {% elsif request.design_mode %}<div class="catalog-editor-note" {{ block.shopify_attributes }}>{{ 'storefront.choose_collection' | t }}</div>{% endif %}
     {% endfor %}
   </div>
 </section>
 {% endif %}
+{% stylesheet %}
+.catalog-category__count { display: block; font-size: 13px; font-weight: 400; color: var(--fk-text-muted); }
+{% endstylesheet %}
 {% schema %}
 {
   "name": "t:storefront_editor.categories",

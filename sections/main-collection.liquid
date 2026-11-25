@@ -3,7 +3,46 @@
   {% assign collection_active_count = collection_active_count | plus: filter.active_values.size %}
   {% if filter.type == 'price_range' %}{% if filter.min_value.value != blank or filter.max_value.value != blank %}{% assign collection_active_count = collection_active_count | plus: 1 %}{% endif %}{% endif %}
 {% endfor %}
+{%- liquid
+  # Category links above the header: the main categories (blocks), then the sub-categories of the one being viewed.
+  # The exact category wins over a block that only lists this collection as a sub-category.
+  assign nav_active = 0
+  for block in section.blocks
+    if nav_active == 0 and block.settings.collection.handle == collection.handle
+      assign nav_active = forloop.index
+    endif
+  endfor
+  assign nav_position = 0
+  for block in section.blocks
+    assign nav_position = nav_position | plus: 1
+    for nav_child in block.settings.subcategories
+      if nav_active == 0 and nav_child.handle == collection.handle
+        assign nav_active = nav_position
+      endif
+    endfor
+  endfor
+  assign nav_catalog = settings.catalog_collection
+-%}
 <section class="catalog-section container collection-page" data-storefront-collection>
+  {%- if section.blocks.size > 0 -%}
+  <nav class="collection-page__nav" aria-label="{{ 'collection_page.navigation' | t }}">
+    <ul class="category-chips" role="list">
+      {%- for block in section.blocks -%}
+        {%- assign nav_category = block.settings.collection -%}
+        {%- if nav_category != blank -%}
+          <li {{ block.shopify_attributes }}><a class="category-chip" href="{{ nav_category.url }}"{% if nav_category.handle == collection.handle %} aria-current="page"{% elsif nav_active == forloop.index %} aria-current="true"{% endif %}>{{ nav_category.title | escape }}</a></li>
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if nav_catalog != blank %}<li><a class="category-chip" href="{{ nav_catalog.url }}"{% if nav_catalog.handle == collection.handle %} aria-current="page"{% endif %}>{{ 'storefront.all_products' | t }}</a></li>{% endif -%}
+    </ul>
+    {%- if nav_active > 0 -%}
+      {%- assign nav_index = nav_active | minus: 1 -%}
+      {%- assign nav_block = section.blocks[nav_index] -%}
+      {%- assign chips_label = 'collection_page.subcategories' | t: collection_name: nav_block.settings.collection.title -%}
+      {% render 'category-chips', chips: nav_block.settings.subcategories, chips_label: chips_label, chips_parent: nav_block.settings.collection, chips_current: collection.handle %}
+    {%- endif -%}
+  </nav>
+  {%- endif -%}
   <header class="collection-page__header{% if collection.image != blank %} collection-page__header--image{% endif %}">
     <div>
       <h1>{{ collection.title | escape }}</h1>
@@ -22,8 +61,12 @@
   </div>
   {% paginate collection.products by section.settings.product_limit %}
     {% if collection.products_count > 0 %}
-      {%- comment -%}In-stock products first within this page; collection sort order is kept inside each group.{%- endcomment -%}
-      <div class="catalog-grid">{% for card_product in collection.products %}{% if card_product.available %}{% render 'product-card', card_product: card_product %}{% endif %}{% endfor %}{% for card_product in collection.products %}{% unless card_product.available %}{% render 'product-card', card_product: card_product %}{% endunless %}{% endfor %}</div>
+      {%- comment -%}
+        In-stock products first within this page, and among them the discounted ones (compare-at price above the price)
+        unless the shopper chose a sort order; the collection's order is kept inside each group.
+      {%- endcomment -%}
+      {%- assign discount_first = false -%}{%- if collection.sort_by == blank or collection.sort_by == collection.default_sort_by -%}{%- assign discount_first = true -%}{%- endif -%}
+      <div class="catalog-grid">{% for grid_pass in (1..2) %}{% for card_product in collection.products %}{% assign card_pass = 2 %}{% if discount_first and card_product.compare_at_price > card_product.price %}{% assign card_pass = 1 %}{% endif %}{% if card_pass == grid_pass %}{% if card_product.available %}{% render 'product-card', card_product: card_product %}{% endif %}{% endif %}{% endfor %}{% endfor %}{% for card_product in collection.products %}{% unless card_product.available %}{% render 'product-card', card_product: card_product %}{% endunless %}{% endfor %}</div>
     {% else %}
       <div class="collection-page__empty" role="status">
         {% if collection_active_count > 0 %}<h2>{{ 'collection_page.no_matches' | t }}</h2><a class="theme-btn" href="{{ collection.url }}">{{ 'collection_page.clear' | t }}</a>
@@ -35,6 +78,9 @@
 </section>
 
 {% stylesheet %}
+.collection-page__nav { display: grid; gap: 10px; min-width: 0; margin-block-end: 16px; }
+.collection-page__nav > * { min-width: 0; }
+.collection-page__nav > .category-chips + .category-chips .category-chip { padding-inline: 14px; font-weight: 500; }
 .collection-page { padding-block: clamp(20px, 3vw, 36px); }
 .collection-page__header { padding: clamp(18px, 3vw, 28px); margin-block-end: 20px; border: 1px solid var(--storefront-border-soft, #cfdfe4); border-radius: 16px; background: linear-gradient(130deg, #fff, #ecf8fa); box-shadow: var(--storefront-shadow); }
 .collection-page__header--image { display: grid; grid-template-columns: minmax(0,1fr) 180px; gap: 20px; align-items: center; }
@@ -109,6 +155,28 @@
       "max": 48,
       "step": 4,
       "default": 24
+    }
+  ],
+  "max_blocks": 8,
+  "blocks": [
+    {
+      "type": "category",
+      "name": "t:storefront_editor.category",
+      "settings": [
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "t:storefront_editor.collection",
+          "info": "t:storefront_editor.category_info"
+        },
+        {
+          "type": "collection_list",
+          "id": "subcategories",
+          "label": "t:storefront_editor.subcategories",
+          "info": "t:storefront_editor.subcategories_info",
+          "limit": 12
+        }
+      ]
     }
   ]
 }

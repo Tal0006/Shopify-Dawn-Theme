@@ -31,12 +31,12 @@
                 <p class="cart-drawer__price"><bdi>{{ item.final_line_price | money }}</bdi>{% if item.original_line_price > item.final_line_price %} <s><bdi>{{ item.original_line_price | money }}</bdi></s>{% endif %}</p>
                 <div class="cart-drawer__controls">
                   <div class="cart-drawer__quantity">
-                    <button type="button" data-cart-delta="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: item.product.title | escape }}" {% if item.quantity <= quantity_min %}disabled{% endif %}>−</button>
+                    <button type="button" data-cart-delta="-1" aria-label="{{ 'products.product.quantity.decrease' | t: product: item.product.title | escape_once }}" {% if item.quantity <= quantity_min %}disabled{% endif %}>−</button>
                     <label class="sr-only" for="DrawerQty-{{ drawer_id }}-{{ forloop.index }}">{{ 'products.product.quantity.label' | t }}: {{ item.product.title | escape }}</label>
                     <input id="DrawerQty-{{ drawer_id }}-{{ forloop.index }}" type="number" name="updates[]" value="{{ item.quantity }}" min="{{ quantity_min }}" step="{{ quantity_step }}" {% if item.variant.quantity_rule.max != blank %}max="{{ item.variant.quantity_rule.max }}"{% endif %} data-cart-quantity>
-                    <button type="button" data-cart-delta="1" aria-label="{{ 'products.product.quantity.increase' | t: product: item.product.title | escape }}" {% if item.variant.quantity_rule.max != blank and item.quantity >= item.variant.quantity_rule.max %}disabled{% endif %}>+</button>
+                    <button type="button" data-cart-delta="1" aria-label="{{ 'products.product.quantity.increase' | t: product: item.product.title | escape_once }}" {% if item.variant.quantity_rule.max != blank and item.quantity >= item.variant.quantity_rule.max %}disabled{% endif %}>+</button>
                   </div>
-                  <a href="{{ item.url_to_remove }}" data-cart-remove aria-label="{{ 'sections.cart.remove_title' | t: title: item.product.title | escape }}">{{ 'storefront.remove' | t }}</a>
+                  <a href="{{ item.url_to_remove }}" data-cart-remove aria-label="{{ 'sections.cart.remove_title' | t: title: item.product.title | escape_once }}">{{ 'storefront.remove' | t }}</a>
                 </div>
               </div>
             </article>

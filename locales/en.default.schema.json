@@ -3434,6 +3434,16 @@
     }
   },
   "storefront_editor": {
+    "view_all_text": "View all link text",
+    "view_all_text_info": "Blank uses an automatic text with the collection name.",
+    "show_count": "Show product count",
+    "subcategories": "Subcategories",
+    "subcategories_info": "Short links to existing collections. Empty collections are hidden.",
+    "promotion_tag": "Promotion tag (optional)",
+    "promotion_tag_info": "In-stock products with this tag are listed first, with products that have a compare-at price. Affects the order only.",
+    "mobile_layout": "Mobile layout",
+    "mobile_layout_carousel": "Carousel",
+    "mobile_layout_grid": "Grid",
     "heading": "Heading",
     "subtitle": "Subtitle",
     "collection": "Collection",

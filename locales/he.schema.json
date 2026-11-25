@@ -9,6 +9,16 @@
  */
 {
   "storefront_editor": {
+    "view_all_text": "טקסט הקישור לכל המוצרים",
+    "view_all_text_info": "לדוגמה: לכל מוצרי הכביסה. ריק = נוסח אוטומטי עם שם הקטגוריה.",
+    "show_count": "הצגת מספר המוצרים",
+    "subcategories": "תתי־קטגוריות",
+    "subcategories_info": "קישורים קצרים לקטגוריות קיימות. קטגוריות ריקות אינן מוצגות.",
+    "promotion_tag": "תגית מבצע (אופציונלי)",
+    "promotion_tag_info": "מוצרים במלאי עם התגית יוצגו ראשונים, יחד עם מוצרים שיש להם מחיר לפני הנחה. משפיע על הסדר בלבד.",
+    "mobile_layout": "תצוגה בנייד",
+    "mobile_layout_carousel": "גלילה לצד",
+    "mobile_layout_grid": "רשת",
     "heading": "כותרת",
     "subtitle": "כותרת משנה",
     "collection": "קטגוריה",

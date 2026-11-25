@@ -1,9 +1,12 @@
 {% for link in menu.links %}
   {% if link.links != blank %}
     {% assign navigation_panel_id = 'NavSubmenu-' | append: section.id | append: '-' | append: forloop.index %}
-    <li class="nav-disclosure" data-nav-disclosure>
-      <button id="{{ navigation_panel_id }}-Trigger" class="nav-mega-trigger submenu-toggle{% if link.active %} is-active{% endif %}" type="button" data-mega-trigger aria-expanded="false" aria-controls="{{ navigation_panel_id }}">
-        <span>{{ link.title | escape }}</span><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    {%- assign navigation_linked = true -%}{%- if link.url == '#' or link.url == blank -%}{%- assign navigation_linked = false -%}{%- endif -%}
+    {%- assign navigation_nested = false -%}{%- for child in link.links -%}{%- if child.links != blank -%}{%- assign navigation_nested = true -%}{%- endif -%}{%- endfor -%}
+    <li class="nav-disclosure{% if navigation_linked %} nav-disclosure--linked{% endif %}{% unless navigation_nested %} nav-disclosure--flat{% endunless %}" data-nav-disclosure>
+      {% if navigation_linked %}<a class="nav-mega-link" href="{{ link.url }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.title | escape }}</a>{% endif %}
+      <button id="{{ navigation_panel_id }}-Trigger" class="nav-mega-trigger submenu-toggle{% if link.active %} is-active{% endif %}" type="button" data-mega-trigger aria-expanded="false" aria-controls="{{ navigation_panel_id }}"{% if navigation_linked %} aria-label="{{ 'collection_page.subcategories' | t: collection_name: link.title }}"{% endif %}>
+        {% unless navigation_linked %}<span>{{ link.title | escape }}</span>{% endunless %}<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
       </button>
       <div id="{{ navigation_panel_id }}" class="nav-mega-panel" data-mega-panel role="region" aria-labelledby="{{ navigation_panel_id }}-Trigger" hidden>
         <ul class="nav-mega-groups" role="list">

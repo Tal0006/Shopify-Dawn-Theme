@@ -331,7 +331,15 @@
     },
     "featured_collection": {
       "view_all": "לכל המוצרים",
-      "view_all_label": "לכל המוצרים בקטגוריית {{ collection_name }}"
+      "view_all_label": "לכל המוצרים בקטגוריית {{ collection_name }}",
+      "product_count": {
+        "one": "מוצר אחד",
+        "other": "{{ count }} מוצרים"
+      },
+      "more_products": {
+        "one": "עוד מוצר אחד",
+        "other": "עוד {{ count }} מוצרים"
+      }
     },
     "collection_list": {
       "view_all": "לכל הקטגוריות"
@@ -572,7 +580,7 @@
     "about_subtitle": "ניקיון, כביסה וטיפוח",
     "about_text": "<p>מבחר מוצרים לניקיון הבית ולטיפוח, במקום אחד.</p>",
     "hero_title": "כל מה שצריך לבית נקי",
-    "hero_subtitle": "ניקיון, כביסה, טואלטיקה ועוד",
+    "hero_subtitle": "ניקוי, כביסה, טיפוח אישי ועוד",
     "featured_title": "מוצרים נבחרים",
     "feature_title": "בשביל הבית שלך",
     "feature_description": "מגלים את המוצרים שמתאימים לך.",
@@ -761,6 +769,9 @@
     "secure": "תשלום מאובטח"
   },
   "collection_page": {
+    "navigation": "מעבר בין קטגוריות",
+    "subcategories": "תתי־קטגוריות: {{ collection_name }}",
+    "all": "הכול",
     "description": "פרטי הקטגוריה",
     "no_matches": "לא מצאנו מוצרים שמתאימים לסינון שבחרת",
     "clear": "נקה סינון",

@@ -18,7 +18,7 @@ test('Theme settings, footer placement and no review gating',()=>{
  assert.equal(byId.google_review_enabled.default,true);
  assert.equal(byId.google_review_url.default,REVIEW_URL);
  for(const id of ['google_review_heading','google_review_text','google_review_button'])assert.equal(byId[id].default,undefined,id+' falls back to translations');
- for(const locale of ['he.schema.json','en.default.schema.json']){const keys=JSON.parse(read('locales/'+locale)).google_review_editor;for(const item of group.settings)for(const value of [item.label,item.info,item.content].filter(Boolean))assert.ok(keys[value.replace('t:google_review_editor.','')],locale+' '+value);}
+ for(const locale of ['he.schema.json','en.default.schema.json']){const keys=JSON.parse(read('locales/'+locale).replace(/^\s*\/\*[\s\S]*?\*\//,'')).google_review_editor;for(const item of group.settings)for(const value of [item.label,item.info,item.content].filter(Boolean))assert.ok(keys[value.replace('t:google_review_editor.','')],locale+' '+value);}
  assert.equal(tr.google_review.heading,'נהניתם מהשירות?');
  assert.equal(tr.google_review.text,'נשמח לשמוע מה חשבתם ולעזור ללקוחות נוספים להכיר את פאנקי');
  assert.equal(tr.google_review.button,'כתבו לנו ביקורת בגוגל');

@@ -57,27 +57,46 @@
     "laundry": {
       "type": "featured-collection",
       "settings": {
-        "heading": "כביסה",
         "product_limit": 8,
         "show_view_all": true,
+        "view_all_text": "לכל מוצרי הכביסה",
+        "subcategories": [
+          "גל-כביסה",
+          "אבקת-כביסה",
+          "מרכך-כביסה",
+          "מסיר-כתמים"
+        ],
         "collection": "כביסה"
       }
     },
     "cleaning": {
       "type": "featured-collection",
       "settings": {
-        "heading": "ניקיון כללי",
         "product_limit": 8,
         "show_view_all": true,
+        "view_all_text": "לכל מוצרי הניקוי הכללי",
+        "subcategories": [
+          "רצפות-1",
+          "ניקוי-כלים"
+        ],
         "collection": "ניקיון-כללי"
       }
     },
     "toiletries": {
       "type": "featured-collection",
       "settings": {
-        "heading": "טואלטיקה",
         "product_limit": 8,
         "show_view_all": true,
+        "view_all_text": "לכל מוצרי הטיפוח",
+        "subcategories": [
+          "תרחיץ-פנים",
+          "דאודורנט",
+          "נקה-7",
+          "כיף",
+          "אל-סבון",
+          "בייבי-וילדים",
+          "החלקה"
+        ],
         "collection": "טואלטיקה"
       }
     },
@@ -95,6 +114,7 @@
         "heading": "חד־פעמי",
         "product_limit": 8,
         "show_view_all": true,
+        "view_all_text": "לכל המוצרים החד־פעמיים",
         "collection": "חד-פעמי-1"
       }
     },

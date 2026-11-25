@@ -8,7 +8,7 @@ const logo='data:image/png;base64,'+fs.readFileSync(path.join(__dirname,'..','fi
 const he=JSON.parse(read('locales/he.default.json').replace(/^\s*\/\*[\s\S]*?\*\//,''));
 let Liquid;try{({Liquid}=require('liquidjs'));}catch{Liquid=null;}
 // The real header section rendered with liquidjs; Shopify-only tags/filters are replaced by simple equivalents.
-async function headerPage({sticky=true,body=null}={}){
+async function headerPage({sticky=true,body=null,menu:customMenu=null}={}){
  const globals={settings:{sticky_header:sticky,catalog_collection:null,group_delivery_navigation:false,announcement_enabled:true,announcement_1_text:'משלוח חינם מ-150 ₪',announcement_2_text:'איסוף עצמי מבאר שבע'},shop:{name:'פאנקי',customer_accounts_enabled:true,url:'https://fanakee.com'},routes:{root_url:'/',account_url:'/account',cart_url:'/cart',search_url:'/search',all_products_collection_url:'/collections/all',collections_url:'/collections',predictive_search_url:'/search/suggest'},cart:{item_count:2,items:[],total_price:3180,currency:{iso_code:'ILS'},note:''},request:{page_type:'index',path:'/'},pages:{},collections:{}};
  globals.cart['empty?']=false;
  const liquid=new Liquid({root:[path.join(root,'snippets')],extname:'.liquid',globals});
@@ -21,7 +21,7 @@ async function headerPage({sticky=true,body=null}={}){
  liquid.registerFilter('money',c=>'₪'+(Number(c)/100).toFixed(2));
  liquid.registerFilter('image_url',img=>img?.src||logo);
  liquid.registerFilter('image_tag',(src,...args)=>{const o=Object.fromEntries(args.filter(Array.isArray));return `<img src="${src}" alt="${o.alt??''}" width="170" height="147">`;});
- const menu={links:[{title:'קטלוג',url:'/collections/all',active:false,current:false,links:[{title:'כביסה',url:'/collections/laundry',current:false,links:[{title:'מרכך',url:'/collections/s',current:false,links:[]}]}]},{title:'צור קשר',url:'/pages/contact',active:false,current:false,links:[]}]};
+ const menu=customMenu||{links:[{title:'קטלוג',url:'/collections/all',active:false,current:false,links:[{title:'כביסה',url:'/collections/laundry',current:false,links:[{title:'מרכך',url:'/collections/s',current:false,links:[]}]}]},{title:'צור קשר',url:'/pages/contact',active:false,current:false,links:[]}]};
  const strip=s=>s.replace(/{% schema %}[\s\S]*?{% endschema %}/,'').replace(/{% stylesheet %}[\s\S]*?{% endstylesheet %}/,'');
  const header=await liquid.parseAndRender(strip(read('sections/header.liquid')),{section:{id:'header',settings:{logo:{src:logo,alt:'פאנקי'},menu}}});
  const announcement=await liquid.renderFile('announcement-bar',{});
