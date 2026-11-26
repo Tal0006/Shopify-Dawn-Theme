@@ -34,7 +34,7 @@
   {% comment %}Server-owned delivery areas (GET /api/v1/areas) in an ARIA 1.2 combobox; options are filled by group-delivery.js.{% endcomment %}
   <label id="GroupAreaLabel-{{ section.id }}" for="GroupArea-{{ section.id }}">{{ 'group_delivery.location' | t }}</label>
   <div class="group-delivery__combobox" data-area-picker>
-   <input id="GroupArea-{{ section.id }}" name="area" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="GroupAreaList-{{ section.id }}" autocomplete="off" required maxlength="60" placeholder="{{ 'group_delivery.area_placeholder' | t | escape }}" aria-describedby="GroupLocationHint-{{ section.id }} GroupAreaSelected-{{ section.id }}" data-area-input>
+   <input id="GroupArea-{{ section.id }}" name="area" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="GroupAreaList-{{ section.id }}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" required maxlength="60" placeholder="{{ 'group_delivery.area_placeholder' | t | escape }}" aria-describedby="GroupLocationHint-{{ section.id }} GroupAreaSelected-{{ section.id }}" data-area-input>
    <ul id="GroupAreaList-{{ section.id }}" class="group-delivery__options" role="listbox" aria-labelledby="GroupAreaLabel-{{ section.id }}" hidden data-area-list></ul>
   </div>
   <p id="GroupAreaSelected-{{ section.id }}" class="group-delivery__selected" data-area-selected hidden></p>

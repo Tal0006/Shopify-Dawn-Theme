@@ -138,6 +138,46 @@ test('Group delivery settlement picker: touch scrolling, taps, outside taps, key
    assert.equal(s.area,'אשקלון');assert.equal(await ev('changes'),0,'no input events from touch');
   });
 
+  for(const width of [390,320])await t.test(width+'px: typing on the on-screen keyboard, then a tap: the field shows the tapped name',async()=>{
+   // Phone keyboards keep the typed letters "in progress" (an IME composition) until they commit them. Writing the
+   // name while the letters are still composing let the keyboard put its letters back afterwards.
+   for(const [typed,choice] of [['אש','אשקלון'],['ש','שדרות'],['נ','נתיבות']]){
+    await load(width);await openByTap();
+    await call('Input.imeSetComposition',{text:typed,selectionStart:typed.length,selectionEnd:typed.length});await frames();
+    assert.ok((await ev(`[...${list}.children].map(o=>o.textContent)`)).includes(choice),'filtered list shows '+choice);
+    const o=await optionBox(choice);await tap(o.x,o.y);
+    // What the keyboard does next: it commits the letters it was composing (on blur, or on its next key).
+    await call('Input.insertText',{text:''}).catch(()=>{});await ev(`${input}.blur()`);await frames();await sleep(150);
+    const s=await state(),shown=await ev(`({value:${input}.value,id:${W}.area?.publicId||null,label:${W}.querySelector('[data-area-selected]').textContent})`);
+    assert.equal(shown.value,choice,'the field shows the tapped settlement (typed "'+typed+'")');
+    assert.equal(shown.id,AREAS[NAMES.indexOf(choice)].publicId,'the chosen id matches the shown name');
+    assert.equal(s.open,false);assert.match(shown.label,new RegExp(choice));
+   }
+  });
+  await t.test('Safari-like: no click after a tap, the name still appears; a ghost click on the search button is swallowed',async()=>{
+   const seen=async choice=>({value:await ev(input+'.value'),id:await ev(W+'.area?.publicId||null'),open:!(await ev(list+'.hidden')),label:await ev(`${W}.querySelector('[data-area-selected]').textContent`),want:AREAS[NAMES.indexOf(choice)].publicId});
+   for(const width of [390,320]){
+    await load(width);
+    // Safari on iOS may send no click after a touch: block every click, so only the tap itself can choose.
+    await ev(`window.clicks=0;addEventListener('click',e=>{clicks++;e.stopImmediatePropagation();e.preventDefault();},true)`);
+    let l=await openByTap();await swipe(l.x,l.bottom-20,l.top+20,{steps:6});
+    const o=await optionBox('אשקלון');await tap(o.x,o.y);let r=await seen('אשקלון');
+    assert.deepEqual([r.value,r.id,r.open],['אשקלון',r.want,false],'tap without click at '+width);assert.match(r.label,/אשקלון/);
+   }
+   // Ghost click: the option chosen lies over the search button; the browser's click for that tap must not search.
+   await load(390);await ev(`window.searchClicks=0;${W}.querySelector('[data-find-group] button[type=submit]').addEventListener('click',()=>searchClicks++)`);
+   let l=await openByTap();
+   const spot=await ev(`(()=>{const b=${W}.querySelector('[data-find-group] button[type=submit]').getBoundingClientRect();for(const o of ${list}.children){const r=o.getBoundingClientRect(),l=${list}.getBoundingClientRect();const top=Math.max(r.top,b.top,l.top),bottom=Math.min(r.bottom,b.bottom,l.bottom),left=Math.max(r.left,b.left),right=Math.min(r.right,b.right);if(bottom-top>8&&right-left>8)return {x:(left+right)/2,y:(top+bottom)/2,name:o.textContent};}return null})()`);
+   assert.ok(spot,'fixture: an open option covers the search button');
+   await ev('calls.length=0');await tap(spot.x,spot.y);await sleep(300);
+   assert.equal(await ev(input+'.value'),spot.name,'the tapped name is shown');assert.equal(await ev('searchClicks'),0,'the search button did not get the tap');
+   assert.equal(await ev(`calls.filter(c=>c.path.endsWith('/groups/find')).length`),0,'no search was started');
+   // The next real tap on the button works again.
+   const b=await box(`${W}.querySelector('[data-find-group] button[type=submit]')`);await sleep(800);await tap(b.x,b.y);await wait('searchClicks===1');
+   // Screen readers activate an option with a click and no pointer.
+   await load(390);await openByTap();await ev(`[...${list}.children].find(o=>o.textContent==='נטע').click()`);
+   assert.equal(await ev(input+'.value'),'נטע');assert.equal(await ev(list+'.hidden'),true);
+  });
   await t.test('Typing still filters; keyboard still works; the chosen settlement is what the search sends',async()=>{
    await load(390);await openByTap();
    await ev(`${input}.value='אש';${input}.dispatchEvent(new Event('input',{bubbles:true}))`);

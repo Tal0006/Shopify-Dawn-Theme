@@ -85,23 +85,40 @@
    // Tapping the field while the list is open must not rebuild it (that would reset its scroll position).
    this.areaInput.addEventListener('click',()=>{if(this.areaList.hidden)this.openAreas();},options);
    this.areaInput.addEventListener('focus',()=>this.openAreas(),options);
-   // An option is chosen on click, which browsers send only for a tap: a finger that scrolls the list gets
-   // pointercancel instead. Choosing on pointerdown selected (and closed) on the first touch of every swipe.
-   // pointerdown only keeps focus in the input, so the keyboard and the combobox context stay.
+   // A tap on an option chooses it when the finger lifts (pointerup), with no movement and no scroll in between. A
+   // swipe never gets that far: the browser takes the gesture over for scrolling and sends pointercancel instead.
+   // Selection never waits for click: Safari on iOS sends no click after a touch whose pointerdown was cancelled, so
+   // pointerdown is never cancelled. Focus stays in the field through mousedown instead (below).
    this.areaList.addEventListener('pointerdown',event=>{
-    if(!event.target.closest('[role=option]'))return;
-    event.preventDefault();
-    // A finger on a list that is still moving (a fling) only stops it, as in native lists; it is not a choice.
-    // Mouse and keyboard scrolling are never a fling, so their next click always counts.
-    this.areaPress={x:event.clientX,y:event.clientY,scroll:this.areaList.scrollTop,stops:event.pointerType==='touch'&&performance.now()-this.areaScrolled<150};
+    const option=event.target.closest('[role=option]');if(!option)return;
+    this.areaPointerAt=performance.now();
+    // A finger on a list that is still flinging only stops it, as in native lists; it is not a choice.
+    const touch=event.pointerType==='touch'||event.pointerType==='pen';
+    this.areaPress={id:event.pointerId,option,touch,x:event.clientX,y:event.clientY,scroll:this.areaList.scrollTop,stops:touch&&performance.now()-this.areaScrolled<100&&this.areaScrollStep>=3};
    },options);
-   this.areaScrolled=-Infinity;
-   this.areaList.addEventListener('scroll',()=>{this.areaScrolled=performance.now();},{...options,passive:true});
+   // Pressing the list (mouse, or the mousedown a browser sends after a tap) must not move focus out of the field:
+   // that would close the list without a choice.
+   this.areaList.addEventListener('mousedown',event=>event.preventDefault(),options);
+   this.areaList.addEventListener('pointermove',event=>{const press=this.areaPress;if(press?.id===event.pointerId&&Math.hypot(event.clientX-press.x,event.clientY-press.y)>10)this.areaPress=null;},{...options,passive:true});
+   this.areaList.addEventListener('pointercancel',()=>{this.areaPress=null;},options);
+   this.areaList.addEventListener('pointerup',event=>{
+    const press=this.areaPress;this.areaPress=null;
+    if(!press||press.id!==event.pointerId||press.stops||Math.abs(this.areaList.scrollTop-press.scroll)>2)return;
+    if(event.target.closest('[role=option]')!==press.option)return;
+    const area=this.areas.find(item=>item.publicId===press.option.dataset.areaId);if(area)this.pickArea(area,press.touch);
+   },options);
+   this.areaScrolled=-Infinity;this.areaScrollStep=0;this.areaPointerAt=-Infinity;
+   this.areaList.addEventListener('scroll',()=>{const top=this.areaList.scrollTop;this.areaScrollStep=Math.abs(top-(this.areaLastTop??top));this.areaLastTop=top;this.areaScrolled=performance.now();},{...options,passive:true});
+   // A click without a pointer before it (screen readers, switch access) still chooses the option.
    this.areaList.addEventListener('click',event=>{
-    const option=event.target.closest('[role=option]'),press=this.areaPress;this.areaPress=null;
-    if(!option||!press||press.stops||Math.abs(this.areaList.scrollTop-press.scroll)>2||Math.hypot(event.clientX-press.x,event.clientY-press.y)>12)return;
-    const area=this.areas.find(item=>item.publicId===option.dataset.areaId);if(area)this.selectArea(area);
+    if(performance.now()-this.areaPointerAt<1000)return;
+    const option=event.target.closest('[role=option]'),area=option&&this.areas.find(item=>item.publicId===option.dataset.areaId);if(area)this.selectArea(area);
    },options);
+   // After a touch choice the list is gone, so the browser's follow-up mouse events and click for that same tap would
+   // land on whatever lies beneath it (the search button). They are swallowed for a moment.
+   for(const type of ['mousedown','mouseup','click'])document.addEventListener(type,event=>{
+    if(performance.now()<this.ghostUntil&&!this.areaList.contains(event.target)){event.preventDefault();event.stopPropagation();if(type==='click')this.ghostUntil=0;}
+   },{...options,capture:true});
    this.querySelector('[data-area-picker]').addEventListener('focusout',event=>{if(!this.querySelector('[data-area-picker]').contains(event.relatedTarget))this.closeAreas();},options);
    // Outside: a tap closes the list, a swipe that scrolls the page does not (touch scrolling ends in pointercancel,
    // never pointerup). pointerup, not click: iOS sends no click for taps on plain content.
@@ -197,6 +214,12 @@
   onAreaInput(){
    if(this.area&&this.areaInput.value!==this.area.name)this.clearArea();
    this.invalidateSearch();this.renderAreas(this.areaInput.value);
+  }
+  // A touch choice: the phone keyboard first finishes what it was typing (blur commits it), so it cannot write its
+  // letters back over the chosen name afterwards; then the name is set. Closing the keyboard also shows the result.
+  pickArea(area,touch){
+   if(touch){this.ghostUntil=performance.now()+700;if(document.activeElement===this.areaInput)this.areaInput.blur();}
+   this.selectArea(area);
   }
   selectArea(area){
    const changed=this.area?.publicId!==area.publicId;
