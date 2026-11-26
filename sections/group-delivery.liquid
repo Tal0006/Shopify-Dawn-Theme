@@ -199,7 +199,7 @@ body:has(.a11y-launcher:not([hidden])) .group-delivery {padding-inline-end:max(1
    sits one layer over its sibling controls, and the search form one layer over later Group Delivery content. */
 .group-delivery [data-find-group] {position:relative;z-index:1;}
 .group-delivery__combobox {position:relative;z-index:1;min-width:0;}
-.group-delivery__options {position:absolute;z-index:1;inset-inline:0;inset-block-start:calc(100% + 4px);max-height:min(280px,50vh);overflow-y:auto;overscroll-behavior:contain;margin:0;padding:6px;list-style:none;border:1px solid #aacbd2;border-radius:12px;background:#fff;box-shadow:0 8px 24px #194e5b1f;}
+.group-delivery__options {position:absolute;z-index:1;inset-inline:0;inset-block-start:calc(100% + 4px);max-height:var(--group-area-list-max,min(280px,50vh));overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-tap-highlight-color:transparent;margin:0;padding:6px;list-style:none;border:1px solid #aacbd2;border-radius:12px;background:#fff;box-shadow:0 8px 24px #194e5b1f;}
 .group-delivery__options[hidden] {display:none;}
 .group-delivery__options [role=option] {display:flex;align-items:center;min-height:44px;padding:8px 12px;border-radius:8px;cursor:pointer;overflow-wrap:anywhere;}
 .group-delivery__options [role=option][aria-selected=true] {font-weight:600;color:var(--storefront-accent,#086b7b);}

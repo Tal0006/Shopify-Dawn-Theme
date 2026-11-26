@@ -417,8 +417,9 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
    assert.equal(await ev(list+'.querySelector("[aria-selected=true]").textContent'),'אשקלון');
    await key('Escape');assert.equal(await ev(list+'.hidden'),true);assert.equal(await ev('widget.area.publicId'),ASHKELON,'Escape closes without changing the selection');
    await key('Escape');assert.equal(await ev(input+'.value'),'');assert.equal(await ev('widget.area'),null,'second Escape clears');
-   // Pointer selection.
-   await ev(input+'.focus();'+list+'.querySelectorAll("[role=option]")[3].dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,cancelable:true}))');
+   // Pointer selection: a complete press (down, then the click browsers send only for a tap). A lone pointerdown is
+   // the start of every touch swipe and selects nothing (tests/group-delivery-touch.browser.cjs).
+   await ev(input+'.focus();(()=>{const o='+list+'.querySelectorAll("[role=option]")[3];o.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,cancelable:true}));o.dispatchEvent(new PointerEvent("pointerup",{bubbles:true,cancelable:true}));o.click();})()');
    assert.equal(await ev('widget.area.name'),'קריית גת');
    // No match: no listbox, a clear message, and search is refused without a request.
    await type('zzz');
@@ -477,7 +478,7 @@ const html='<html dir="rtl" lang="he"><head><meta name="viewport" content="width
     assert.equal(await ev(list+'.querySelector("[data-active]").textContent'),'שדרות');
     const last=await ev('(()=>{const o='+list+'.querySelector("[data-active]").getBoundingClientRect(),l='+list+'.getBoundingClientRect();return o.top>=l.top-1&&o.bottom<=l.bottom+1})()');
     assert.equal(last,true,'active option scrolled into view');
-    const clicked=await ev('(()=>{const o='+list+'.querySelector("[data-active]").getBoundingClientRect();const hit=document.elementFromPoint(o.left+o.width/2,o.top+o.height/2);hit.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,cancelable:true}));return widget.area?.name})()');
+    const clicked=await ev('(()=>{const o='+list+'.querySelector("[data-active]").getBoundingClientRect();const hit=document.elementFromPoint(o.left+o.width/2,o.top+o.height/2);const at={bubbles:true,cancelable:true,clientX:o.left+o.width/2,clientY:o.top+o.height/2};hit.dispatchEvent(new PointerEvent("pointerdown",at));hit.dispatchEvent(new PointerEvent("pointerup",at));hit.dispatchEvent(new MouseEvent("click",at));return widget.area?.name})()');
     assert.equal(clicked,'שדרות','pointer on the visible option selects it');
     assert.equal(await ev(list+'.hidden'),true);
     // Closed: the button is the topmost element at its own center again.

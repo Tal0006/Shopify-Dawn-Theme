@@ -82,15 +82,35 @@
    this.querySelector('[data-verify-secondary]').addEventListener('click',()=>this.verifyActions?.secondary?.(),options);
    this.areaInput.addEventListener('input',()=>this.onAreaInput(),options);
    this.areaInput.addEventListener('keydown',event=>this.onAreaKeydown(event),options);
-   this.areaInput.addEventListener('click',()=>this.openAreas(),options);
+   // Tapping the field while the list is open must not rebuild it (that would reset its scroll position).
+   this.areaInput.addEventListener('click',()=>{if(this.areaList.hidden)this.openAreas();},options);
    this.areaInput.addEventListener('focus',()=>this.openAreas(),options);
-   // pointerdown keeps focus in the input, so selection never loses the combobox context.
+   // An option is chosen on click, which browsers send only for a tap: a finger that scrolls the list gets
+   // pointercancel instead. Choosing on pointerdown selected (and closed) on the first touch of every swipe.
+   // pointerdown only keeps focus in the input, so the keyboard and the combobox context stay.
    this.areaList.addEventListener('pointerdown',event=>{
-    const option=event.target.closest('[role=option]');if(!option)return;
-    event.preventDefault();const area=this.areas.find(item=>item.publicId===option.dataset.areaId);if(area)this.selectArea(area);
+    if(!event.target.closest('[role=option]'))return;
+    event.preventDefault();
+    // A finger on a list that is still moving (a fling) only stops it, as in native lists; it is not a choice.
+    // Mouse and keyboard scrolling are never a fling, so their next click always counts.
+    this.areaPress={x:event.clientX,y:event.clientY,scroll:this.areaList.scrollTop,stops:event.pointerType==='touch'&&performance.now()-this.areaScrolled<150};
+   },options);
+   this.areaScrolled=-Infinity;
+   this.areaList.addEventListener('scroll',()=>{this.areaScrolled=performance.now();},{...options,passive:true});
+   this.areaList.addEventListener('click',event=>{
+    const option=event.target.closest('[role=option]'),press=this.areaPress;this.areaPress=null;
+    if(!option||!press||press.stops||Math.abs(this.areaList.scrollTop-press.scroll)>2||Math.hypot(event.clientX-press.x,event.clientY-press.y)>12)return;
+    const area=this.areas.find(item=>item.publicId===option.dataset.areaId);if(area)this.selectArea(area);
    },options);
    this.querySelector('[data-area-picker]').addEventListener('focusout',event=>{if(!this.querySelector('[data-area-picker]').contains(event.relatedTarget))this.closeAreas();},options);
-   document.addEventListener('pointerdown',event=>{if(!this.querySelector('[data-area-picker]')?.contains(event.target))this.closeAreas();},options);
+   // Outside: a tap closes the list, a swipe that scrolls the page does not (touch scrolling ends in pointercancel,
+   // never pointerup). pointerup, not click: iOS sends no click for taps on plain content.
+   // A press that starts in the picker is never an outside tap, even if the page moved under the pointer meanwhile.
+   const inPicker=target=>!!this.querySelector('[data-area-picker]')?.contains(target);
+   document.addEventListener('pointerdown',event=>{this.pressOutside=!inPicker(event.target);},{...options,capture:true});
+   document.addEventListener('pointerup',event=>{if(this.pressOutside&&!inPicker(event.target))this.closeAreas();this.pressOutside=false;},options);
+   // Keep the open list inside the visible screen (the on-screen keyboard shrinks it on phones).
+   window.visualViewport?.addEventListener('resize',()=>{if(!this.areaList.hidden)this.fitAreas();},options);
    // The only geolocation request; it needs this explicit click.
    this.querySelector('[data-geolocate]').addEventListener('click',()=>{void this.locate();},options);
    this.querySelector('[data-resume-primary]').addEventListener('click',()=>this.resumeActions?.primary?.(),options);
@@ -137,8 +157,16 @@
     const option=document.createElement('li');option.id=listId+'-'+index;option.setAttribute('role','option');option.dataset.areaId=area.publicId;
     option.setAttribute('aria-selected',String(this.area?.publicId===area.publicId));option.textContent=area.name;return option;
    }));
-   this.areaList.hidden=false;this.areaInput.setAttribute('aria-expanded','true');
+   this.areaList.hidden=false;this.areaInput.setAttribute('aria-expanded','true');this.fitAreas();
    this.setActive(this.options.findIndex(area=>area.publicId===this.area?.publicId));
+  }
+  // The list uses the visible space below the field (the on-screen keyboard excluded), up to 6 options high. With
+  // room for fewer than 4, the page first moves the field up (never above the sticky header area) so the list fits.
+  fitAreas(){
+   const view=window.visualViewport,bottom=()=>(view?view.offsetTop+view.height:window.innerHeight)-16;
+   let field=this.areaInput.getBoundingClientRect(),space=bottom()-field.bottom;
+   if(space<200){const lift=Math.min(200-space,field.top-(view?view.offsetTop:0)-120);if(lift>0){window.scrollBy(0,lift);field=this.areaInput.getBoundingClientRect();space=bottom()-field.bottom;}}
+   this.areaList.style.setProperty('--group-area-list-max',Math.round(Math.max(140,Math.min(280,space)))+'px');
   }
   closeAreas(){
    if(!this.areaList)return;
