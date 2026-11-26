@@ -3,7 +3,7 @@ import type {Queryable} from './db.js';
 export type AuditAction='login'|'logout'|'group.approve'|'area.create'|'area.update'|'group.export'|'member.withdraw'|'group.operational_status_change'|'group.complete'|'group.charges_process'|'group.charges_reconcile'|'finance.transaction_create'|'finance.transaction_update'|'finance.transaction_delete'|'finance.recurring_create'|'finance.recurring_update'|'finance.recurring_deactivate'|'finance.recurring_delete'|
  // Cancellation requests: the request id (target) and statuses only; never the ID number, contact details, reason or note.
  // Renewal of expired groups (src/renewals.ts): the customer's reconfirmation and the reopen.
- 'member.reconfirm'|'group.reopen'|'cancellation.status_change'|'cancellation.note_update'|'cancellation.reveal_id'|'cancellation.retention_purge';
+ 'member.reconfirm'|'group.reopen'|'member.expire_unconfirmed'|'cancellation.status_change'|'cancellation.note_update'|'cancellation.reveal_id'|'cancellation.retention_purge';
 export type AuditResult='OK'|'DENIED'|'FAILED';
 export type AuditEntry={action:AuditAction;actor:string;target?:string|null;result:AuditResult;detail?:string|null;subject?:string|null;previousStatus?:string|null;newStatus?:string|null;amountAgorot?:number|null};
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/,STATUS=/^[A-Z_]{3,30}$/;
@@ -29,9 +29,12 @@ export async function audit(db:Queryable,entry:AuditEntry){
 export async function auditStrict(db:Queryable,entry:AuditEntry){await insert(db,entry);}
 export async function auditPage(db:Queryable,query:any){
  const page=Number.parseInt(String(query?.page??'1'),10),size=50,current=Number.isSafeInteger(page)&&page>0&&page<=100000?page:1;
- const total=(await db.query('SELECT COUNT(*)::int AS n FROM admin_audit')).rows[0].n;
- const rows=(await db.query(`SELECT at,action,actor,target,result,detail,subject,previous_status,new_status,amount_agorot FROM admin_audit ORDER BY at DESC,id LIMIT ${size} OFFSET ${(current-1)*size}`)).rows;
- return {events:rows.map(event),pagination:{page:current,pageSize:size,total,pageCount:Math.max(1,Math.ceil(total/size))}};
+ // Optional: one group's history (its public id), linked from the group page.
+ const target=typeof query?.target==='string'&&UUID.test(query.target)?query.target:null;
+ const where=target?' WHERE target=$1':'',values=target?[target]:[];
+ const total=(await db.query('SELECT COUNT(*)::int AS n FROM admin_audit'+where,values)).rows[0].n;
+ const rows=(await db.query(`SELECT at,action,actor,target,result,detail,subject,previous_status,new_status,amount_agorot FROM admin_audit${where} ORDER BY at DESC,id LIMIT ${size} OFFSET ${(current-1)*size}`,values)).rows;
+ return {events:rows.map(event),target,pagination:{page:current,pageSize:size,total,pageCount:Math.max(1,Math.ceil(total/size))}};
 }
 const event=(row:any)=>({at:new Date(row.at).toISOString(),action:row.action,actor:row.actor,target:row.target,result:row.result,detail:row.detail,
  subject:row.subject??null,previousStatus:row.previous_status??null,newStatus:row.new_status??null,amountAgorot:row.amount_agorot===null||row.amount_agorot===undefined?null:Number(row.amount_agorot)});

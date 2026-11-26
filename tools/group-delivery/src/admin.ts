@@ -18,7 +18,7 @@ const opChip=(status:string)=>'<span class="chip chip--op chip--op-'+escape(stat
 const ACTION_LABELS:Record<string,string>={'group.operational_status_change':'שינוי סטטוס משלוח','group.complete':'השלמת משלוח','login':'התחברות','logout':'התנתקות','group.approve':'אישור קבוצה','area.create':'הוספת אזור','area.update':'עדכון אזור','group.export':'ייצוא נתוני קבוצה','member.withdraw':'הסרת לקוח מהקבוצה',
  'group.charges_process':'שליחת חיובים','group.charges_reconcile':'בדיקת חיובים','finance.transaction_create':'רישום תנועה כספית','finance.transaction_update':'עדכון תנועה כספית','finance.transaction_delete':'מחיקת תנועה כספית',
  'finance.recurring_create':'הוספת חיוב קבוע','finance.recurring_update':'עדכון חיוב קבוע','finance.recurring_deactivate':'הפסקת חיוב קבוע','finance.recurring_delete':'מחיקת חיוב קבוע',
- 'group.reopen':'פתיחת קבוצה מחדש','member.reconfirm':'רישום אישור לקוח',
+ 'group.reopen':'פתיחת קבוצה מחדש','member.reconfirm':'רישום אישור לקוח','member.expire_unconfirmed':'התחייבות שפג תוקפה (לא אושרה מחדש)',
  'cancellation.status_change':'שינוי שלב בבקשת ביטול','cancellation.note_update':'עדכון הערה בבקשת ביטול','cancellation.reveal_id':'הצגת מספר תעודת זהות בבקשת ביטול','cancellation.retention_purge':'מחיקת פרטי בקשת ביטול (תקופת שמירה)'};
 const RESULT_LABELS:Record<string,string>={OK:'הצליח',DENIED:'נדחה',FAILED:'נכשל'};
 const chip=(kind:'group'|'member',status:string)=>'<span class="chip chip--'+escape(status.toLowerCase())+'">'+escape((kind==='group'?GROUP_LABELS:MEMBER_LABELS)[status]||status)+'</span>';
@@ -47,7 +47,6 @@ export const ADMIN_SECTIONS:{key:string;label:string;href:string;enabled:boolean
  {key:'cancellations',label:'בקשות ביטול',href:'/admin/cancellations',enabled:true},
  {key:'feedback',label:'משוב לקוחות',href:'/admin/feedback',enabled:true},
  {key:'dashboard',label:'משלוחים קבוצתיים',href:'/admin',enabled:true},
- {key:'renewals',label:'חידוש קבוצות',href:'/admin/renewals',enabled:true},
  {key:'areas',label:'אזורי משלוח',href:'/admin/areas',enabled:true},
  {key:'audit',label:'יומן פעולות',href:'/admin/audit',enabled:true},
  {key:'system',label:'מערכות האתר',href:'/admin/system/services',enabled:true},
@@ -114,7 +113,7 @@ export function dashboardPage(data:{metrics:any;list:any;areas:any[];csrf:string
    card('הושלמו היום',String(o.completedToday),o.completed+' משלוחים הושלמו בסך הכול')+
   '</ul>'+
   '<section aria-labelledby="groups-title" class="card"><div class="section-head"><h2 id="groups-title">משלוחים קבוצתיים</h2><span class="muted">'+m.approvedGroups+' אושרו · '+m.expiredGroups+' פג תוקפן · '+m.allGroups+' בסך הכול</span></div>'+
-  '<nav class="segmented segmented--views" aria-label="תצוגת מחזורי משלוח">'+view('','הכול')+view('current','פעילים')+view('awaiting','ממתינים למשלוח')+view('completed','הושלמו')+'</nav>'+
+  '<nav class="segmented segmented--views" aria-label="תצוגת מחזורי משלוח">'+view('','הכול')+view('current','פעילים')+view('awaiting','ממתינים למשלוח')+view('completed','הושלמו')+view('expiring','מסתיימות בקרוב')+view('expired','פג תוקף עם התחייבויות')+'</nav>'+
   '<form method="get" action="/admin" class="filters" role="search" aria-label="סינון קבוצות">'+
    '<div class="field field--wide"><label for="q">חיפוש</label><input id="q" name="q" type="search" value="'+escape(f.q)+'" placeholder="מזהה קבוצה, אימייל או טלפון" autocomplete="off"></div>'+
    '<div class="field"><label for="area">אזור</label><select id="area" name="area">'+option('','כל האזורים',f.area)+data.areas.map((a:any)=>option(a.publicId,a.name+(a.active?'':' (לא פעיל)'),f.area)).join('')+option('none','ללא אזור מוגדר',f.area)+'</select></div>'+
@@ -180,7 +179,8 @@ const ERRORS:Record<string,string>={confirm:'יש לסמן את תיבת האי�
  COMPLETION_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להשלמת המשלוח. לא בוצע שינוי.',
  PAYMENT_UNAVAILABLE:'חיוב בכרטיסי אשראי אינו זמין כרגע. לא בוצע שינוי.',CHARGE_IN_PROGRESS:'החיוב של הלקוח כבר התחיל או בוצע, ולכן לא ניתן להסיר אותו כאן. לא בוצע שינוי.'};
 // Withdrawn members are labelled by who withdrew them (migration 004 backfills older rows as MEMBER).
-const WITHDRAWN_BY:Record<string,string>={ADMIN:'הוסר על ידי מנהל',MEMBER:'פרש מהקבוצה'};
+const WITHDRAWN_BY:Record<string,string>={ADMIN:'הוסר על ידי מנהל',MEMBER:'פרש מהקבוצה',EXPIRED:'פג תוקף, לא אושר מחדש'};
+const inactiveReason=(by?:string|null)=>by==='ADMIN'||by==='EXPIRED'?by:'MEMBER';
 // Customer recovery events (security_events). Codes, tokens and contact details are never stored, so none are shown.
 const RECOVERY_EVENTS:Record<string,string>={RECOVERY_REQUESTED:'בקשת קוד לשחזור גישה',RECOVERY_SENT:'קוד אימות נשלח במייל',RECOVERY_DELIVERY_FAILED:'שליחת קוד האימות נכשלה',
  RECOVERY_SUCCEEDED:'הגישה שוחזרה במכשיר נוסף',RECOVERY_FAILED:'קוד אימות שגוי',RECOVERY_LOCKED:'הקוד ננעל אחרי יותר מדי ניסיונות'};
@@ -194,7 +194,7 @@ const accessCard=(access:any)=>{
   '<p class="muted">קודי אימות, אישורי הצטרפות וכתובות IP אינם נשמרים ואינם מוצגים.</p></section>';
 };
 const memberChip=(m:{status:string;withdrawnBy?:string|null})=>m.status==='WITHDRAWN'
- ?'<span class="chip chip--'+(m.withdrawnBy==='ADMIN'?'removed':'withdrawn')+'">'+escape(WITHDRAWN_BY[m.withdrawnBy==='ADMIN'?'ADMIN':'MEMBER'])+'</span>'
+ ?'<span class="chip chip--'+(m.withdrawnBy==='ADMIN'?'removed':m.withdrawnBy==='EXPIRED'?'expired':'withdrawn')+'">'+escape(WITHDRAWN_BY[inactiveReason(m.withdrawnBy)])+'</span>'
  :chip('member',m.status);
 // Operational workflow card: stepper with the time each step was reached, the status form (forward one step or back),
 // the completion trigger + dialog (?confirm=complete renders it without JavaScript) and the transition history.
@@ -238,7 +238,8 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
   return '<tr data-href="'+escape(base+'/members/'+m.id)+'"'+(m.status==='WITHDRAWN'?' class="row--withdrawn"':'')+'>'+
    '<td data-label="אימייל"><a class="row-link" href="'+escape(base+'/members/'+m.id)+'" dir="ltr">'+escape(m.email)+'</a></td>'+
    '<td data-label="טלפון"><span dir="ltr">'+escape(m.phone)+'</span></td>'+
-   '<td data-label="סטטוס">'+memberChip(m)+(m.charge?chargeChip(m.charge):paymentChip(m.paymentStatus))+'</td>'+
+   '<td data-label="התחייבות">'+memberChip(m)+'</td>'+
+   '<td data-label="תשלום">'+(m.charge?chargeChip(m.charge):m.paymentStatus?paymentChip(m.paymentStatus):'<span class="muted">'+(g.paymentMode==='CARDCOM'?'—':'ללא תשלום מקוון')+'</span>')+'</td>'+
    '<td data-label="התחייבות" class="num">'+escape(money(m.pledgedTotalAgorot))+'</td>'+
    '<td data-label="שורות בסל" class="num">'+m.cartLines+'</td>'+
    '<td data-label="הצטרפות">'+time(m.createdAt)+'</td><td data-label="עדכון אחרון">'+time(m.updatedAt)+'</td>'+
@@ -265,7 +266,7 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
    '<dl class="facts">'+
     '<div class="facts__wide"><dt>מזהה קבוצה</dt><dd><code dir="ltr">'+escape(g.publicId)+'</code> '+copyButton(g.publicId,'מזהה הקבוצה')+'</dd></div>'+
     '<div><dt>יעד</dt><dd>'+escape(money(g.thresholdAgorot))+'</dd></div>'+
-    '<div><dt>משתתפים פעילים</dt><dd>'+g.activeMembers+(g.withdrawnMembers?' · '+g.withdrawnMembers+' הוסרו מהקבוצה':'')+'</dd></div>'+
+    '<div><dt>משתתפים פעילים</dt><dd>'+g.activeMembers+(g.withdrawnMembers?' · '+g.withdrawnMembers+' הוסרו מהקבוצה':'')+(g.expiredUnconfirmed?' · '+g.expiredUnconfirmed+' פג תוקף ולא אושרו מחדש':'')+'</dd></div>'+
     '<div><dt>שלב המשלוח</dt><dd>'+escape(OPERATIONAL_LABELS[g.operationalStatus]||g.operationalStatus)+'</dd></div>'+
     (g.completedAt?'<div><dt>הושלם</dt><dd>'+time(g.completedAt)+'</dd></div>':'')+
     '<div><dt>תפוסה</dt><dd>'+g.capacity.active+' מתוך '+g.capacity.limit+' מקומות פעילים</dd></div>'+
@@ -273,8 +274,8 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
     '<div><dt>'+(g.active?'פתוחה להצטרפות עד':g.operationalStatus==='COMPLETED'?'תוקף ההצטרפות היה עד':'תאריך תפוגה')+'</dt><dd>'+time(g.expiresAt)+'</dd></div>'+
    '</dl></section>'+approve+chargesCard(g,data.csrf)+operationsCard(g,data.timeline||[],data.csrf,!!data.confirming)+
   '<section class="card" aria-labelledby="members-title"><div class="section-head"><h2 id="members-title">לקוחות בקבוצה</h2>'+
-   '<nav class="segmented" aria-label="סינון לפי סטטוס">'+filter('','הכול')+filter('PLEDGED','פעילים')+filter('WITHDRAWN','הוסרו מהקבוצה')+'</nav></div>'+
-   (data.members.length?'<div class="table-wrap"><table class="table table--members"><caption class="sr-only">לקוחות בקבוצה, לפי סדר ההצטרפות</caption><thead><tr><th scope="col">אימייל</th><th scope="col">טלפון</th><th scope="col">סטטוס</th><th scope="col">התחייבות</th><th scope="col">שורות בסל</th><th scope="col">הצטרפות</th><th scope="col">עדכון אחרון</th><th scope="col">פעולות</th></tr></thead><tbody>'+members+'</tbody></table></div>'+
+   '<nav class="segmented" aria-label="סינון לפי סטטוס">'+filter('','הכול')+filter('PLEDGED','פעילים')+filter('WITHDRAWN','לא פעילים')+'</nav></div>'+
+   (data.members.length?'<div class="table-wrap"><table class="table table--members"><caption class="sr-only">לקוחות בקבוצה, לפי סדר ההצטרפות</caption><thead><tr><th scope="col">אימייל</th><th scope="col">טלפון</th><th scope="col">מצב התחייבות</th><th scope="col">תשלום</th><th scope="col">סכום</th><th scope="col">שורות בסל</th><th scope="col">הצטרפות</th><th scope="col">עדכון אחרון</th><th scope="col">פעולות</th></tr></thead><tbody>'+members+'</tbody></table></div>'+
     pager(base,{memberStatus:data.memberStatus||undefined},data.pagination,'לקוחות'):
     '<div class="empty"><strong>'+(data.memberStatus?'אין לקוחות בסטטוס הזה.':'אין לקוחות בקבוצה.')+'</strong></div>')+
    '<p class="muted">המערכת שומרת אימייל וטלפון בלבד; שם לקוח אינו נשמר. פעולות הקשר רק פותחות את האפליקציה המתאימה ואינן שולחות הודעות.</p>'+
@@ -306,7 +307,7 @@ function removal(g:any,m:any,csrf:string,confirming:boolean){
 
 export function memberPage(data:{group:any;member:any;csrf:string;error?:string;confirming?:boolean}){
  const g=data.group,m=data.member,base='/admin/groups/'+g.publicId,tel=dialable(m.phone);
- const withdrawnFacts=m.status==='WITHDRAWN'?'<div><dt>יציאה מהקבוצה</dt><dd>'+escape(WITHDRAWN_BY[m.withdrawnBy==='ADMIN'?'ADMIN':'MEMBER'])+'</dd></div>'+
+ const withdrawnFacts=m.status==='WITHDRAWN'?'<div><dt>'+(m.withdrawnBy==='EXPIRED'?'מצב ההתחייבות':'יציאה מהקבוצה')+'</dt><dd>'+escape(WITHDRAWN_BY[inactiveReason(m.withdrawnBy)])+'</dd></div>'+
   '<div><dt>מועד היציאה</dt><dd>'+(m.withdrawnAt?time(m.withdrawnAt):'<span class="muted">לא נרשם (לפני תיעוד מועדי יציאה)</span>')+'</dd></div>':'';
  // Active pledge, or the last cart kept after a withdrawal (history only: never counted, restored or used for checkout).
  const past=m.snapshotKind==='HISTORICAL';
@@ -327,7 +328,7 @@ export function memberPage(data:{group:any;member:any;csrf:string;error?:string;
     '<div><dt>הצטרפות</dt><dd>'+time(m.createdAt)+'</dd></div><div><dt>עדכון אחרון</dt><dd>'+time(m.updatedAt)+'</dd></div>'+
     '<div><dt>קבוצה</dt><dd><a href="'+escape(base)+'">'+escape(g.areaName)+'</a> · '+chip('group',g.status)+'</dd></div>'+
     withdrawnFacts+
-    '<div class="facts__wide"><dt>מצב הקבוצה</dt><dd>'+progress(g)+'<span class="muted">'+g.activeMembers+' משתתפים פעילים'+(g.withdrawnMembers?' · '+g.withdrawnMembers+' הוסרו מהקבוצה':'')+'</span></dd></div>'+
+    '<div class="facts__wide"><dt>מצב הקבוצה</dt><dd>'+progress(g)+'<span class="muted">'+g.activeMembers+' משתתפים פעילים'+(g.withdrawnMembers?' · '+g.withdrawnMembers+' הוסרו מהקבוצה':'')+(g.expiredUnconfirmed?' · '+g.expiredUnconfirmed+' פג תוקף ולא אושרו מחדש':'')+'</span></dd></div>'+
    '</dl>'+
    '<div class="actions"><a class="btn btn--quiet" href="mailto:'+escape(m.email)+'">שליחת אימייל</a>'+(tel?'<a class="btn btn--quiet" href="tel:'+escape(tel)+'">חיוג</a><a class="btn btn--quiet" href="https://wa.me/'+escape(tel.slice(1))+'" target="_blank" rel="noopener noreferrer">וואטסאפ<span class="sr-only"> (נפתח בכרטיסייה חדשה)</span></a>':'')+'</div>'+
   '</section>'+
@@ -354,7 +355,7 @@ export function areasPage(data:{areas:any[];csrf:string;notice?:string}){
   {csrf:data.csrf,active:'areas'});
 }
 
-export function auditView(data:{events:any[];pagination:Page;csrf:string}){
+export function auditView(data:{events:any[];pagination:Page;csrf:string;target?:string|null}){
  // A readable sentence for member removals, built only from the stored safe metadata (status, amount, ids).
  const describe=(e:any)=>{
   if(e.action==='group.operational_status_change'||e.action==='group.complete'){
@@ -373,6 +374,12 @@ export function auditView(data:{events:any[];pagination:Page;csrf:string}){
    const text=e.result!=='OK'?'הבקשה לא בוצעה.':e.action==='cancellation.status_change'?label(e.previousStatus||'')+' ← '+label(e.newStatus||''):e.action==='cancellation.retention_purge'?'הפרטים האישיים נמחקו.':e.action==='cancellation.reveal_id'?'המספר המלא הוצג למנהל.':'';
    return text?'<span class="audit__desc">'+escape(text)+'</span>':'';
   }
+  if(e.action==='member.reconfirm'||e.action==='group.reopen'||e.action==='member.expire_unconfirmed'){
+   const text=e.result!=='OK'?'הבקשה לא בוצעה; לא נשמר שינוי.':e.action==='member.reconfirm'?'אישור הלקוח נרשם'+(e.amountAgorot!==null?' לסכום '+money(e.amountAgorot):'')+'.':
+    e.action==='group.reopen'?'הקבוצה נפתחה מחדש'+(e.amountAgorot!==null?'; נספרו התחייבויות בסך '+money(e.amountAgorot):'')+'.':'ההתחייבות לא אושרה מחדש ונשמרה כהתחייבות שפג תוקפה'+(e.amountAgorot!==null?' ('+money(e.amountAgorot)+')':'')+'.';
+   const link=e.target&&e.subject?' <a href="'+escape('/admin/groups/'+e.target+'/members/'+e.subject)+'">לפרטי הלקוח</a>':'';
+   return '<span class="audit__desc">'+escape(text)+link+'</span>';
+  }
   if(e.action!=='member.withdraw')return '';
   const text=e.result!=='OK'?'הבקשה לא בוצעה; הלקוח וההתחייבות לא שונו.':e.detail==='ALREADY_WITHDRAWN'?'הלקוח כבר הוסר קודם לכן. לא בוצע שינוי.':
    'הלקוח הוסר מהקבוצה.'+(e.amountAgorot!==null?' התחייבות של '+money(e.amountAgorot)+' הוסרה.':'');
@@ -381,8 +388,8 @@ export function auditView(data:{events:any[];pagination:Page;csrf:string}){
  };
  const rows=data.events.map(e=>'<tr><td data-label="זמן">'+time(e.at)+'</td><td data-label="פעולה">'+escape(ACTION_LABELS[e.action]||e.action)+describe(e)+'</td><td data-label="מבצע"><code dir="ltr">'+escape(e.actor)+'</code></td>'+
   '<td data-label="יעד">'+(e.target?'<code dir="ltr">'+escape(e.target)+'</code>':'—')+'</td><td data-label="תוצאה">'+escape(RESULT_LABELS[e.result]||e.result)+(e.detail?' <span class="muted" dir="ltr">'+escape(e.detail)+'</span>':'')+'</td></tr>').join('');
- return layout('יומן פעולות','<div class="page-head"><div><h1>יומן פעולות ניהול</h1><p class="muted">פעולות שינוי, התחברויות וייצוא נתונים. ללא סיסמאות, אסימונים או פרטי לקוחות.</p></div></div>'+
-  '<section class="card">'+(data.events.length?'<div class="table-wrap"><table class="table"><caption class="sr-only">יומן פעולות, מהחדש לישן</caption><thead><tr><th scope="col">זמן</th><th scope="col">פעולה</th><th scope="col">מבצע</th><th scope="col">יעד</th><th scope="col">תוצאה</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+pager('/admin/audit',{},data.pagination,'אירועים'):'<div class="empty"><strong>אין עדיין אירועים ביומן.</strong></div>')+'</section>',
+ return layout('יומן פעולות','<div class="page-head"><div><h1>יומן פעולות ניהול</h1><p class="muted">פעולות שינוי, התחברויות וייצוא נתונים. ללא סיסמאות, אסימונים או פרטי לקוחות.</p>'+(data.target?'<p>מוצגות פעולות של קבוצה אחת: <code dir="ltr">'+escape(data.target)+'</code> · <a href="'+escape('/admin/groups/'+data.target)+'">לדף הקבוצה</a> · <a href="/admin/audit">כל הפעולות</a></p>':'')+'</div></div>'+
+  '<section class="card">'+(data.events.length?'<div class="table-wrap"><table class="table"><caption class="sr-only">יומן פעולות, מהחדש לישן</caption><thead><tr><th scope="col">זמן</th><th scope="col">פעולה</th><th scope="col">מבצע</th><th scope="col">יעד</th><th scope="col">תוצאה</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+pager('/admin/audit',data.target?{target:data.target}:{},data.pagination,'אירועים'):'<div class="empty"><strong>אין עדיין אירועים ביומן.</strong></div>')+'</section>',
   {csrf:data.csrf,active:'audit'});
 }
 

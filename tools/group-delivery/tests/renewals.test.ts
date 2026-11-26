@@ -40,8 +40,9 @@ test('Group renewals',{timeout:240000},async t=>{
 
   await t.test('owner only: no session, a wrong Origin or a missing CSRF token changes nothing',async()=>{
    const g=await expiredGroup(AREA.kiryatGat,1);
-   const page=await fetch(origin+'/admin/renewals',{redirect:'manual'});assert.equal(page.status,303);assert.match(page.headers.get('location')||'',/^\/admin\?expired=1/);
-   assert.equal((await api('/admin/api/renewals',undefined,{})).status,401);
+   const page=await fetch(origin+'/admin/groups/'+g.id,{redirect:'manual'});assert.equal(page.status,303);assert.match(page.headers.get('location')||'',/^\/admin\?expired=1/);
+   assert.equal((await api('/admin/api/groups/'+g.id+'/renewal',undefined,{})).status,401);
+   assert.equal((await api('/admin/api/groups?view=expired',undefined,{})).status,401);
    assert.equal((await reconfirm(g.id,g.members[0],{method:'PHONE'})).status,200,'the owner can');
    for(const headers of [{},{Cookie:cookie,Origin:origin},{Cookie:cookie,Origin:'https://evil.example','X-CSRF-Token':csrf},{Origin:origin,'X-CSRF-Token':csrf}]){
     const r=await api('/admin/api/groups/'+g.id+'/reopen',{confirm:true,days:7},headers);
@@ -51,16 +52,21 @@ test('Group renewals',{timeout:240000},async t=>{
    assert.equal((await audits('group.reopen',g.id)).length,0,'refused before reaching the action');
   });
 
-  await t.test('overview: groups approaching expiry, and expired groups that still hold pledges',async()=>{
+  await t.test('overview inside the existing groups list: views for groups expiring soon and expired groups with pledges',async()=>{
    const soon=(await join(AREA.netivot)).group.publicId;
    await f.db.query("UPDATE delivery_groups SET expires_at=NOW()+INTERVAL '10 hours' WHERE public_id=$1",[soon]);
    const expired=await expiredGroup(AREA.ofakim,2);
-   const o=(await api('/admin/api/renewals')).body;
-   assert.ok(o.approaching.some((g:any)=>g.publicId===soon),'approaching');
-   const e=o.expired.find((g:any)=>g.publicId===expired.id);
-   assert.deepEqual([e.activeMembers,e.reconfirmed,e.pledgedTotalAgorot,e.status],[2,0,50000,'EXPIRED']);
-   assert.ok(!JSON.stringify(o).includes('@example.test'),'no contact details in the overview');
-   const html=(await api('/admin/renewals')).text;assert.match(html,/חידוש קבוצות/);assert.match(html,/0 מתוך 2/);
+   const ids=async(view:string)=>(await api('/admin/api/groups?view='+view)).body.groups.map((g:any)=>g.publicId);
+   assert.ok((await ids('expiring')).includes(soon),'expiring soon');assert.ok(!(await ids('expiring')).includes(expired.id));
+   assert.ok((await ids('expired')).includes(expired.id),'expired with stored pledges');assert.ok(!(await ids('expired')).includes(soon));
+   const e=(await api('/admin/api/groups?view=expired')).body.groups.find((g:any)=>g.publicId===expired.id);
+   assert.deepEqual([e.activeMembers,e.pledgedTotalAgorot,e.status],[2,50000,'EXPIRED']);
+   // No separate dashboard: the standalone page and API do not exist; the existing list offers the views.
+   assert.equal((await api('/admin/renewals')).status,404);assert.equal((await api('/admin/api/renewals')).status,404);
+   const html=(await api('/admin?view=expired')).text;assert.match(html,/פג תוקף עם התחייבויות/);assert.match(html,/מסתיימות בקרוב/);assert.ok(!html.includes('חידוש קבוצות'));
+   // Original commitments, products and customer details stay visible on the group page.
+   const page=(await api('/admin/groups/'+expired.id)).text;
+   for(const text of ['@example.test','מוצרים בהתחייבויות','התחייבות שמורה: '])assert.ok(page.includes(text),text);
    await f.db.query("UPDATE delivery_groups SET expires_at=NOW()+INTERVAL '20 days' WHERE public_id=$1",[soon]);
   });
 
@@ -115,20 +121,28 @@ test('Group renewals',{timeout:240000},async t=>{
    f.shopify.prices={};
   });
 
-  await t.test('reopen: only reconfirmed pledges count; the rest are withdrawn with history and receipts kept; customers see the progress',async()=>{
+  await t.test('reopen: only reconfirmed pledges count; the rest stay as expired, unconfirmed commitments (never withdrawals); receipts kept',async()=>{
    const g=await expiredGroup(AREA.kiryatGat,3);
    // (kiryatGat already holds the authorization test's expired group; it is not current, so it does not conflict.)
    // One of three customers confirms: 250 ILS, below the 500 ILS target, so the group is OPEN and offered to customers.
    assert.equal((await reconfirm(g.id,g.members[0],{method:'PHONE'})).status,200);
    const before=(await members(g.id))[1];
    const r=await reopen(g.id,{confirm:true,days:14});
-   assert.equal(r.status,200);assert.deepEqual([r.body.counted,r.body.withdrawn,r.body.days],[1,2,14]);
+   assert.equal(r.status,200);assert.deepEqual([r.body.counted,r.body.expiredUnconfirmed,r.body.days],[1,2,14]);
    const after=await group(g.id);
    assert.deepEqual([after.status,Number(after.pledged_total_agorot),after.reopened_count],['OPEN',25000,1]);
    const days=(new Date(after.expires_at).getTime()-Date.now())/86400000;assert.ok(days>13.9&&days<14.1,'new deadline');
    const rows=await members(g.id);
-   assert.deepEqual(rows.map((m:any)=>[m.status,Number(m.pledged_total_agorot),m.withdrawn_by]),[['PLEDGED',25000,null],['WITHDRAWN',0,'ADMIN'],['WITHDRAWN',0,'ADMIN']]);
-   assert.deepEqual(rows[1].cart_snapshot,before.cart_snapshot,'the withdrawn pledge keeps its cart as history');
+   assert.deepEqual(rows.map((m:any)=>[m.status,Number(m.pledged_total_agorot),m.withdrawn_by]),[['PLEDGED',25000,null],['WITHDRAWN',0,'EXPIRED'],['WITHDRAWN',0,'EXPIRED']]);
+   assert.deepEqual(rows[1].cart_snapshot,before.cart_snapshot,'the original cart is kept');
+   assert.ok(new Date(rows[1].withdrawn_at).getTime()<Date.now()-60000,'dated at the group\'s expiry, not at the reopen');
+   // Shown as expired and unconfirmed, never as a customer withdrawal or an owner removal; counted apart.
+   const page=(await api('/admin/groups/'+g.id)).text;
+   assert.ok(page.includes('פג תוקף, לא אושר מחדש'));assert.ok(!page.includes('פרש מהקבוצה'));assert.ok(!page.includes('הוסר על ידי מנהל'));
+   assert.ok(page.includes('<dd>1 · 2 פג תוקף ולא אושרו מחדש</dd>'),'counted apart');assert.ok(!page.includes('הוסרו מהקבוצה'),'not counted as removals');
+   const memberPage=(await api('/admin/groups/'+g.id+'/members/'+g.members[1])).text;assert.ok(memberPage.includes('פג תוקף, לא אושר מחדש'));assert.ok(!memberPage.includes('פרש מהקבוצה'));
+   assert.equal((await api('/admin/api/groups/'+g.id+'/members?status=WITHDRAWN')).body.members.filter((m:any)=>m.withdrawnBy==='EXPIRED').length,2,'listed under inactive');
+   const csv=(await api('/admin/groups/'+g.id+'/export.csv')).text;assert.equal((csv.match(/EXPIRED_UNCONFIRMED/g)||[]).length,2);
    // Device receipts keep working: the confirmed customers are members, the other one sees an inactive membership.
    assert.equal((await f.groups.member(g.id,g.tokens[0])).status,'PLEDGED');
    assert.equal((await f.groups.member(g.id,g.tokens[1])).status,'WITHDRAWN');
@@ -136,9 +150,19 @@ test('Group renewals',{timeout:240000},async t=>{
    const found=await f.groups.find({areaPublicId:AREA.kiryatGat});
    assert.deepEqual([found.group?.publicId,found.group?.pledgedTotalAgorot,found.group?.participantCount],[g.id,25000,1]);
    const a=(await audits('group.reopen',g.id)).at(-1);
-   assert.deepEqual([a.result,a.previous_status,a.new_status,Number(a.amount_agorot),a.detail],['OK','EXPIRED','OPEN',25000,'COUNTED_1_WITHDRAWN_2_DAYS_14']);
-   assert.equal((await audits('member.withdraw',g.id)).at(-1).detail,'NOT_RECONFIRMED');
+   assert.deepEqual([a.result,a.previous_status,a.new_status,Number(a.amount_agorot),a.detail],['OK','EXPIRED','OPEN',25000,'COUNTED_1_EXPIRED_2_DAYS_14']);
+   const kept=await audits('member.expire_unconfirmed',g.id);
+   assert.deepEqual(kept.map((x:any)=>[x.detail,Number(x.amount_agorot),x.previous_status]),[['NOT_RECONFIRMED',25000,'PLEDGED'],['NOT_RECONFIRMED',25000,'PLEDGED']],'each one audited with its original amount');
+   assert.equal((await audits('member.withdraw',g.id)).length,0,'no withdrawal is recorded');
    assert.equal((await f.db.query('SELECT COUNT(*)::int AS n FROM member_reconfirmations WHERE group_id=$1 AND used_at IS NOT NULL',[after.id])).rows[0].n,1);
+   // The customer can renew it themselves from the storefront receipt: the reason is cleared and it counts again.
+   await f.groups.update(g.id,g.tokens[2],{lines:[{variantId:'1',quantity:1}]});
+   const renewed=(await members(g.id))[2];assert.deepEqual([renewed.status,Number(renewed.pledged_total_agorot),renewed.withdrawn_by,renewed.withdrawn_at],['PLEDGED',12500,null,null]);
+   assert.equal(Number((await group(g.id)).pledged_total_agorot),37500,'counted once, at today\'s price');
+   // Migration 017 replaced the 004 check: exactly one check on the reason, and unknown reasons are still refused.
+   const checks=(await f.db.query("SELECT conname FROM pg_constraint WHERE conrelid='group_members'::regclass AND contype='c' AND pg_get_constraintdef(oid) ILIKE '%withdrawn_by%'")).rows;
+   assert.deepEqual(checks.map((c:any)=>c.conname),['group_members_withdrawn_by_check']);
+   await assert.rejects(()=>f.db.query("UPDATE group_members SET withdrawn_by='SOMETHING' WHERE id=$1",[g.members[1]]));
    // Reaching the target through renewals follows the service's own rule (THRESHOLD_REACHED at 500 ILS).
    const full=await expiredGroup(AREA.sderot,2);
    for(const m of full.members)assert.equal((await reconfirm(full.id,m,{method:'PHONE'})).status,200);
@@ -177,20 +201,23 @@ test('Group renewals',{timeout:240000},async t=>{
    const state=(await api('/admin/api/groups/'+g.id+'/renewal')).body;assert.equal(state.eligible,false);assert.ok(state.blockers.includes('PAYMENT_RECORDED'));
   });
 
-  await t.test('group page: renewal section, products, payments and history; no Shopify request unless names are asked for',async()=>{
+  await t.test('group page: renewal section, products, separate commitment and payment columns, the audit log of the group; no Shopify request unless names are asked for',async()=>{
    const g=await expiredGroup(AREA.ashdod,1);
    await f.db.query("UPDATE delivery_groups SET expires_at=NOW()-INTERVAL '2 hours' WHERE status IN ('OPEN','THRESHOLD_REACHED') AND area_id=(SELECT id FROM delivery_areas WHERE public_id=$1)",[AREA.ashdod]);await f.groups.expire();
    const requests=f.shopify.requests;
    const html=(await api('/admin/groups/'+g.id)).text;
    assert.equal(f.shopify.requests,requests,'the group page makes no Shopify request');
-   for(const text of ['חידוש הקבוצה','ממתין לאישור הלקוח','רישום אישור הלקוח','מוצרים בהתחייבויות','מצב תשלום','היסטוריית פעולות בקבוצה','הצגת שמות המוצרים'])assert.ok(html.includes(text),text);
+   for(const text of ['חידוש הקבוצה','ממתין לאישור הלקוח','רישום אישור הלקוח','מוצרים בהתחייבויות','הצגת שמות המוצרים','>מצב התחייבות</th>','>תשלום</th>','ללא תשלום מקוון','/admin/audit?target='+g.id])assert.ok(html.includes(text),text);
+   for(const text of ['היסטוריית פעולות בקבוצה','id="pay-title"'])assert.ok(!html.includes(text),'no duplicate card: '+text);
    assert.ok(html.indexOf('לקוחות בקבוצה')<html.indexOf('חידוש הקבוצה'),'customers come first');
    await api('/admin/groups/'+g.id+'?products=names');assert.equal(f.shopify.requests,requests+1,'one batched request for the names');
    assert.equal((await reconfirm(g.id,g.members[0],{method:'PHONE'})).status,200);
    const ready=(await api('/admin/groups/'+g.id)).text;assert.match(ready,/פתיחה מחדש/);assert.match(ready,/אישר מחדש בשיחת טלפון/);
    const done=await form('/admin/groups/'+g.id+'/reopen',{days:'10',confirm:'yes'});
    assert.match(done.location,/renewalNotice=reopened/);
-   const history=(await api('/admin/groups/'+g.id)).text;assert.match(history,/פתיחת קבוצה מחדש/);assert.match(history,/רישום אישור לקוח/);
+   const history=(await api('/admin/audit?target='+g.id)).text;assert.match(history,/פתיחת קבוצה מחדש/);assert.match(history,/רישום אישור לקוח/);assert.match(history,/מוצגות פעולות של קבוצה אחת/);
+   const all=(await api('/admin/api/audit?target='+g.id)).body;assert.ok(all.events.length>=2&&all.events.every((e:any)=>e.target===g.id),'only this group');
+   assert.equal((await api('/admin/api/audit?target=not-a-uuid')).body.target,null,'an invalid filter is ignored');
    const unconfirmed=await form('/admin/groups/'+g.id+'/reopen',{days:'10'});assert.match(unconfirmed.location,/renewalError=/);
   });
  }finally{await f.close();}

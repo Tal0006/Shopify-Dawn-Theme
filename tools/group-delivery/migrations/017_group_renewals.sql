@@ -20,6 +20,15 @@ CREATE TABLE IF NOT EXISTS member_reconfirmations (
  revoked_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS member_reconfirmations_member ON member_reconfirmations(group_id,member_id,recorded_at DESC);
+-- Why a membership stopped counting: MEMBER (the customer withdrew), ADMIN (the store owner removed it) and now EXPIRED
+-- (its group expired and the customer did not reconfirm before the group was reopened). The original amount and cart
+-- stay in cart_snapshot and the audit log. Replaces the check from migration 004, whatever name PostgreSQL gave it.
+DO $$ DECLARE c record; BEGIN
+ FOR c IN SELECT conname FROM pg_constraint WHERE conrelid='group_members'::regclass AND contype='c' AND pg_get_constraintdef(oid) ILIKE '%withdrawn_by%' LOOP
+  EXECUTE format('ALTER TABLE group_members DROP CONSTRAINT %I',c.conname);
+ END LOOP;
+END $$;
+ALTER TABLE group_members ADD CONSTRAINT group_members_withdrawn_by_check CHECK(withdrawn_by IS NULL OR withdrawn_by IN ('MEMBER','ADMIN','EXPIRED'));
 -- How often a group was reopened, and when last (shown to the store owner).
 ALTER TABLE delivery_groups ADD COLUMN IF NOT EXISTS reopened_count integer NOT NULL DEFAULT 0 CHECK(reopened_count>=0);
 ALTER TABLE delivery_groups ADD COLUMN IF NOT EXISTS last_reopened_at timestamptz;

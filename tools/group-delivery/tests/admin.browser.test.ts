@@ -163,12 +163,12 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    assert.match(await ev('document.querySelector(".facts").textContent'),/משתתפים פעילים1 · 2 הוסרו מהקבוצה/);
    assert.deepEqual(await ev('[...document.querySelectorAll(".table--members .chip")].map(c=>c.textContent)'),['התחייבות פעילה','הוסר על ידי מנהל','פרש מהקבוצה'],'store-owner removal and self-withdrawal are told apart');
    await shot('admin-group-after-remove');
-   // Filters: הכול / פעילים / הוסרו מהקבוצה.
+   // Filters: הכול / פעילים / לא פעילים.
    const filter=async(label:string,rows:number)=>{
     await ev('[...document.querySelectorAll(".segmented__item")].find(a=>a.textContent==='+JSON.stringify(label)+').click()');
     await wait('document.querySelector(".segmented__item[aria-current]")?.textContent==='+JSON.stringify(label)+'&&document.querySelectorAll(".table--members tbody tr").length==='+rows);
    };
-   await filter('הוסרו מהקבוצה',2);await filter('פעילים',1);await filter('הכול',3);
+   await filter('לא פעילים',2);await filter('פעילים',1);await filter('הכול',3);
    // The removed customer's page: who and when, and the kept cart shown as history only.
    await go('/admin/groups/'+ids.ashdod+'/members/'+second[0]);
    assert.equal(await ev('document.querySelector(".page-head .chip").textContent'),'הוסר על ידי מנהל');
@@ -309,7 +309,7 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    await wait('location.pathname==="/admin/system"&&!!document.querySelector(".metrics--fin")');
    assert.deepEqual(await ev('[document.querySelector("h1").textContent,document.documentElement.dir,document.querySelector(".topbar__nav a[aria-current=page]").textContent]'),['כספים','rtl','כספים']);
    assert.deepEqual(await ev('[...document.querySelectorAll(".metric--fin .metric__label")].map(e=>e.textContent)'),['הכנסות החודש','הוצאות החודש','רווח / הפסד','חיובים קבועים']);
-   assert.deepEqual(await ev('[...document.querySelectorAll(".topbar__nav a")].map(a=>a.textContent)'),['כספים','בקשות ביטול','משוב לקוחות','משלוחים קבוצתיים','חידוש קבוצות','אזורי משלוח','יומן פעולות','מערכות האתר']);
+   assert.deepEqual(await ev('[...document.querySelectorAll(".topbar__nav a")].map(a=>a.textContent)'),['כספים','בקשות ביטול','משוב לקוחות','משלוחים קבוצתיים','אזורי משלוח','יומן פעולות','מערכות האתר']);
    const modal=(id:string)=>'!!document.querySelector("#'+id+'")?.matches(":modal")';
    const submit=(id:string)=>ev('document.querySelector("#'+id+' form").requestSubmit(document.querySelector("#'+id+' button.btn--primary"))');
    const fill=(id:string,values:Record<string,string>)=>ev('(()=>{const d=document.querySelector("#'+id+'");'+Object.entries(values).map(([k,v])=>'d.querySelector("[name='+k+']").value='+JSON.stringify(v)+';').join('')+'})()');

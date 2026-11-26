@@ -112,7 +112,7 @@ test('Admin removal of a customer from a group',{timeout:180000},async t=>{
    assert.deepEqual((await json('/admin/api/groups/'+g+'/members?memberStatus=WITHDRAWN')).members.map((m:any)=>m.email),[bob.email]);
    assert.deepEqual((await json('/admin/api/groups/'+g+'/members?memberStatus=PLEDGED')).members.map((m:any)=>m.email),[alice.email]);
    const page=await(await get('/admin/groups/'+g)).text();
-   for(const label of ['הכול','פעילים','הוסרו מהקבוצה'])assert.match(page,new RegExp('class="segmented__item"[^>]*>'+label+'</a>'));
+   for(const label of ['הכול','פעילים','לא פעילים'])assert.match(page,new RegExp('class="segmented__item"[^>]*>'+label+'</a>'));
    const exported=new TextDecoder().decode(new Uint8Array(await(await get('/admin/groups/'+g+'/export.csv')).arrayBuffer()));
    assert.match(exported,/"bob@example\.test","'\+972502222222","WITHDRAWN","0\.00"/);
   });
@@ -213,7 +213,7 @@ test('Admin removal of a customer from a group',{timeout:180000},async t=>{
    assert.match(removed,/<span class="chip chip--removed">הוסר על ידי מנהל<\/span>/);assert.match(removed,/<dt>יציאה מהקבוצה<\/dt><dd>הוסר על ידי מנהל<\/dd>/);
    const list=(await json('/admin/api/groups/'+g+'/members?memberStatus=WITHDRAWN')).members;
    assert.deepEqual(list.map((m:any)=>[m.email,m.withdrawnBy,m.cartLines]),[[bob.email,'MEMBER',0]]);
-   const page=await(await get('/admin/groups/'+g)).text();assert.match(page,/פרש מהקבוצה/);assert.match(page,/class="segmented__item"[^>]*>הוסרו מהקבוצה<\/a>/);
+   const page=await(await get('/admin/groups/'+g)).text();assert.match(page,/פרש מהקבוצה/);assert.match(page,/class="segmented__item"[^>]*>לא פעילים<\/a>/);
    // Operational line export: active pledges only (the kept cart is history).
    const lines=new TextDecoder().decode(new Uint8Array(await(await get('/admin/groups/'+g+'/export-lines.csv')).arrayBuffer()).slice(3)).trim().split('\r\n');
    assert.equal(lines.length,2);assert.match(lines[1],/alice@example\.test/);

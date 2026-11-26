@@ -16,7 +16,10 @@ export const ACTIVE_STATUSES=['OPEN','THRESHOLD_REACHED'];
 // SQL form of groups.acceptsPledges (alias g): a completed delivery is never active, whatever its business status.
 const ACCEPTING="g.status IN ('OPEN','THRESHOLD_REACHED') AND g.operational_status<>'COMPLETED'";
 // Delivery-cycle views: current (not completed), awaiting delivery (ready or on the way), completed.
-export const VIEWS:Record<string,string>={current:"g.operational_status<>'COMPLETED'",awaiting:"g.operational_status IN ('READY_FOR_DELIVERY','OUT_FOR_DELIVERY')",completed:"g.operational_status='COMPLETED'"};
+export const VIEWS:Record<string,string>={current:"g.operational_status<>'COMPLETED'",awaiting:"g.operational_status IN ('READY_FOR_DELIVERY','OUT_FOR_DELIVERY')",completed:"g.operational_status='COMPLETED'",
+ // Expiration management: still collecting pledges with a deadline in the next 72 hours; expired with stored pledges.
+ expiring:"g.status IN ('OPEN','THRESHOLD_REACHED') AND g.operational_status<>'COMPLETED' AND g.expires_at>NOW() AND g.expires_at<=NOW()+INTERVAL '72 hours'",
+ expired:"g.status='EXPIRED' AND g.operational_status<>'COMPLETED' AND EXISTS(SELECT 1 FROM group_members m WHERE m.group_id=g.id AND m.status='PLEDGED')"};
 export const MEMBER_STATUSES=['PLEDGED','WITHDRAWN'] as const;
 const TZ='Asia/Jerusalem';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -96,7 +99,7 @@ const memberRow=(row:any)=>({
  // Lines of the ACTIVE pledge. A withdrawn member's kept snapshot is history and is not counted here.
  cartLines:row.status===ACTIVE_MEMBER_STATUS?Number(row.cart_lines):0,createdAt:new Date(row.created_at).toISOString(),updatedAt:new Date(row.updated_at).toISOString(),
  // Recorded since migration 004; NULL for withdrawals made before it (and for active members).
- withdrawnAt:row.withdrawn_at?new Date(row.withdrawn_at).toISOString():null,withdrawnBy:(row.withdrawn_by as 'MEMBER'|'ADMIN'|null)??null,
+ withdrawnAt:row.withdrawn_at?new Date(row.withdrawn_at).toISOString():null,withdrawnBy:(row.withdrawn_by as 'MEMBER'|'ADMIN'|'EXPIRED'|null)??null,
  // Card payment state (NULL for members of groups without cards), the last explicitly approved amount and a pending change.
  paymentStatus:row.payment_status??null,approvedAmountAgorot:row.approved_amount_agorot===null||row.approved_amount_agorot===undefined?null:Number(row.approved_amount_agorot),
  pendingAmountAgorot:row.pending_amount_agorot===null||row.pending_amount_agorot===undefined?null:Number(row.pending_amount_agorot),consentAt:row.consent_at?new Date(row.consent_at).toISOString():null,
@@ -170,11 +173,13 @@ export class AdminData{
   await this.fresh();
   const row=(await this.db.query(GROUP_SELECT+' WHERE g.public_id=$1',[publicId(id)])).rows[0];
   if(!row)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
-  const withdrawn=(await this.db.query("SELECT COUNT(*)::int AS n FROM group_members m WHERE m.group_id=$1 AND m.status='WITHDRAWN'",[row.id])).rows[0].n;
+  // Inactive rows by reason: expired, unconfirmed commitments are counted apart and never as removals.
+  const inactive=(await this.db.query("SELECT COUNT(*) FILTER(WHERE m.withdrawn_by IS DISTINCT FROM 'EXPIRED')::int AS withdrawn,COUNT(*) FILTER(WHERE m.withdrawn_by='EXPIRED')::int AS expired FROM group_members m WHERE m.group_id=$1 AND m.status='WITHDRAWN'",[row.id])).rows[0];
+  const withdrawn=inactive.withdrawn,expiredUnconfirmed=inactive.expired;
   // Capacity: active members against the domain limit (withdrawn rows hold no slot).
   // Charge summary for approved card groups: counts and sums only (never a token or Cardcom id).
   const charges=row.payment_mode==='CARDCOM'&&this.payments?await this.payments.summary(row.id):null;
-  return {...groupRow(row),operationalTargets:operationalTargets(row.operational_status),withdrawnMembers:withdrawn,capacity:{active:Number(row.active_members),limit:GROUP_CAPACITY},charges,paymentsAvailable:this.payments?.available??false,_id:row.id as string};
+  return {...groupRow(row),operationalTargets:operationalTargets(row.operational_status),withdrawnMembers:withdrawn,expiredUnconfirmed,capacity:{active:Number(row.active_members),limit:GROUP_CAPACITY},charges,paymentsAvailable:this.payments?.available??false,_id:row.id as string};
  }
  // Operational timeline of one group (successful transitions from the audit log, oldest first).
  async timeline(id:string){return operationalHistory(this.db,publicId(id));}
@@ -234,12 +239,6 @@ export class AdminData{
   }
   return {lookup,products:rows.map((r:any)=>{const variantId=String(r.variant).replace('gid://shopify/ProductVariant/','');
    return {variantId,title:titles.get(variantId)??null,quantity:Number(r.quantity),customers:Number(r.customers),storedAgorot:Number(r.stored_agorot)};})};
- }
- // Every admin action recorded for this group, newest first (safe metadata only, as stored in admin_audit).
- async history(id:string,limit=50){
-  const target=publicId(id);
-  return (await this.db.query('SELECT at,action,result,detail,previous_status,new_status,amount_agorot FROM admin_audit WHERE target=$1 ORDER BY at DESC,id LIMIT '+Math.min(200,Math.max(1,limit)),[target])).rows
-   .map((r:any)=>({at:new Date(r.at).toISOString(),action:r.action,result:r.result,detail:r.detail,previousStatus:r.previous_status,newStatus:r.new_status,amountAgorot:r.amount_agorot===null?null:Number(r.amount_agorot)}));
  }
  // All members of a group for the CSV exports (no pagination: at most GROUP_CAPACITY active members plus their withdrawn history).
  async exportRows(id:string){

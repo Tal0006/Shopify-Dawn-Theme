@@ -11,7 +11,7 @@ import {Auth,same} from './auth.js';
 import {loginPage,dashboardPage,groupPage,memberPage,areasPage,auditView,errorPage,adminCSS,adminJS} from './admin.js';
 import {AdminData,csv} from './admin-data.js';
 import {Renewals} from './renewals.js';
-import {renewalsPage,groupExtras,RENEWAL_ERRORS} from './renewals-page.js';
+import {groupExtras,RENEWAL_ERRORS} from './renewals-page.js';
 import {audit,actorOf,auditPage} from './audit.js';
 import {safeNext} from './auth.js';
 import {ApiError,type ErrorCode} from './domain.js';
@@ -154,13 +154,13 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   res.type('html').send(dashboardPage({metrics,list,areas:areaList,csrf:csrfOf(res)}));
  });
  app.get('/admin/groups/:publicId',async(req,res)=>{
-  const [data,timeline,products,history,renewal]=await Promise.all([admin.members(req.params.publicId,req.query),admin.timeline(req.params.publicId),admin.products(req.params.publicId,req.query.products==='names'),admin.history(req.params.publicId),renewals.state(req.params.publicId)]);
+  const [data,timeline,products,renewal]=await Promise.all([admin.members(req.params.publicId,req.query),admin.timeline(req.params.publicId),admin.products(req.params.publicId,req.query.products==='names'),renewals.state(req.params.publicId)]);
   const error=typeof req.query.error==='string'&&GROUP_PAGE_ERRORS.includes(req.query.error)?req.query.error:noticeOf(req.query.error);
   // Renewal messages belong to the renewal section; the price-change step reopens the form of that one member.
   const renewalError=typeof req.query.renewalError==='string'&&RENEWAL_ERRORS[req.query.renewalError]?req.query.renewalError:undefined;
   const priceMember=typeof req.query.member==='string'&&/^[a-f0-9-]{36}$/.test(req.query.member)?req.query.member:undefined;
   const priceTotal=typeof req.query.total==='string'&&/^\d{1,10}$/.test(req.query.total)?Number(req.query.total):undefined;
-  const extras=groupExtras({group:data.group,products,history,renewal,csrf:csrfOf(res),error:renewalError,notice:noticeOf(req.query.renewalNotice),priceMember,priceTotal});
+  const extras=groupExtras({group:data.group,products,renewal,csrf:csrfOf(res),error:renewalError,notice:noticeOf(req.query.renewalNotice),priceMember,priceTotal});
   res.type('html').send(groupPage({...data,timeline,extras,csrf:csrfOf(res),notice:noticeOf(req.query.notice),error,confirming:req.query.confirm==='complete'}));
  });
  app.get('/admin/groups/:publicId/members/:memberId',async(req,res)=>{
@@ -284,7 +284,8 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   await audit(db,{action:'group.export',actor:res.locals.actor,target:group.publicId,result:'OK',detail:'members'});
   sendCsv(res,'group-'+group.shortId+'-members.csv',csv([
    ['אזור','מזהה קבוצה','סטטוס קבוצה','אימייל','טלפון','סטטוס לקוח','סכום התחייבות (₪)','שורות בסל','הצטרפות','עדכון אחרון'],
-   ...members.map(m=>[group.areaName,group.publicId,group.status,m.email,m.phone,m.status,(m.pledgedTotalAgorot/100).toFixed(2),m.cartLines,dateText(m.createdAt),dateText(m.updatedAt)])
+   // An expired, unconfirmed commitment is exported as such, never as a withdrawal.
+   ...members.map(m=>[group.areaName,group.publicId,group.status,m.email,m.phone,m.withdrawnBy==='EXPIRED'?'EXPIRED_UNCONFIRMED':m.status,(m.pledgedTotalAgorot/100).toFixed(2),m.cartLines,dateText(m.createdAt),dateText(m.updatedAt)])
   ]));
  });
  app.get('/admin/groups/:publicId/export-lines.csv',async(req,res)=>{
@@ -367,8 +368,6 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  });
  // Expiration management (src/renewals.ts). Behind the same session, Origin and CSRF checks as every /admin route.
  // Successful changes and their audit rows commit together; refusals are audited here with the error code.
- app.get('/admin/renewals',async(_req,res)=>res.type('html').send(renewalsPage({overview:await renewals.overview(),csrf:csrfOf(res)})));
- app.get('/admin/api/renewals',async(_req,res)=>res.json(await renewals.overview()));
  app.get('/admin/api/groups/:publicId/renewal',async(req,res)=>res.json(await renewals.state(req.params.publicId)));
  const renewalAction=async<T>(res:express.Response,id:string,action:'member.reconfirm'|'group.reopen',subject:string|null,run:()=>Promise<T>):Promise<T>=>{
   try{return await run();}
