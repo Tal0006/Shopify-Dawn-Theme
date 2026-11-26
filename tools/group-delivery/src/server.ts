@@ -10,6 +10,8 @@ import {Shopify,type CartValidator} from './shopify.js';
 import {Auth,same} from './auth.js';
 import {loginPage,dashboardPage,groupPage,memberPage,areasPage,auditView,errorPage,adminCSS,adminJS} from './admin.js';
 import {AdminData,csv} from './admin-data.js';
+import {Renewals} from './renewals.js';
+import {renewalsPage,groupExtras,RENEWAL_ERRORS} from './renewals-page.js';
 import {audit,actorOf,auditPage} from './audit.js';
 import {safeNext} from './auth.js';
 import {ApiError,type ErrorCode} from './domain.js';
@@ -41,7 +43,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  const orders=deps.orders!==undefined?deps.orders:cfg.payments.orders?new ShopifyOrders({domain:cfg.domain,...cfg.payments.orders}):null;
  const payments=new Payments(db,groups,validator,cfg.payments,cardcom,deps.paymentsLog,orders);
  groups.attachPayments(payments);app.locals.payments=payments;
- const auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator,payments);
+ const auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator,payments),renewals=new Renewals(db,groups,validator);
  const systemHealth=new SystemHealth(db,cfg.ops,()=>cfg.origin,deps.fetch,deps.health);
  // Business finance (/admin/system). deps.now: test seam for "today" (Israel time decides the current month).
  const finance=new Finance(db,cfg.ops.costs,deps.now);
@@ -152,9 +154,14 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   res.type('html').send(dashboardPage({metrics,list,areas:areaList,csrf:csrfOf(res)}));
  });
  app.get('/admin/groups/:publicId',async(req,res)=>{
-  const [data,timeline]=await Promise.all([admin.members(req.params.publicId,req.query),admin.timeline(req.params.publicId)]);
+  const [data,timeline,products,history,renewal]=await Promise.all([admin.members(req.params.publicId,req.query),admin.timeline(req.params.publicId),admin.products(req.params.publicId,req.query.products==='names'),admin.history(req.params.publicId),renewals.state(req.params.publicId)]);
   const error=typeof req.query.error==='string'&&GROUP_PAGE_ERRORS.includes(req.query.error)?req.query.error:noticeOf(req.query.error);
-  res.type('html').send(groupPage({...data,timeline,csrf:csrfOf(res),notice:noticeOf(req.query.notice),error,confirming:req.query.confirm==='complete'}));
+  // Renewal messages belong to the renewal section; the price-change step reopens the form of that one member.
+  const renewalError=typeof req.query.renewalError==='string'&&RENEWAL_ERRORS[req.query.renewalError]?req.query.renewalError:undefined;
+  const priceMember=typeof req.query.member==='string'&&/^[a-f0-9-]{36}$/.test(req.query.member)?req.query.member:undefined;
+  const priceTotal=typeof req.query.total==='string'&&/^\d{1,10}$/.test(req.query.total)?Number(req.query.total):undefined;
+  const extras=groupExtras({group:data.group,products,history,renewal,csrf:csrfOf(res),error:renewalError,notice:noticeOf(req.query.renewalNotice),priceMember,priceTotal});
+  res.type('html').send(groupPage({...data,timeline,extras,csrf:csrfOf(res),notice:noticeOf(req.query.notice),error,confirming:req.query.confirm==='complete'}));
  });
  app.get('/admin/groups/:publicId/members/:memberId',async(req,res)=>{
   const data=await admin.member(req.params.publicId,req.params.memberId);
@@ -357,6 +364,42 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.post('/admin/api/groups/:publicId/members/:memberId/withdraw',async(req,res)=>{
   const {group,member,previous,changed}=await removeMember(res,req.params.publicId,req.params.memberId,req.body?.confirm===true);
   res.json({group,member,previous,changed});
+ });
+ // Expiration management (src/renewals.ts). Behind the same session, Origin and CSRF checks as every /admin route.
+ // Successful changes and their audit rows commit together; refusals are audited here with the error code.
+ app.get('/admin/renewals',async(_req,res)=>res.type('html').send(renewalsPage({overview:await renewals.overview(),csrf:csrfOf(res)})));
+ app.get('/admin/api/renewals',async(_req,res)=>res.json(await renewals.overview()));
+ app.get('/admin/api/groups/:publicId/renewal',async(req,res)=>res.json(await renewals.state(req.params.publicId)));
+ const renewalAction=async<T>(res:express.Response,id:string,action:'member.reconfirm'|'group.reopen',subject:string|null,run:()=>Promise<T>):Promise<T>=>{
+  try{return await run();}
+  catch(error){await audit(db,{action,actor:res.locals.actor,target:id,subject,result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});throw error;}
+ };
+ const back=(id:string,params:Record<string,string>)=>'/admin/groups/'+encodeURIComponent(id)+'?'+new URLSearchParams(params).toString()+'#renew-title';
+ app.post('/admin/groups/:publicId/members/:memberId/reconfirm',async(req,res)=>{
+  const {publicId:id,memberId}=req.params;
+  try{await renewalAction(res,id,'member.reconfirm',memberId,()=>renewals.reconfirm(id,memberId,{method:req.body?.method,reference:req.body?.reference,acceptTotalAgorot:req.body?.acceptTotalAgorot},res.locals.actor));}
+  catch(error){
+   if(error instanceof ApiError&&RENEWAL_ERRORS[error.code]){
+    const total=error.code==='PRICE_CHANGED'?(await renewals.currentTotal(id,memberId).catch(()=>null)):null;
+    res.redirect(303,back(id,{renewalError:error.code,...(total!==null?{member:memberId,total:String(total)}:{})}));return;
+   }
+   throw error;
+  }
+  res.redirect(303,back(id,{renewalNotice:'reconfirmed'}));
+ });
+ app.post('/admin/api/groups/:publicId/members/:memberId/reconfirm',async(req,res)=>{
+  const {publicId:id,memberId}=req.params;
+  res.json(await renewalAction(res,id,'member.reconfirm',memberId,()=>renewals.reconfirm(id,memberId,req.body,res.locals.actor)));
+ });
+ app.post('/admin/groups/:publicId/reopen',async(req,res)=>{
+  const id=req.params.publicId;
+  try{await renewalAction(res,id,'group.reopen',null,()=>renewals.reopen(id,{confirm:req.body?.confirm==='yes',days:Number(req.body?.days)},res.locals.actor));}
+  catch(error){if(error instanceof ApiError&&RENEWAL_ERRORS[error.code]){res.redirect(303,back(id,{renewalError:error.code}));return;}throw error;}
+  res.redirect(303,back(id,{renewalNotice:'reopened'}));
+ });
+ app.post('/admin/api/groups/:publicId/reopen',async(req,res)=>{
+  const id=req.params.publicId;
+  res.json(await renewalAction(res,id,'group.reopen',null,()=>renewals.reopen(id,req.body,res.locals.actor)));
  });
  // Operational delivery workflow (admin only). The transition and its audit row commit together inside
  // groups.setOperationalStatus; refused attempts are audited here. COMPLETED needs an explicit confirmation.

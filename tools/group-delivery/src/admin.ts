@@ -18,6 +18,7 @@ const opChip=(status:string)=>'<span class="chip chip--op chip--op-'+escape(stat
 const ACTION_LABELS:Record<string,string>={'group.operational_status_change':'שינוי סטטוס משלוח','group.complete':'השלמת משלוח','login':'התחברות','logout':'התנתקות','group.approve':'אישור קבוצה','area.create':'הוספת אזור','area.update':'עדכון אזור','group.export':'ייצוא נתוני קבוצה','member.withdraw':'הסרת לקוח מהקבוצה',
  'group.charges_process':'שליחת חיובים','group.charges_reconcile':'בדיקת חיובים','finance.transaction_create':'רישום תנועה כספית','finance.transaction_update':'עדכון תנועה כספית','finance.transaction_delete':'מחיקת תנועה כספית',
  'finance.recurring_create':'הוספת חיוב קבוע','finance.recurring_update':'עדכון חיוב קבוע','finance.recurring_deactivate':'הפסקת חיוב קבוע','finance.recurring_delete':'מחיקת חיוב קבוע',
+ 'group.reopen':'פתיחת קבוצה מחדש','member.reconfirm':'רישום אישור לקוח',
  'cancellation.status_change':'שינוי שלב בבקשת ביטול','cancellation.note_update':'עדכון הערה בבקשת ביטול','cancellation.reveal_id':'הצגת מספר תעודת זהות בבקשת ביטול','cancellation.retention_purge':'מחיקת פרטי בקשת ביטול (תקופת שמירה)'};
 const RESULT_LABELS:Record<string,string>={OK:'הצליח',DENIED:'נדחה',FAILED:'נכשל'};
 const chip=(kind:'group'|'member',status:string)=>'<span class="chip chip--'+escape(status.toLowerCase())+'">'+escape((kind==='group'?GROUP_LABELS:MEMBER_LABELS)[status]||status)+'</span>';
@@ -46,6 +47,7 @@ export const ADMIN_SECTIONS:{key:string;label:string;href:string;enabled:boolean
  {key:'cancellations',label:'בקשות ביטול',href:'/admin/cancellations',enabled:true},
  {key:'feedback',label:'משוב לקוחות',href:'/admin/feedback',enabled:true},
  {key:'dashboard',label:'משלוחים קבוצתיים',href:'/admin',enabled:true},
+ {key:'renewals',label:'חידוש קבוצות',href:'/admin/renewals',enabled:true},
  {key:'areas',label:'אזורי משלוח',href:'/admin/areas',enabled:true},
  {key:'audit',label:'יומן פעולות',href:'/admin/audit',enabled:true},
  {key:'system',label:'מערכות האתר',href:'/admin/system/services',enabled:true},
@@ -89,7 +91,8 @@ export function dashboardPage(data:{metrics:any;list:any;areas:any[];csrf:string
   '<td data-label="משלוח">'+opChip(g.operationalStatus)+(g.completedAt?'<span class="cell-note">'+time(g.completedAt)+'</span>':'')+'</td>'+
   '<td data-label="התחייבויות">'+progress(g)+'</td>'+
   '<td data-label="משתתפים" class="num">'+g.activeMembers+(g.totalMembers>g.activeMembers?' <span class="muted">('+(g.totalMembers-g.activeMembers)+' יצאו)</span>':'')+'</td>'+
-  '<td data-label="נפתחה">'+time(g.createdAt)+'</td><td data-label="עודכנה">'+time(g.updatedAt)+'</td><td data-label="תוקף עד">'+time(g.expiresAt)+'</td></tr>').join('');
+  '<td data-label="תשלום">'+(g.paymentMode==='CARDCOM'?'<span class="cell-note">'+g.paymentSummary.reserved+' שמורים · '+g.paymentSummary.charged+' חויבו'+(g.paymentSummary.failed?' · '+g.paymentSummary.failed+' בבדיקה':'')+'</span>':'<span class="muted">ללא</span>')+'</td>'+
+  '<td data-label="נפתחה">'+time(g.createdAt)+'</td><td data-label="עודכנה">'+time(g.updatedAt)+'</td><td data-label="תוקף עד">'+time(g.expiresAt)+(g.reopenedCount?'<span class="cell-note">נפתחה מחדש</span>':'')+'</td></tr>').join('');
  const empty=filtered?'<div class="empty"><strong>לא נמצאו קבוצות שמתאימות לחיפוש.</strong><a class="btn btn--quiet" href="/admin">ניקוי הסינון</a></div>':'<div class="empty"><strong>עדיין אין משלוחים קבוצתיים.</strong><span>קבוצה נפתחת כשהלקוח הראשון מצטרף באזור.</span></div>';
  const option=(value:string,label:string,selected:string)=>'<option value="'+escape(value)+'"'+(value===selected?' selected':'')+'>'+escape(label)+'</option>';
  return layout('לוח בקרה',
@@ -124,7 +127,7 @@ export function dashboardPage(data:{metrics:any;list:any;areas:any[];csrf:string
    '<div class="filters__actions"><button class="btn btn--primary">סינון</button>'+(filtered?'<a class="btn btn--quiet" href="/admin">ניקוי</a>':'')+'</div>'+
   '</form>'+
   (list.groups.length?'<div class="table-wrap"><table class="table table--groups"><caption class="sr-only">משלוחים קבוצתיים, ממוינים לפי '+escape(f.sort)+'</caption><thead><tr>'+
-   sortHeader('area','אזור')+'<th scope="col">מזהה</th>'+sortHeader('status','סטטוס קבוצה')+sortHeader('operational','משלוח')+sortHeader('pledged','התחייבויות')+sortHeader('members','משתתפים')+sortHeader('created','נפתחה')+sortHeader('updated','עודכנה')+sortHeader('expires','תוקף עד')+
+   sortHeader('area','אזור')+'<th scope="col">מזהה</th>'+sortHeader('status','סטטוס קבוצה')+sortHeader('operational','משלוח')+sortHeader('pledged','התחייבויות')+sortHeader('members','משתתפים')+'<th scope="col">תשלום</th>'+sortHeader('created','נפתחה')+sortHeader('updated','עודכנה')+sortHeader('expires','תוקף עד')+
    '</tr></thead><tbody>'+rows+'</tbody></table></div>'+pager('/admin',params,list.pagination,'קבוצות'):empty)+
   '</section>',{csrf:data.csrf,active:'dashboard'});
 }
@@ -228,7 +231,7 @@ function operationsCard(g:any,timeline:any[],csrf:string,confirming:boolean){
   '<ol class="steps" aria-label="שלבי המשלוח">'+steps+'</ol>'+open+
   (form||dialog?'<div class="ops-actions">'+form+dialog+'</div>':'')+history+'</section>';
 }
-export function groupPage(data:{group:any;members:any[];pagination:Page;memberStatus:string;csrf:string;notice?:string;error?:string;timeline?:any[];confirming?:boolean}){
+export function groupPage(data:{group:any;members:any[];pagination:Page;memberStatus:string;csrf:string;notice?:string;error?:string;timeline?:any[];confirming?:boolean;extras?:string}){
  const g=data.group,base='/admin/groups/'+g.publicId;
  const members=data.members.map((m:any)=>{
   const tel=dialable(m.phone),wa=tel?'https://wa.me/'+tel.slice(1):null;
@@ -275,7 +278,7 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
     pager(base,{memberStatus:data.memberStatus||undefined},data.pagination,'לקוחות'):
     '<div class="empty"><strong>'+(data.memberStatus?'אין לקוחות בסטטוס הזה.':'אין לקוחות בקבוצה.')+'</strong></div>')+
    '<p class="muted">המערכת שומרת אימייל וטלפון בלבד; שם לקוח אינו נשמר. פעולות הקשר רק פותחות את האפליקציה המתאימה ואינן שולחות הודעות.</p>'+
-  '</section>',{csrf:data.csrf,active:'dashboard'});
+  '</section>'+(data.extras||''),{csrf:data.csrf,active:'dashboard'});
 }
 
 // Removal from the group (store owner). Shown only for a PLEDGED member of an active group. The trigger is a link to
@@ -576,7 +579,7 @@ fieldset{margin:0;padding:0;border:0;min-width:0}legend{padding:0;font-size:13px
 .fb-dist .meter__track{margin:0}.fb-dist__count{font-variant-numeric:tabular-nums;color:var(--muted)}
 .fb-terms{margin:8px 0 12px;padding-inline-start:24px;display:grid;gap:6px}.fb-terms__text{font-weight:600;overflow-wrap:anywhere}
 @media print{.topbar,.filters,.actions,.pager{display:none}}
-`+Array.from({length:101},(_,i)=>`.meter__track .p${i}{width:${i}%}`).join("")+``;
+`+Array.from({length:101},(_,i)=>`.meter__track .p${i}{width:${i}%}`).join("")+`.renewal-list{list-style:none;margin:12px 0;padding:0;display:grid;gap:12px}.renewal-member{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}.inline-form{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end}.inline-form label{display:grid;gap:4px;font-size:14px}.inline-form .check{display:flex;align-items:center;gap:6px}.history{margin:0;padding-inline-start:20px;display:grid;gap:6px;font-size:14px}@media(max-width:700px){.renewal-confirm input,.inline-form .check input{width:44px;height:44px}}`;
 
 // Progressive enhancements only (CSP: script-src 'self'). No storage, no network calls, no customer data kept in JS.
 export const adminJS=`(()=>{'use strict';

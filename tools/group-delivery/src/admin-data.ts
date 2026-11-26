@@ -77,12 +77,19 @@ const groupRow=(row:any)=>{
   operationalStatus:row.operational_status,completedAt:row.completed_at?new Date(row.completed_at).toISOString():null,completedBy:row.completed_by??null,thresholdAgorot:threshold,
   remainingAgorot:Math.max(0,threshold-total),progressPercent:threshold>0?Math.min(100,Math.floor(total*100/threshold)):0,
   activeMembers:Number(row.active_members),totalMembers:Number(row.all_members),
+  // Payment summary (separate from the commitment status): card members by payment stage. Groups without cards have none.
+  paymentSummary:{reserved:Number(row.pay_reserved??0),charged:Number(row.pay_charged??0),failed:Number(row.pay_failed??0),canceled:Number(row.pay_canceled??0)},
+  reopenedCount:Number(row.reopened_count??0),
   createdAt:new Date(row.created_at).toISOString(),updatedAt:new Date(row.updated_at).toISOString(),expiresAt:new Date(row.expires_at).toISOString()
  };
 };
 const GROUP_SELECT=`SELECT g.*,a.public_id AS area_public_id,
  (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id AND m.status='${ACTIVE_MEMBER_STATUS}')::int AS active_members,
- (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id)::int AS all_members
+ (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id)::int AS all_members,
+ (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id AND m.payment_status IN ('CARD_RESERVED','CONSENT_REQUIRED'))::int AS pay_reserved,
+ (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id AND m.payment_status='CHARGED')::int AS pay_charged,
+ (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id AND m.payment_status IN ('PAYMENT_FAILED','CHARGE_PENDING'))::int AS pay_failed,
+ (SELECT COUNT(*) FROM group_members m WHERE m.group_id=g.id AND m.payment_status='CANCELED')::int AS pay_canceled
  FROM delivery_groups g LEFT JOIN delivery_areas a ON a.id=g.area_id`;
 const memberRow=(row:any)=>({
  id:row.id,email:row.email,phone:row.phone,status:row.status,pledgedTotalAgorot:Number(row.pledged_total_agorot),
@@ -212,6 +219,27 @@ export class AdminData{
   return {group:publicGroup,member:{...memberRow(row),access:{receipts:Number(access?.receipts??0),recoveredReceipts:Number(access?.recovered??0),events},
    // HISTORICAL: the last cart kept after a withdrawal; never counted, restored or used for checkout.
    snapshotKind:row.status===ACTIVE_MEMBER_STATUS?'ACTIVE' as const:'HISTORICAL' as const,historicalLines:row.status===ACTIVE_MEMBER_STATUS?0:Number(row.cart_lines),snapshotTotalAgorot:lines.reduce((sum,line)=>sum+line.storedLineAgorot,0),lines,productLookup}};
+ }
+ // Products across the ACTIVE pledges of a group: quantity, customers and stored amount per variant. Titles come
+ // from one batched Shopify request when available; the stored pledges are never changed.
+ async products(id:string,resolve=false){
+  const group=await this.group(id);
+  const rows=(await this.db.query(`SELECT line->>'variantId' AS variant,SUM((line->>'quantity')::int)::int AS quantity,COUNT(DISTINCT m.id)::int AS customers,
+   SUM((line->>'quantity')::int*(line->>'unitAgorot')::bigint)::bigint AS stored_agorot
+   FROM group_members m,jsonb_array_elements(m.cart_snapshot) line WHERE m.group_id=$1 AND m.status='${ACTIVE_MEMBER_STATUS}' AND jsonb_typeof(m.cart_snapshot)='array'
+   GROUP BY 1 ORDER BY 2 DESC,1`,[group._id])).rows;
+  const titles=new Map<string,string|null>();let lookup:'OK'|'UNAVAILABLE'|'SKIPPED'='SKIPPED';
+  if(resolve&&rows.length&&this.shopify.inspect){
+   try{for(const line of await this.shopify.inspect(rows.map((r:any)=>({variantId:r.variant,quantity:1,unitAgorot:'0'}))))titles.set(line.variantId,line.title);lookup='OK';}catch{lookup='UNAVAILABLE';}
+  }
+  return {lookup,products:rows.map((r:any)=>{const variantId=String(r.variant).replace('gid://shopify/ProductVariant/','');
+   return {variantId,title:titles.get(variantId)??null,quantity:Number(r.quantity),customers:Number(r.customers),storedAgorot:Number(r.stored_agorot)};})};
+ }
+ // Every admin action recorded for this group, newest first (safe metadata only, as stored in admin_audit).
+ async history(id:string,limit=50){
+  const target=publicId(id);
+  return (await this.db.query('SELECT at,action,result,detail,previous_status,new_status,amount_agorot FROM admin_audit WHERE target=$1 ORDER BY at DESC,id LIMIT '+Math.min(200,Math.max(1,limit)),[target])).rows
+   .map((r:any)=>({at:new Date(r.at).toISOString(),action:r.action,result:r.result,detail:r.detail,previousStatus:r.previous_status,newStatus:r.new_status,amountAgorot:r.amount_agorot===null?null:Number(r.amount_agorot)}));
  }
  // All members of a group for the CSV exports (no pagination: at most GROUP_CAPACITY active members plus their withdrawn history).
  async exportRows(id:string){
