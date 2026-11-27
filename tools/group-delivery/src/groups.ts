@@ -28,6 +28,10 @@ export interface AdmitOptions {
  tokenHash?:string;
  /** Card membership: the amount the member explicitly approved and when. */
  card?:{approvedAgorot:bigint;consentAt:Date};
+  /** The first cart version's source (migration 018): a join, or an order placed from an existing receipt. */
+ cartSource?:'JOIN'|'ANOTHER_ORDER';
+ /** "Place another order": the same customer's LOCKED (paid or delivered) orders in this group do not block it. */
+ besideLocked?:boolean;
 }
 // The domain's active-member definition and the per-group limit on active members. Withdrawn rows are kept as history
 // and never count toward capacity, participant counts or totals.
@@ -46,8 +50,14 @@ export const operationalTargets=(from:string):OperationalStatus[]=>{
 };
 // Accepting pledges: business status OPEN/THRESHOLD_REACHED and the delivery not completed.
 export const acceptsPledges=(group:{status:string;operational_status?:string})=>['OPEN','THRESHOLD_REACHED'].includes(group.status)&&group.operational_status!=='COMPLETED';
+// Records the order's current cart as a new version (migration 018). Must run in the same transaction as the change.
+export async function recordCart(db:Queryable,memberId:string,source:'JOIN'|'CUSTOMER_UPDATE'|'REOPEN'|'ADMIN_RESTORE'|'ADMIN_SPLIT'|'ADMIN_TRANSFER'|'ANOTHER_ORDER',actor:string|null=null){
+ await db.query('INSERT INTO member_cart_versions(id,member_id,cart_snapshot,amount_agorot,source,actor) SELECT $1,id,cart_snapshot,pledged_total_agorot,$3,$4 FROM group_members WHERE id=$2',[randomUUID(),memberId,source,actor]);
+}
+// A locked order (paid outside the online flow, or delivered) is never edited, withdrawn or reconfirmed.
+export const LOCKED_MESSAGE='ההזמנה הזו כבר שולמה או נמסרה ואינה ניתנת לשינוי. אפשר לבצע הזמנה נוספת נפרדת.';
 // Stores one device receipt for a membership (hash only). Shared by join and OTP recovery; never revokes another.
-export async function issueToken(db:Queryable,memberId:string,source:'JOIN'|'RECOVERY',token=randomBytes(32).toString('hex')){
+export async function issueToken(db:Queryable,memberId:string,source:'JOIN'|'RECOVERY'|'LINK',token=randomBytes(32).toString('hex')){
  await db.query('INSERT INTO member_tokens(id,member_id,token_hash,source) VALUES($1,$2,$3,$4)',[randomUUID(),memberId,hash(token),source]);
  return token;
 }
@@ -133,22 +143,22 @@ export class Groups {
  }
  // Every admission rule except the insert; must run inside locked(). Shared by free joins, card reservations (checked
  // up front so a shopper is not sent to Cardcom for a join that cannot happen) and card activation (checked again).
- async admissible(db:Queryable,group:any,place:AreaPlace,person:{email:string;phone:string},mode:PaymentMode){
+ async admissible(db:Queryable,group:any,place:AreaPlace,person:{email:string;phone:string},mode:PaymentMode,besideLocked=false){
   if(!acceptsPledges(group))throw new ApiError(409,'GROUP_CLOSED');
   // A group only takes members of its own payment mode (no free joins into a card group, no card joins into an old one).
   if(group.payment_mode!==mode)throw new ApiError(409,'GROUP_CLOSED');
   if(!this.fits(group,place))throw new ApiError(409,'LOCATION_OUTSIDE_GROUP','המיקום אינו מתאים לקבוצה הזאת. חפשו קבוצה באזור שלכם.');
-  const members=(await db.query('SELECT email,phone,status FROM group_members WHERE group_id=$1',[group.id])).rows;
+  const members=(await db.query('SELECT email,phone,status,order_state FROM group_members WHERE group_id=$1',[group.id])).rows;
   // Capacity counts active (PLEDGED) members only; withdrawn rows are history and hold no slot.
   if(members.filter(member=>member.status===ACTIVE_MEMBER_STATUS).length>=GROUP_CAPACITY)throw new ApiError(409,'GROUP_FULL');
   // Any existing row with this email or phone, withdrawn or not, refuses a new join. A withdrawn member returns only
   // through their receipt (update-pledge); email + phone alone never reactivate a row or issue a token (no OTP yet).
-  if(members.some(member=>member.email===person.email||member.phone===person.phone))throw new ApiError(409,'ALREADY_JOINED','לא ניתן להצטרף שוב עם אותם פרטים. לעדכון הסל השתמשו באישור ההצטרפות הקיים.');
+  if(members.some(member=>(member.email===person.email||member.phone===person.phone)&&!(besideLocked&&member.order_state==='LOCKED')))throw new ApiError(409,'ALREADY_JOINED','לא ניתן להצטרף שוב עם אותם פרטים. לעדכון הסל השתמשו באישור ההצטרפות הקיים.');
  }
  // Shared membership insert; must run inside locked(). Every rule applies to new and existing groups alike.
  // Members store no coordinates. A card membership (options.card) is created only from a verified Cardcom reservation.
  async admit(db:Queryable,group:any,place:AreaPlace,person:{email:string;phone:string},cart:ValidatedCart,options:AdmitOptions={}){
-  await this.admissible(db,group,place,person,options.card?'CARDCOM':'NONE');
+  await this.admissible(db,group,place,person,options.card?'CARDCOM':'NONE',options.besideLocked===true);
   const token=options.tokenHash?null:randomBytes(32).toString('hex'),tokenHash=options.tokenHash??hash(token!),memberId=randomUUID();
   const card=options.card;
   await db.query(`INSERT INTO group_members(id,group_id,email,phone,locality_key,cart_snapshot,pledged_total_agorot,token_hash,payment_status,approved_amount_agorot,consent_at)
@@ -156,6 +166,7 @@ export class Groups {
    [memberId,group.id,person.email,person.phone,place.key,JSON.stringify(cart.snapshot),cart.total.toString(),tokenHash,card?'CARD_RESERVED':null,card?card.approvedAgorot.toString():null,card?card.consentAt:null]);
   // The join receipt is this membership's first device receipt (member_tokens); a recovery adds another one.
   await db.query('INSERT INTO member_tokens(id,member_id,token_hash,source) VALUES($1,$2,$3,$4)',[randomUUID(),memberId,tokenHash,'JOIN']);
+  await recordCart(db,memberId,options.cartSource??'JOIN');
   return {memberId,group:await this.recalculate(db,group),memberToken:token,validatedPledgeAgorot:Number(cart.total)};
  }
  private async enroll(db:Queryable,group:any,place:AreaPlace,person:{email:string;phone:string},cart:ValidatedCart){
@@ -192,7 +203,7 @@ export class Groups {
  // rolling deploy (before member_tokens existed) still authenticates; a revoked member_tokens row always wins.
  async member(id:string,token:string){
   publicId(id);if(!/^[a-f0-9]{64}$/.test(token))throw new ApiError(401,'MEMBER_AUTH_REQUIRED');
-  const row=(await this.db.query(`SELECT m.id,m.status,m.pledged_total_agorot,m.cart_snapshot,m.payment_status,m.approved_amount_agorot,m.pending_amount_agorot,g.payment_mode,
+  const row=(await this.db.query(`SELECT m.id,m.status,m.pledged_total_agorot,m.cart_snapshot,m.payment_status,m.approved_amount_agorot,m.pending_amount_agorot,m.order_state,g.payment_mode,
    (SELECT r.card_last4 FROM group_payment_reservations r WHERE r.member_id=m.id AND r.status='CARD_RESERVED' ORDER BY r.verified_at DESC LIMIT 1) AS card_last4,
    (SELECT r.card_brand FROM group_payment_reservations r WHERE r.member_id=m.id AND r.status='CARD_RESERVED' ORDER BY r.verified_at DESC LIMIT 1) AS card_brand
    FROM group_members m JOIN delivery_groups g ON m.group_id=g.id
@@ -206,12 +217,17 @@ export class Groups {
  async update(id:string,token:string,body:any){
   const proof=await this.member(id,token);
   if(Array.isArray(body?.lines)&&body.lines.length===0)throw new ApiError(422,'EMPTY_CART_CANNOT_UPDATE_PLEDGE','הסל ריק, ולכן ההתחייבות לא שונתה.');
+  if(proof.order_state==='LOCKED')throw new ApiError(409,'ORDER_LOCKED',LOCKED_MESSAGE);
   const cart=await this.shopify.validate(lines(body?.lines));
   return this.locked(async db=>{
    const group=await this.group(db,id);
    if(!acceptsPledges(group))throw new ApiError(409,'GROUP_CLOSED');
+   // Checked again under the lock: an order locked since the receipt check is never edited.
+   const state=(await db.query('SELECT order_state FROM group_members WHERE id=$1 FOR UPDATE',[proof.id])).rows[0];
+   if(state?.order_state==='LOCKED')throw new ApiError(409,'ORDER_LOCKED',LOCKED_MESSAGE);
    if(group.payment_mode==='CARDCOM')return this.updateCard(db,group,proof.id,cart);
    await db.query("UPDATE group_members SET cart_snapshot=$1::jsonb,pledged_total_agorot=$2,status='PLEDGED',withdrawn_at=NULL,withdrawn_by=NULL,updated_at=NOW() WHERE id=$3 AND group_id=$4",[JSON.stringify(cart.snapshot),cart.total.toString(),proof.id,group.id]);
+   await recordCart(db,proof.id,'CUSTOMER_UPDATE');
    return {group:await this.recalculate(db,group),validatedPledgeAgorot:Number(cart.total)};
   });
  }
@@ -230,6 +246,7 @@ export class Groups {
     consentRequired:{approvedAmountAgorot:Number(approved),newAmountAgorot:Number(cart.total)}};
   }
   await db.query("UPDATE group_members SET cart_snapshot=$1::jsonb,pledged_total_agorot=$2,pending_cart_snapshot=NULL,pending_amount_agorot=NULL,payment_status='CARD_RESERVED',updated_at=NOW() WHERE id=$3",[JSON.stringify(cart.snapshot),cart.total.toString(),memberId]);
+  await recordCart(db,memberId,'CUSTOMER_UPDATE');
   return {group:await this.recalculate(db,group),validatedPledgeAgorot:Number(cart.total)};
  }
  // Explicit consent to a pending higher amount: {confirm:true, amountAgorot} must equal the pending amount, and the
@@ -257,6 +274,7 @@ export class Groups {
     return {changed:Number(cart.total)};
    }
    await db.query("UPDATE group_members SET cart_snapshot=pending_cart_snapshot,pledged_total_agorot=pending_amount_agorot,approved_amount_agorot=pending_amount_agorot,consent_at=NOW(),pending_cart_snapshot=NULL,pending_amount_agorot=NULL,payment_status='CARD_RESERVED',updated_at=NOW() WHERE id=$1",[proof.id]);
+   await recordCart(db,proof.id,'CUSTOMER_UPDATE');
    return {group:await this.recalculate(db,group),validatedPledgeAgorot:Number(cart.total)};
   });
   if('changed' in outcome&&outcome.changed!==undefined)throw new ApiError(409,'PLEDGE_AMOUNT_CHANGED','סכום ההתחייבות השתנה. יש לאשר את הסכום החדש לפני שנוכל להמשיך.',{newAmountAgorot:outcome.changed});
@@ -270,8 +288,9 @@ export class Groups {
  // threshold status come from recalculate(). Already withdrawn: no write, same result (idempotent).
  private async retire(db:Queryable,group:any,memberId:string,by:'MEMBER'|'ADMIN'){
   if(!acceptsPledges(group))throw new ApiError(409,'GROUP_CLOSED');
-  const before=(await db.query('SELECT status,pledged_total_agorot,payment_status FROM group_members WHERE id=$1 AND group_id=$2 FOR UPDATE',[memberId,group.id])).rows[0];
+  const before=(await db.query('SELECT status,pledged_total_agorot,payment_status,order_state FROM group_members WHERE id=$1 AND group_id=$2 FOR UPDATE',[memberId,group.id])).rows[0];
   if(!before)throw new ApiError(404,'MEMBER_NOT_FOUND','הלקוח לא נמצא בקבוצה הזאת.');
+  if(before.order_state==='LOCKED')throw new ApiError(409,'ORDER_LOCKED',LOCKED_MESSAGE);
   const previous={status:before.status as 'PLEDGED'|'WITHDRAWN',pledgedTotalAgorot:Number(before.pledged_total_agorot)};
   if(previous.status==='WITHDRAWN')return {group:await this.aggregate(db,group),member:{status:'WITHDRAWN' as const,pledgedTotalAgorot:0},previous,changed:false};
   // A charge that started or happened is never undone by a self-service withdrawal (refunds are the business's process).
@@ -289,6 +308,8 @@ export class Groups {
  async withdraw(id:string,token:string,body:any){
   const proof=await this.member(id,token);
   if(body?.confirm!==true)throw new ApiError(400,'WITHDRAW_CONFIRMATION_REQUIRED');
+  // A paid or delivered order says so, whatever its cycle's state (retire() checks again under the lock).
+  if(proof.order_state==='LOCKED')throw new ApiError(409,'ORDER_LOCKED',LOCKED_MESSAGE);
   return this.locked(async db=>{
    const {group,member}=await this.retire(db,await this.group(db,id),proof.id,'MEMBER');
    return {group,member};
@@ -314,7 +335,11 @@ export class Groups {
    else try{cart=await this.shopify.inspect(snapshot);}
    catch(error){if((error as any)?.code!=='SHOPIFY_UNAVAILABLE')throw error;cart=null;cartCheck='UNAVAILABLE';}
   }
+  const linked=(await this.db.query('SELECT g.public_id FROM member_links l JOIN group_members t ON t.id=l.to_member_id JOIN delivery_groups g ON g.id=t.group_id WHERE l.from_member_id=$1 ORDER BY l.created_at',[row.id])).rows.map((x:any)=>x.public_id as string);
   return {member:{status:row.status as 'PLEDGED'|'WITHDRAWN',pledgedTotalAgorot:Number(row.pledged_total_agorot),cartCheck,cart,
+   // Migration 018, present only when they apply (an open order without links reads exactly as before): a locked
+   // order, and the groups of orders linked to this one (split off it, placed from it, or carried to the next cycle).
+   ...(row.order_state==='LOCKED'?{orderState:'LOCKED' as const}:{}),...(linked.length?{linkedGroupPublicIds:linked}:{}),
    // Card groups only (the member read of groups without cards is unchanged). Never the token, its expiry or any Cardcom id.
    ...(row.payment_mode==='CARDCOM'&&row.payment_status?{payment:{status:row.payment_status as string,
     approvedAmountAgorot:Number(row.approved_amount_agorot??0),pendingAmountAgorot:row.pending_amount_agorot===null?null:Number(row.pending_amount_agorot),

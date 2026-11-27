@@ -18,7 +18,7 @@ const opChip=(status:string)=>'<span class="chip chip--op chip--op-'+escape(stat
 const ACTION_LABELS:Record<string,string>={'group.operational_status_change':'שינוי סטטוס משלוח','group.complete':'השלמת משלוח','login':'התחברות','logout':'התנתקות','group.approve':'אישור קבוצה','area.create':'הוספת אזור','area.update':'עדכון אזור','group.export':'ייצוא נתוני קבוצה','member.withdraw':'הסרת לקוח מהקבוצה',
  'group.charges_process':'שליחת חיובים','group.charges_reconcile':'בדיקת חיובים','finance.transaction_create':'רישום תנועה כספית','finance.transaction_update':'עדכון תנועה כספית','finance.transaction_delete':'מחיקת תנועה כספית',
  'finance.recurring_create':'הוספת חיוב קבוע','finance.recurring_update':'עדכון חיוב קבוע','finance.recurring_deactivate':'הפסקת חיוב קבוע','finance.recurring_delete':'מחיקת חיוב קבוע',
- 'group.reopen':'פתיחת קבוצה מחדש','member.reconfirm':'רישום אישור לקוח','member.expire_unconfirmed':'התחייבות שפג תוקפה (לא אושרה מחדש)',
+ 'group.reopen':'פתיחת קבוצה מחדש','member.reconfirm':'רישום אישור לקוח','member.payment_attest':'רישום תשלום שהתקבל מחוץ למערכת','member.order_restore':'שחזור הזמנה מקורית','member.order_split':'הזמנה נפרדת במחזור חדש','member.transfer':'העברת הזמנה למחזור חדש','group.cycle_split':'סיום מחזור ופתיחת מחזור חדש','member.expire_unconfirmed':'התחייבות שפג תוקפה (לא אושרה מחדש)',
  'cancellation.status_change':'שינוי שלב בבקשת ביטול','cancellation.note_update':'עדכון הערה בבקשת ביטול','cancellation.reveal_id':'הצגת מספר תעודת זהות בבקשת ביטול','cancellation.retention_purge':'מחיקת פרטי בקשת ביטול (תקופת שמירה)'};
 const RESULT_LABELS:Record<string,string>={OK:'הצליח',DENIED:'נדחה',FAILED:'נכשל'};
 const chip=(kind:'group'|'member',status:string)=>'<span class="chip chip--'+escape(status.toLowerCase())+'">'+escape((kind==='group'?GROUP_LABELS:MEMBER_LABELS)[status]||status)+'</span>';
@@ -179,8 +179,10 @@ const ERRORS:Record<string,string>={confirm:'יש לסמן את תיבת האי�
  COMPLETION_CONFIRMATION_REQUIRED:'נדרש אישור מפורש להשלמת המשלוח. לא בוצע שינוי.',
  PAYMENT_UNAVAILABLE:'חיוב בכרטיסי אשראי אינו זמין כרגע. לא בוצע שינוי.',CHARGE_IN_PROGRESS:'החיוב של הלקוח כבר התחיל או בוצע, ולכן לא ניתן להסיר אותו כאן. לא בוצע שינוי.'};
 // Withdrawn members are labelled by who withdrew them (migration 004 backfills older rows as MEMBER).
-const WITHDRAWN_BY:Record<string,string>={ADMIN:'הוסר על ידי מנהל',MEMBER:'פרש מהקבוצה',EXPIRED:'פג תוקף, לא אושר מחדש'};
-const inactiveReason=(by?:string|null)=>by==='ADMIN'||by==='EXPIRED'?by:'MEMBER';
+const WITHDRAWN_BY:Record<string,string>={ADMIN:'הוסר על ידי מנהל',MEMBER:'פרש מהקבוצה',EXPIRED:'פג תוקף, לא אושר מחדש',TRANSFERRED:'הועבר למחזור חדש'};
+const inactiveReason=(by?:string|null)=>by==='ADMIN'||by==='EXPIRED'||by==='TRANSFERRED'?by:'MEMBER';
+// Migration 018: why an order is locked (never edited or withdrawn).
+const LOCKED_LABELS:Record<string,string>={PAID_EXTERNAL:'שולם מחוץ למערכת',DELIVERED:'נמסר'};
 // Customer recovery events (security_events). Codes, tokens and contact details are never stored, so none are shown.
 const RECOVERY_EVENTS:Record<string,string>={RECOVERY_REQUESTED:'בקשת קוד לשחזור גישה',RECOVERY_SENT:'קוד אימות נשלח במייל',RECOVERY_DELIVERY_FAILED:'שליחת קוד האימות נכשלה',
  RECOVERY_SUCCEEDED:'הגישה שוחזרה במכשיר נוסף',RECOVERY_FAILED:'קוד אימות שגוי',RECOVERY_LOCKED:'הקוד ננעל אחרי יותר מדי ניסיונות'};
@@ -193,9 +195,9 @@ const accessCard=(access:any)=>{
    events.map((e:any)=>'<tr><td data-label="מועד">'+time(e.at)+'</td><td data-label="אירוע">'+escape(RECOVERY_EVENTS[e.event]??e.event)+'</td></tr>').join('')+'</tbody></table></div>':'<p class="muted">לא היו בקשות לשחזור גישה.</p>')+
   '<p class="muted">קודי אימות, אישורי הצטרפות וכתובות IP אינם נשמרים ואינם מוצגים.</p></section>';
 };
-const memberChip=(m:{status:string;withdrawnBy?:string|null})=>m.status==='WITHDRAWN'
- ?'<span class="chip chip--'+(m.withdrawnBy==='ADMIN'?'removed':m.withdrawnBy==='EXPIRED'?'expired':'withdrawn')+'">'+escape(WITHDRAWN_BY[inactiveReason(m.withdrawnBy)])+'</span>'
- :chip('member',m.status);
+const memberChip=(m:{status:string;withdrawnBy?:string|null;orderState?:string;lockedReason?:string|null})=>m.status==='WITHDRAWN'
+ ?'<span class="chip chip--'+(m.withdrawnBy==='ADMIN'?'removed':m.withdrawnBy==='EXPIRED'||m.withdrawnBy==='TRANSFERRED'?'expired':'withdrawn')+'">'+escape(WITHDRAWN_BY[inactiveReason(m.withdrawnBy)])+'</span>'
+ :chip('member',m.status)+(m.orderState==='LOCKED'?' <span class="chip chip--pledged">'+escape(LOCKED_LABELS[m.lockedReason||'']||'נעול')+'</span>':'');
 // Operational workflow card: stepper with the time each step was reached, the status form (forward one step or back),
 // the completion trigger + dialog (?confirm=complete renders it without JavaScript) and the transition history.
 function operationsCard(g:any,timeline:any[],csrf:string,confirming:boolean){
@@ -266,7 +268,7 @@ export function groupPage(data:{group:any;members:any[];pagination:Page;memberSt
    '<dl class="facts">'+
     '<div class="facts__wide"><dt>מזהה קבוצה</dt><dd><code dir="ltr">'+escape(g.publicId)+'</code> '+copyButton(g.publicId,'מזהה הקבוצה')+'</dd></div>'+
     '<div><dt>יעד</dt><dd>'+escape(money(g.thresholdAgorot))+'</dd></div>'+
-    '<div><dt>משתתפים פעילים</dt><dd>'+g.activeMembers+(g.withdrawnMembers?' · '+g.withdrawnMembers+' הוסרו מהקבוצה':'')+(g.expiredUnconfirmed?' · '+g.expiredUnconfirmed+' פג תוקף ולא אושרו מחדש':'')+'</dd></div>'+
+    '<div><dt>משתתפים פעילים</dt><dd>'+g.activeMembers+(g.withdrawnMembers?' · '+g.withdrawnMembers+' הוסרו מהקבוצה':'')+(g.expiredUnconfirmed?' · '+g.expiredUnconfirmed+' פג תוקף ולא אושרו מחדש':'')+(g.transferred?' · '+g.transferred+' הועברו למחזור חדש':'')+'</dd></div>'+
     '<div><dt>שלב המשלוח</dt><dd>'+escape(OPERATIONAL_LABELS[g.operationalStatus]||g.operationalStatus)+'</dd></div>'+
     (g.completedAt?'<div><dt>הושלם</dt><dd>'+time(g.completedAt)+'</dd></div>':'')+
     '<div><dt>תפוסה</dt><dd>'+g.capacity.active+' מתוך '+g.capacity.limit+' מקומות פעילים</dd></div>'+
@@ -328,7 +330,7 @@ export function memberPage(data:{group:any;member:any;csrf:string;error?:string;
     '<div><dt>הצטרפות</dt><dd>'+time(m.createdAt)+'</dd></div><div><dt>עדכון אחרון</dt><dd>'+time(m.updatedAt)+'</dd></div>'+
     '<div><dt>קבוצה</dt><dd><a href="'+escape(base)+'">'+escape(g.areaName)+'</a> · '+chip('group',g.status)+'</dd></div>'+
     withdrawnFacts+
-    '<div class="facts__wide"><dt>מצב הקבוצה</dt><dd>'+progress(g)+'<span class="muted">'+g.activeMembers+' משתתפים פעילים'+(g.withdrawnMembers?' · '+g.withdrawnMembers+' הוסרו מהקבוצה':'')+(g.expiredUnconfirmed?' · '+g.expiredUnconfirmed+' פג תוקף ולא אושרו מחדש':'')+'</span></dd></div>'+
+    '<div class="facts__wide"><dt>מצב הקבוצה</dt><dd>'+progress(g)+'<span class="muted">'+g.activeMembers+' משתתפים פעילים'+(g.withdrawnMembers?' · '+g.withdrawnMembers+' הוסרו מהקבוצה':'')+(g.expiredUnconfirmed?' · '+g.expiredUnconfirmed+' פג תוקף ולא אושרו מחדש':'')+(g.transferred?' · '+g.transferred+' הועברו למחזור חדש':'')+'</span></dd></div>'+
    '</dl>'+
    '<div class="actions"><a class="btn btn--quiet" href="mailto:'+escape(m.email)+'">שליחת אימייל</a>'+(tel?'<a class="btn btn--quiet" href="tel:'+escape(tel)+'">חיוג</a><a class="btn btn--quiet" href="https://wa.me/'+escape(tel.slice(1))+'" target="_blank" rel="noopener noreferrer">וואטסאפ<span class="sr-only"> (נפתח בכרטיסייה חדשה)</span></a>':'')+'</div>'+
   '</section>'+

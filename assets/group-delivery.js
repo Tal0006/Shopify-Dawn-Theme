@@ -26,7 +26,10 @@
   if(!member||!['PLEDGED','WITHDRAWN'].includes(member.status)||!count(member.pledgedTotalAgorot)||!['OK','UNAVAILABLE'].includes(member.cartCheck))return null;
   if(member.cart!==null&&!(Array.isArray(member.cart)&&member.cart.every(line=>line&&VARIANT.test(line.variantId)&&count(line.quantity)&&line.quantity>0&&count(line.restorableQuantity)&&line.restorableQuantity<=line.quantity&&
    count(line.storedUnitAgorot)&&(line.currentUnitAgorot===null||count(line.currentUnitAgorot))&&typeof line.available==='boolean'&&typeof line.priceChanged==='boolean'&&REASONS.has(line.reason)&&(line.title===null||typeof line.title==='string'))))return null;
-  return {status:member.status,pledgedTotalAgorot:member.pledgedTotalAgorot,cartCheck:member.cartCheck,cart:member.cart,payment:paymentShape(member.payment)};
+  // Migration 018, present only when they apply: a locked (paid or delivered) order, and the groups of linked orders.
+  const linked=Array.isArray(member.linkedGroupPublicIds)?member.linkedGroupPublicIds.filter(id=>UUID.test(id)).slice(0,6):[];
+  return {status:member.status,pledgedTotalAgorot:member.pledgedTotalAgorot,cartCheck:member.cartCheck,cart:member.cart,payment:paymentShape(member.payment),
+   locked:member.orderState==='LOCKED',linked};
  };
  class GroupDelivery extends HTMLElement {
   // Render cold starts can take close to a minute: announce the wait, then fail at a finite limit.
@@ -73,6 +76,10 @@
    this.querySelector('[data-restore-cancel]').addEventListener('click',()=>this.closeReview(),options);
    this.querySelector('[data-withdraw]').addEventListener('click',()=>{const dialog=this.querySelector('[data-withdraw-dialog]');if(!dialog.open&&!this.busy)dialog.showModal();},options);
    this.querySelector('[data-withdraw-cancel]').addEventListener('click',()=>this.querySelector('[data-withdraw-dialog]').close(),options);
+   // Another, separate order: one request id per dialog, so a double submit can never create two orders.
+   this.querySelector('[data-another-order]').addEventListener('click',()=>{const dialog=this.querySelector('[data-another-dialog]');if(!dialog.open&&!this.busy){this.anotherRequestId=crypto.randomUUID();dialog.showModal();}},options);
+   this.querySelector('[data-another-cancel]').addEventListener('click',()=>this.querySelector('[data-another-dialog]').close(),options);
+   this.querySelector('[data-another-confirm]').addEventListener('click',event=>{void this.perform(()=>this.anotherOrder(),event.currentTarget);},options);
    this.querySelector('[data-withdraw-confirm]').addEventListener('click',event=>{void this.perform(()=>this.withdraw(),event.currentTarget);},options);
    // Card reservation consent gates the button; a changed pledge has its own explicit consent.
    this.querySelector('[data-reserve-consent]').addEventListener('change',()=>this.controls(),options);
@@ -449,7 +456,7 @@
    this.clearResume();
    const receipts=[...this.receipts.values()].sort((a,b)=>b.savedAt-a.savedAt).slice(0,6);
    if(!receipts.length)return;
-   const current=['OPEN','THRESHOLD_REACHED','APPROVED'],items=[];let rejected=null;
+   const current=['OPEN','THRESHOLD_REACHED','APPROVED'],items=[];let rejected=null,linkedAdded=false;
    for(const receipt of receipts){
     const id=receipt.publicId;let group=null,member=null,failed=false;
     try{group=this.checkGroup((await this.withReceipt(id,()=>this.api('/groups/'+id))).group);if(group.publicId!==id)throw failure('INVALID_RESPONSE');}
@@ -460,8 +467,13 @@
      if(!this.receiptFor(id))continue;
      if(!member)failed=true;
     }
+    // Orders linked to this one (split off it, placed from it, or carried to the next cycle): their receipts are
+    // fetched once through this receipt and kept like any other, so this device opens both orders.
+    if(member?.linked?.some(other=>!this.receiptFor(other)))linkedAdded=await this.linkReceipts(id)||linkedAdded;
     if(group||failed)items.push({id,group,member:member&&{...member},failed});
    }
+   // New linked receipts: evaluated once more with the rest (at most one extra pass).
+   if(linkedAdded&&!this.linkedPass){this.linkedPass=true;try{return await this.resume();}finally{this.linkedPass=false;}}
    // A receipt the service rejected is reported as before (unless the shopper's own delivery is shown instead).
    if(!this.decide(items)&&rejected)this.message.textContent=this.errorMessage(rejected);
   }
@@ -523,6 +535,7 @@
    if(!this.origin||!this.receipts)return;
    if(this.busy){this.resyncQueued=true;return;}
    const dialog=this.querySelector('[data-withdraw-dialog]');if(dialog.open)dialog.close();
+   const another=this.querySelector('[data-another-dialog]');if(another?.open)another.close();
    this.closeReview(false);this.closeAreas();this.hideOtp();this.hideVerify();
    this.loadReceipts();this.member=null;this.restored=false;this.foundPlace=null;this.group=null;this.pending=false;
    this.clearArea();this.areaInput.value='';
@@ -570,11 +583,15 @@
    this.querySelector('[data-recovery]').hidden=!recovering;
    if(lines)this.querySelector('[data-empty-cart]').hidden=lines.length>0||recovering;
    if(!recovering&&this.reviewMode==='restore')this.closeReview(false);
-   // An empty cart never offers the update action in an open group: it must never read as a withdrawal.
-   button.hidden=empty&&open;
+   // An empty cart never offers the update action in an open group: it must never read as a withdrawal. A locked
+   // (paid or delivered) order is never updated: a new cart is offered as another, separate order instead.
+   const locked=pledged&&member?.locked===true;
+   button.hidden=(empty&&open)||locked;
+   this.querySelector('[data-member-locked]').hidden=!locked;
+   this.querySelector('[data-another-order]').hidden=!(locked&&lines!==null&&lines.length>0);
    const payment=member?.payment||null,withdraw=this.querySelector('[data-withdraw]');
    // A card member whose charge started (or happened) has no self-service cancellation.
-   withdraw.hidden=!(pledged&&open&&(!payment||['CARD_RESERVED','CONSENT_REQUIRED'].includes(payment.status)));
+   withdraw.hidden=!(pledged&&open&&!locked&&(!payment||['CARD_RESERVED','CONSENT_REQUIRED'].includes(payment.status)));
    withdraw.textContent=payment?this.dataset.cancelJoin:this.withdrawLabel;
    this.querySelector('[data-withdraw-text]').textContent=payment?this.dataset.cancelText:this.withdrawText;
    const line=this.querySelector('[data-member-payment]'),text={CARD_RESERVED:this.dataset.paymentReserved,CONSENT_REQUIRED:this.dataset.paymentReserved,CHARGE_PENDING:this.dataset.paymentChargePending,CHARGED:this.dataset.paymentCharged,PAYMENT_FAILED:this.dataset.paymentFailed}[payment?.status]||'';
@@ -738,6 +755,35 @@
    else{this.showPending(area.name);this.message.textContent=this.dataset.noneFound;}
    if(result.withinStandardRadius===true)this.message.textContent=this.dataset.standard;
    this.pledge(result);
+  }
+  // Receipts of the orders linked to a stored receipt's order. Temporary failures change nothing.
+  async linkReceipts(publicId){
+   const receipt=this.receiptFor(publicId);if(!receipt)return false;
+   let added=false;
+   try{
+    const result=await this.api('/groups/'+publicId+'/member/linked',{},receipt.memberToken);
+    for(const order of Array.isArray(result?.orders)?result.orders.slice(0,6):[]){
+     if(!UUID.test(order?.groupPublicId)||!TOKEN.test(order?.memberToken)||this.receiptFor(order.groupPublicId))continue;
+     const saved={publicId:order.groupPublicId,memberToken:order.memberToken,savedAt:Date.now()};
+     this.receipts.set(saved.publicId,saved);this.persist(saved);added=true;
+    }
+   }catch(error){if(error?.name==='AbortError')throw error;}
+   return added;
+  }
+  // Another, separate order from this receipt (the existing order never changes). The service places it in the area's
+  // current delivery cycle and returns its own receipt.
+  async anotherOrder(){
+   const dialog=this.querySelector('[data-another-dialog]');
+   const receipt=this.receiptFor(this.group?.publicId);if(!receipt)throw failure('DEFAULT');
+   const lines=await this.cart();if(!lines.length)throw failure('CART_EMPTY');
+   const requestId=this.anotherRequestId||crypto.randomUUID();this.anotherRequestId=requestId;
+   const result=await this.withReceipt(receipt.publicId,()=>this.api('/groups/'+receipt.publicId+'/orders',{lines,confirm:true,requestId},receipt.memberToken));
+   if(!TOKEN.test(result?.memberToken)||!UUID.test(result?.group?.publicId))throw failure('INVALID_RESPONSE');
+   if(dialog.open)dialog.close();this.anotherRequestId=null;
+   const saved={publicId:result.group.publicId,memberToken:result.memberToken,savedAt:Date.now()};
+   this.receipts.set(saved.publicId,saved);this.persist(saved);
+   this.member={publicId:saved.publicId,status:'PLEDGED',pledgedTotalAgorot:Number.isSafeInteger(result.validatedPledgeAgorot)?result.validatedPledgeAgorot:0,cartCheck:'OK',cart:lines.map(line=>({variantId:line.variantId,quantity:line.quantity})),locked:false,linked:[]};
+   this.show(result.group);this.pledge(result);this.message.textContent=this.dataset.anotherDone;
   }
   async join(){
    const lines=await this.cart();

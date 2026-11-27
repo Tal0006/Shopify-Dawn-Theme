@@ -49,7 +49,8 @@ export class Recovery {
    if(sent.recent>0||sent.hour>=limits.sendsPerHour)throw new ApiError(429,'RATE_LIMITED','יותר מדי בקשות. נסו שוב מאוחר יותר.');
    const groupHour=(await db.query("SELECT COUNT(*)::int AS n FROM member_recovery_challenges WHERE group_id=$1 AND created_at>NOW()-INTERVAL '1 hour'",[group.id])).rows[0].n;
    if(groupHour>=limits.groupStartsPerHour)throw new ApiError(429,'RATE_LIMITED','יותר מדי בקשות. נסו שוב מאוחר יותר.');
-   const member=(await db.query('SELECT id,email FROM group_members WHERE group_id=$1 AND email=$2 AND phone=$3',[group.id,person.email,person.phone])).rows[0];
+   // Several orders of one customer can share a group (a locked one and a later open one): the open one, newest first.
+   const member=(await db.query("SELECT id,email FROM group_members WHERE group_id=$1 AND email=$2 AND phone=$3 ORDER BY (order_state='OPEN') DESC,created_at DESC LIMIT 1",[group.id,person.email,person.phone])).rows[0];
    // Only the newest code for these details can be used: a new request closes the earlier ones, so repeated requests
    // never add up to more than one challenge's attempts at a time.
    await db.query("UPDATE member_recovery_challenges SET consumed_at=NOW(),closed_reason='SUPERSEDED' WHERE identity_hash=$1 AND consumed_at IS NULL",[identity]);

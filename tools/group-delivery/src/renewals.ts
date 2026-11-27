@@ -7,7 +7,7 @@
 import {randomUUID} from 'node:crypto';
 import type {Database,Queryable} from './db.js';
 import {ApiError,publicId} from './domain.js';
-import {ACTIVE_MEMBER_STATUS,type Groups} from './groups.js';
+import {ACTIVE_MEMBER_STATUS,LOCKED_MESSAGE,recordCart,type Groups} from './groups.js';
 import type {CartValidator,SnapshotLine} from './shopify.js';
 import {auditStrict} from './audit.js';
 
@@ -44,6 +44,8 @@ export class Renewals {
   if(group.area_id===null)out.push('NO_AREA');
   if((await db.query('SELECT 1 FROM group_payment_charges WHERE group_id=$1 LIMIT 1',[group.id])).rows.length)out.push('CHARGES_EXIST');
   if((await db.query("SELECT 1 FROM group_members WHERE group_id=$1 AND payment_status IN ('CHARGE_PENDING','CHARGED','PAYMENT_FAILED') LIMIT 1",[group.id])).rows.length)out.push('PAYMENT_RECORDED');
+  // Migration 018: a cycle with a paid (owner-attested) or delivered order is history and is never reopened.
+  if((await db.query("SELECT 1 FROM group_members WHERE group_id=$1 AND order_state='LOCKED' UNION ALL SELECT 1 FROM member_payment_records WHERE group_id=$1 AND voided_at IS NULL LIMIT 1",[group.id])).rows.length)out.push('PAYMENT_RECORDED');
   if(group.area_id!==null&&(await db.query(`SELECT 1 FROM delivery_groups x WHERE x.area_id=$1 AND x.id<>$2 AND ${CURRENT} LIMIT 1`,[group.area_id,group.id])).rows.length)out.push('CURRENT_GROUP_EXISTS');
   return [...new Set(out)];
  }
@@ -103,8 +105,9 @@ export class Renewals {
    if(!group)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
    const blockers=(await this.blockers(db,group)).filter(code=>code!=='CURRENT_GROUP_EXISTS');
    if(blockers.length)throw new ApiError(409,'RENEWAL_NOT_ALLOWED','לא ניתן לחדש את הקבוצה הזו ('+blockers.join(', ')+'). לא בוצע שינוי.');
-   const member=(await db.query('SELECT id,status,pledged_total_agorot,cart_snapshot FROM group_members WHERE id=$1 AND group_id=$2 FOR UPDATE',[memberId,group.id])).rows[0];
+   const member=(await db.query('SELECT id,status,pledged_total_agorot,cart_snapshot,order_state FROM group_members WHERE id=$1 AND group_id=$2 FOR UPDATE',[memberId,group.id])).rows[0];
    if(!member)throw new ApiError(404,'MEMBER_NOT_FOUND','הלקוח לא נמצא.');
+   if(member.order_state==='LOCKED')throw new ApiError(409,'RENEWAL_NOT_ALLOWED',LOCKED_MESSAGE);
    if(member.status!==ACTIVE_MEMBER_STATUS)throw new ApiError(409,'RENEWAL_NOT_ALLOWED','הלקוח כבר אינו פעיל בקבוצה. הוא יכול לחדש בעצמו לאחר פתיחת הקבוצה.');
    if(!sameLines(member.cart_snapshot,snapshot))throw new ApiError(409,'RENEWAL_NOT_ALLOWED','הסל השתנה בזמן הבדיקה. יש לנסות שוב.');
    if(await this.activeElsewhere(db,member.id))throw new ApiError(409,'ALREADY_ACTIVE_ELSEWHERE','הלקוח כבר רשום במשלוח קבוצתי פעיל אחר. לא בוצע שינוי.');
@@ -156,6 +159,7 @@ export class Renewals {
    for(const {member,c} of counted){
     await db.query('UPDATE group_members SET cart_snapshot=$1::jsonb,pledged_total_agorot=$2,updated_at=NOW() WHERE id=$3',[JSON.stringify(c.confirmed_snapshot),c.confirmed_amount_agorot,member.id]);
     await db.query('UPDATE member_reconfirmations SET used_at=NOW() WHERE id=$1',[c.id]);
+    await recordCart(db,member.id,'REOPEN',actor);
    }
    for(const m of unconfirmed){
     // Not reconfirmed: kept as an expired, unconfirmed commitment (reason EXPIRED, dated at the group's expiry), never

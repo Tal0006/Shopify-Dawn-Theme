@@ -99,7 +99,9 @@ const memberRow=(row:any)=>({
  // Lines of the ACTIVE pledge. A withdrawn member's kept snapshot is history and is not counted here.
  cartLines:row.status===ACTIVE_MEMBER_STATUS?Number(row.cart_lines):0,createdAt:new Date(row.created_at).toISOString(),updatedAt:new Date(row.updated_at).toISOString(),
  // Recorded since migration 004; NULL for withdrawals made before it (and for active members).
- withdrawnAt:row.withdrawn_at?new Date(row.withdrawn_at).toISOString():null,withdrawnBy:(row.withdrawn_by as 'MEMBER'|'ADMIN'|'EXPIRED'|null)??null,
+ withdrawnAt:row.withdrawn_at?new Date(row.withdrawn_at).toISOString():null,withdrawnBy:(row.withdrawn_by as 'MEMBER'|'ADMIN'|'EXPIRED'|'TRANSFERRED'|null)??null,
+ // Migration 018: a locked order (paid outside the online flow, or delivered) is never edited or withdrawn.
+ orderState:(row.order_state as 'OPEN'|'LOCKED')??'OPEN',lockedReason:(row.locked_reason as 'PAID_EXTERNAL'|'DELIVERED'|null)??null,
  // Card payment state (NULL for members of groups without cards), the last explicitly approved amount and a pending change.
  paymentStatus:row.payment_status??null,approvedAmountAgorot:row.approved_amount_agorot===null||row.approved_amount_agorot===undefined?null:Number(row.approved_amount_agorot),
  pendingAmountAgorot:row.pending_amount_agorot===null||row.pending_amount_agorot===undefined?null:Number(row.pending_amount_agorot),consentAt:row.consent_at?new Date(row.consent_at).toISOString():null,
@@ -174,12 +176,12 @@ export class AdminData{
   const row=(await this.db.query(GROUP_SELECT+' WHERE g.public_id=$1',[publicId(id)])).rows[0];
   if(!row)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
   // Inactive rows by reason: expired, unconfirmed commitments are counted apart and never as removals.
-  const inactive=(await this.db.query("SELECT COUNT(*) FILTER(WHERE m.withdrawn_by IS DISTINCT FROM 'EXPIRED')::int AS withdrawn,COUNT(*) FILTER(WHERE m.withdrawn_by='EXPIRED')::int AS expired FROM group_members m WHERE m.group_id=$1 AND m.status='WITHDRAWN'",[row.id])).rows[0];
-  const withdrawn=inactive.withdrawn,expiredUnconfirmed=inactive.expired;
+  const inactive=(await this.db.query("SELECT COUNT(*) FILTER(WHERE m.withdrawn_by IS DISTINCT FROM 'EXPIRED' AND m.withdrawn_by IS DISTINCT FROM 'TRANSFERRED')::int AS withdrawn,COUNT(*) FILTER(WHERE m.withdrawn_by='EXPIRED')::int AS expired,COUNT(*) FILTER(WHERE m.withdrawn_by='TRANSFERRED')::int AS transferred FROM group_members m WHERE m.group_id=$1 AND m.status='WITHDRAWN'",[row.id])).rows[0];
+  const withdrawn=inactive.withdrawn,expiredUnconfirmed=inactive.expired,transferred=inactive.transferred;
   // Capacity: active members against the domain limit (withdrawn rows hold no slot).
   // Charge summary for approved card groups: counts and sums only (never a token or Cardcom id).
   const charges=row.payment_mode==='CARDCOM'&&this.payments?await this.payments.summary(row.id):null;
-  return {...groupRow(row),operationalTargets:operationalTargets(row.operational_status),withdrawnMembers:withdrawn,expiredUnconfirmed,capacity:{active:Number(row.active_members),limit:GROUP_CAPACITY},charges,paymentsAvailable:this.payments?.available??false,_id:row.id as string};
+  return {...groupRow(row),operationalTargets:operationalTargets(row.operational_status),withdrawnMembers:withdrawn,expiredUnconfirmed,transferred,capacity:{active:Number(row.active_members),limit:GROUP_CAPACITY},charges,paymentsAvailable:this.payments?.available??false,_id:row.id as string};
  }
  // Operational timeline of one group (successful transitions from the audit log, oldest first).
  async timeline(id:string){return operationalHistory(this.db,publicId(id));}
@@ -189,7 +191,7 @@ export class AdminData{
   const values:any[]=[group._id];let clause='WHERE group_id=$1';
   if(status){values.push(status);clause+=' AND status=$2';}
   const total=(await this.db.query('SELECT COUNT(*)::int AS n FROM group_members '+clause,values)).rows[0].n;
-  const rows=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by,payment_status,approved_amount_agorot,pending_amount_agorot,consent_at,(SELECT json_build_object('status',c.status,'orderName',c.shopify_order_name,'sync',c.shopify_payment_state,'failureCode',c.failure_code,'cancel',c.shopify_cancel_state) FROM group_payment_charges c WHERE c.member_id=group_members.id LIMIT 1) AS charge
+  const rows=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by,order_state,locked_reason,payment_status,approved_amount_agorot,pending_amount_agorot,consent_at,(SELECT json_build_object('status',c.status,'orderName',c.shopify_order_name,'sync',c.shopify_payment_state,'failureCode',c.failure_code,'cancel',c.shopify_cancel_state) FROM group_payment_charges c WHERE c.member_id=group_members.id LIMIT 1) AS charge
    FROM group_members ${clause} ORDER BY created_at ASC,id ASC LIMIT ${page.pageSize} OFFSET ${(page.page-1)*page.pageSize}`,values)).rows;
   const {_id,...publicGroup}=group;
   return {group:publicGroup,members:rows.map(memberRow),pagination:meta(page,total),memberStatus:status};
@@ -199,7 +201,7 @@ export class AdminData{
  async member(id:string,memberId:string,resolve=true){
   const group=await this.group(id);
   if(typeof memberId!=='string'||!UUID.test(memberId))throw new ApiError(404,'NOT_FOUND','הלקוח לא נמצא.');
-  const row=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,cart_snapshot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by,payment_status,approved_amount_agorot,pending_amount_agorot,consent_at,(SELECT json_build_object('status',c.status,'orderName',c.shopify_order_name,'sync',c.shopify_payment_state,'failureCode',c.failure_code,'cancel',c.shopify_cancel_state) FROM group_payment_charges c WHERE c.member_id=group_members.id LIMIT 1) AS charge
+  const row=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,cart_snapshot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by,order_state,locked_reason,payment_status,approved_amount_agorot,pending_amount_agorot,consent_at,(SELECT json_build_object('status',c.status,'orderName',c.shopify_order_name,'sync',c.shopify_payment_state,'failureCode',c.failure_code,'cancel',c.shopify_cancel_state) FROM group_payment_charges c WHERE c.member_id=group_members.id LIMIT 1) AS charge
    FROM group_members WHERE id=$1 AND group_id=$2`,[memberId,group._id])).rows[0];
   if(!row)throw new ApiError(404,'NOT_FOUND','הלקוח לא נמצא.');
   const snapshot:SnapshotLine[]=Array.isArray(row.cart_snapshot)?row.cart_snapshot:[];
@@ -243,7 +245,7 @@ export class AdminData{
  // All members of a group for the CSV exports (no pagination: at most GROUP_CAPACITY active members plus their withdrawn history).
  async exportRows(id:string){
   const group=await this.group(id);
-  const rows=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,cart_snapshot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by,payment_status,approved_amount_agorot,pending_amount_agorot,consent_at,(SELECT json_build_object('status',c.status,'orderName',c.shopify_order_name,'sync',c.shopify_payment_state,'failureCode',c.failure_code,'cancel',c.shopify_cancel_state) FROM group_payment_charges c WHERE c.member_id=group_members.id LIMIT 1) AS charge FROM group_members WHERE group_id=$1 ORDER BY created_at ASC,id ASC`,[group._id])).rows;
+  const rows=(await this.db.query(`SELECT id,email,phone,status,pledged_total_agorot,cart_snapshot,jsonb_array_length(cart_snapshot)::int AS cart_lines,created_at,updated_at,withdrawn_at,withdrawn_by,order_state,locked_reason,payment_status,approved_amount_agorot,pending_amount_agorot,consent_at,(SELECT json_build_object('status',c.status,'orderName',c.shopify_order_name,'sync',c.shopify_payment_state,'failureCode',c.failure_code,'cancel',c.shopify_cancel_state) FROM group_payment_charges c WHERE c.member_id=group_members.id LIMIT 1) AS charge FROM group_members WHERE group_id=$1 ORDER BY created_at ASC,id ASC`,[group._id])).rows;
   const {_id,...publicGroup}=group;
   return {group:publicGroup,members:rows.map((row:any)=>({...memberRow(row),snapshot:Array.isArray(row.cart_snapshot)?row.cart_snapshot as SnapshotLine[]:[]}))};
  }

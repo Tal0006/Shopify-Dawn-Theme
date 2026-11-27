@@ -12,6 +12,7 @@ import {loginPage,dashboardPage,groupPage,memberPage,areasPage,auditView,errorPa
 import {AdminData,csv} from './admin-data.js';
 import {Renewals} from './renewals.js';
 import {groupExtras,RENEWAL_ERRORS} from './renewals-page.js';
+import {Orders} from './orders.js';
 import {audit,actorOf,auditPage} from './audit.js';
 import {safeNext} from './auth.js';
 import {ApiError,type ErrorCode} from './domain.js';
@@ -43,7 +44,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  const orders=deps.orders!==undefined?deps.orders:cfg.payments.orders?new ShopifyOrders({domain:cfg.domain,...cfg.payments.orders}):null;
  const payments=new Payments(db,groups,validator,cfg.payments,cardcom,deps.paymentsLog,orders);
  groups.attachPayments(payments);app.locals.payments=payments;
- const auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator,payments),renewals=new Renewals(db,groups,validator);
+ const auth=new Auth(db,cfg),admin=new AdminData(db,groups,validator,payments),renewals=new Renewals(db,groups,validator),lifecycle=new Orders(db,groups,validator);
  const systemHealth=new SystemHealth(db,cfg.ops,()=>cfg.origin,deps.fetch,deps.health);
  // Business finance (/admin/system). deps.now: test seam for "today" (Israel time decides the current month).
  const finance=new Finance(db,cfg.ops.costs,deps.now);
@@ -285,7 +286,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   sendCsv(res,'group-'+group.shortId+'-members.csv',csv([
    ['אזור','מזהה קבוצה','סטטוס קבוצה','אימייל','טלפון','סטטוס לקוח','סכום התחייבות (₪)','שורות בסל','הצטרפות','עדכון אחרון'],
    // An expired, unconfirmed commitment is exported as such, never as a withdrawal.
-   ...members.map(m=>[group.areaName,group.publicId,group.status,m.email,m.phone,m.withdrawnBy==='EXPIRED'?'EXPIRED_UNCONFIRMED':m.status,(m.pledgedTotalAgorot/100).toFixed(2),m.cartLines,dateText(m.createdAt),dateText(m.updatedAt)])
+   ...members.map(m=>[group.areaName,group.publicId,group.status,m.email,m.phone,m.withdrawnBy==='EXPIRED'?'EXPIRED_UNCONFIRMED':m.withdrawnBy==='TRANSFERRED'?'TRANSFERRED':m.orderState==='LOCKED'?'LOCKED_'+m.lockedReason:m.status,(m.pledgedTotalAgorot/100).toFixed(2),m.cartLines,dateText(m.createdAt),dateText(m.updatedAt)])
   ]));
  });
  app.get('/admin/groups/:publicId/export-lines.csv',async(req,res)=>{
@@ -400,6 +401,22 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   const id=req.params.publicId;
   res.json(await renewalAction(res,id,'group.reopen',null,()=>renewals.reopen(id,req.body,res.locals.actor)));
  });
+ // Order lifecycle (src/orders.ts). Same session, Origin and CSRF checks as every /admin route; refusals are audited.
+ const orderAction=async<T>(res:express.Response,id:string,action:'member.payment_attest'|'group.cycle_split',subject:string|null,run:()=>Promise<T>):Promise<T>=>{
+  try{return await run();}
+  catch(error){await audit(db,{action,actor:res.locals.actor,target:id,subject,result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});throw error;}
+ };
+ app.post('/admin/api/groups/:publicId/members/:memberId/external-payment',async(req,res)=>{
+  const {publicId:id,memberId}=req.params;
+  res.json(await orderAction(res,id,'member.payment_attest',memberId,()=>lifecycle.attestPayment(id,memberId,req.body,res.locals.actor)));
+ });
+ app.get('/admin/api/groups/:publicId/members/:memberId/history',async(req,res)=>res.json(await lifecycle.history(req.params.memberId)));
+ // Read-only preview (POST only because the plan is a body); the split itself needs the preview's state.
+ app.post('/admin/api/groups/:publicId/cycle-split/preview',async(req,res)=>res.json(await lifecycle.splitPreview(req.params.publicId,req.body)));
+ app.post('/admin/api/groups/:publicId/cycle-split',async(req,res)=>{
+  const id=req.params.publicId;
+  res.json(await orderAction(res,id,'group.cycle_split',null,()=>lifecycle.split(id,req.body,res.locals.actor)));
+ });
  // Operational delivery workflow (admin only). The transition and its audit row commit together inside
  // groups.setOperationalStatus; refused attempts are audited here. COMPLETED needs an explicit confirmation.
  const operational=async(res:express.Response,id:string,body:{status?:unknown;confirm?:boolean})=>{
@@ -509,6 +526,10 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  // Explicit consent to a higher pledge after a cart change (card members); the card is not entered again.
  app.post('/api/v1/groups/:publicId/confirm-pledge',async(req,res)=>res.json(await groups.confirmPledge(req.params.publicId,bearer(req),req.body)));
  app.post('/api/v1/groups/:publicId/withdraw',async(req,res)=>res.json(await groups.withdraw(req.params.publicId,bearer(req),req.body)));
+ // Another, separate order from an existing receipt (never an edit of it): {lines, confirm:true, requestId}.
+ app.post('/api/v1/groups/:publicId/orders',async(req,res)=>res.status(201).json(await lifecycle.anotherOrder(req.params.publicId,bearer(req),req.body)));
+ // Receipts for the orders linked to this receipt's order (a split order, or one placed from it).
+ app.post('/api/v1/groups/:publicId/member/linked',async(req,res)=>res.json(await lifecycle.linkedReceipts(req.params.publicId,bearer(req))));
  // Email OTP recovery for a browser without the receipt (see src/recovery.ts). Besides the shared public-write budget,
  // each step has its own per-IP hourly bucket; per-details, per-group and per-challenge limits live in Recovery.
  app.post('/api/v1/groups/:publicId/recovery/start',async(req,res)=>{

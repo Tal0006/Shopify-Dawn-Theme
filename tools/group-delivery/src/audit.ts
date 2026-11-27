@@ -3,7 +3,9 @@ import type {Queryable} from './db.js';
 export type AuditAction='login'|'logout'|'group.approve'|'area.create'|'area.update'|'group.export'|'member.withdraw'|'group.operational_status_change'|'group.complete'|'group.charges_process'|'group.charges_reconcile'|'finance.transaction_create'|'finance.transaction_update'|'finance.transaction_delete'|'finance.recurring_create'|'finance.recurring_update'|'finance.recurring_deactivate'|'finance.recurring_delete'|
  // Cancellation requests: the request id (target) and statuses only; never the ID number, contact details, reason or note.
  // Renewal of expired groups (src/renewals.ts): the customer's reconfirmation and the reopen.
- 'member.reconfirm'|'group.reopen'|'member.expire_unconfirmed'|'cancellation.status_change'|'cancellation.note_update'|'cancellation.reveal_id'|'cancellation.retention_purge';
+ 'member.reconfirm'|'group.reopen'|'member.expire_unconfirmed'|
+ // Order lifecycle (src/orders.ts): owner-attested external payment, cycle split (restore, split, transfer).
+ 'member.payment_attest'|'member.order_restore'|'member.order_split'|'member.transfer'|'group.cycle_split'|'cancellation.status_change'|'cancellation.note_update'|'cancellation.reveal_id'|'cancellation.retention_purge';
 export type AuditResult='OK'|'DENIED'|'FAILED';
 export type AuditEntry={action:AuditAction;actor:string;target?:string|null;result:AuditResult;detail?:string|null;subject?:string|null;previousStatus?:string|null;newStatus?:string|null;amountAgorot?:number|null};
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/,STATUS=/^[A-Z_]{3,30}$/;
