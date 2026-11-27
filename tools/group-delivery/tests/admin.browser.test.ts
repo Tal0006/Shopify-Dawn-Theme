@@ -430,6 +430,41 @@ test('Admin dashboard in the browser',{skip:CHROME?false:'Chrome not installed (
    await size(1440);
   });
 
+  await t.test('cycle split pages: read-only preview, the final button submits once on a double click, a stale preview is refused',async()=>{
+   const area='6f1a2c00-0004-4a00-8000-0000000000a4';
+   const first=await f.groups.joinArea({...f.person(),areaPublicId:area,lines:[{variantId:'1',quantity:1}]});const id=first.group.publicId;
+   await f.groups.join(id,{...f.person(),areaPublicId:area,lines:[{variantId:'2',quantity:1}]});
+   const second=(await f.db.query('SELECT m.id FROM group_members m JOIN delivery_groups g ON g.id=m.group_id WHERE g.public_id=$1 ORDER BY m.created_at DESC LIMIT 1',[id])).rows[0].id;
+   const splits=async()=>Number((await f.db.query('SELECT count(*) AS n FROM group_cycle_splits')).rows[0].n);
+   // The group page offers the workflow; the choice page lists each order with its cart.
+   await go('/admin/groups/'+id);
+   assert.equal(await ev(`!!document.querySelector('a[href$="/cycle-split"]')`),true);
+   await go('/admin/groups/'+id+'/cycle-split');
+   assert.equal(await ev('document.querySelector("h1").textContent'),'סיום מחזור ופתיחת מחזור חדש');
+   assert.equal(await ev('document.querySelectorAll("fieldset").length'),2);
+   await ev(`document.querySelector('input[name="role_${second}"][value="TRANSFER"]').checked=true`);
+   await ev(`document.querySelector('form[action$="/cycle-split/review"] button').click()`);
+   await wait('document.querySelector("h1")?.textContent.startsWith("תצוגה מקדימה")');
+   assert.equal(await splits(),0,'the preview changes nothing');
+   assert.deepEqual(await ev('[...document.querySelectorAll("article h3")].map(h=>h.textContent)'),['הזמנה שנשארת במחזור הקודם','הזמנה שעוברת למחזור החדש']);
+   await size(390,844);assert.equal(await ev(overflow),false,'preview fits a phone');await size(1440);
+   // Keep a copy of this preview in a second tab-like snapshot: its form is submitted again later (stale).
+   const staleForm=await ev(`document.querySelector('form[action$="/cycle-split/execute"]').outerHTML`);
+   await ev('document.querySelector("[name=reason]").value="PAID_ORDERS_DELIVERED";document.querySelector("[name=deliveredAttested]").checked=true;document.querySelector("[name=confirm]").checked=true');
+   // Double click: the button disables itself after the first submit; one split is recorded.
+   await ev(`{const b=document.querySelector('form[action$="/cycle-split/execute"] button');b.click();b.click();window.__disabled=b.disabled;}`);
+   await wait('location.pathname==="/admin/groups/'+id+'"&&location.search.includes("orderNotice=cycle_split")');
+   assert.equal(await splits(),1);
+   assert.equal(Number((await f.db.query("SELECT count(*) AS n FROM admin_audit WHERE action='group.cycle_split'")).rows[0].n),1,'one attempt, no duplicate refusal either');
+   assert.ok((await ev('document.body.textContent')).includes('המחזור הקודם הושלם'));
+   // The old preview, submitted again (new key, old state): refused, nothing changed, the owner is told why.
+   await ev('document.querySelector("main").insertAdjacentHTML("beforeend",'+JSON.stringify(staleForm.replace(/name="idempotencyKey" value="[^"]+"/,'name="idempotencyKey" value="'+crypto.randomUUID()+'"'))+');'+
+    `{const f=document.querySelector('main form[action$="/cycle-split/execute"]');f.querySelector("[name=reason]").value="PAID_ORDERS_DELIVERED";f.querySelector("[name=deliveredAttested]").checked=true;f.querySelector("[name=confirm]").checked=true;f.submit();}`);
+   await wait('location.search.includes("error=")');
+   assert.equal(await splits(),1);
+   assert.ok((await ev('document.body.textContent')).includes('לא ניתן לבצע את הפעולה'),'a completed cycle cannot be split again');
+  });
+
   await t.test('errors and session expiry show friendly pages, never internals',async()=>{
    await go('/admin/groups/00000000-0000-4000-8000-000000000000');
    assert.equal(await ev('document.querySelector("h1").textContent'),'לא נמצא');

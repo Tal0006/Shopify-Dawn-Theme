@@ -138,7 +138,9 @@ test('Group Delivery returning device',{timeout:180000},async t=>{
    await receipts([ID.done,TOKEN.done,1000]);const visit=state.requests.length;await tab.go();
    assert.deepEqual(await view(),{...START,resume:g.previous_completed});
    assert.deepEqual(await tab.ev('[widget.querySelector("[data-resume-primary]").textContent,widget.querySelector("[data-resume-secondary]").textContent]'),[g.search_new,g.view_previous]);
-   assert.deepEqual(state.requests.slice(visit).filter(r=>r.includes('/groups/')),['GET /api/v1/groups/'+ID.done],'one group read; no member read for a completed group');
+   // Migration 018: the receipt holder's own member read also runs for a closed cycle, only to find an order linked to it
+   // in the next cycle (owner split); nothing else is requested and the page shows the same history notice.
+   assert.deepEqual(state.requests.slice(visit).filter(r=>r.includes('/groups/')),['GET /api/v1/groups/'+ID.done,'POST /api/v1/groups/'+ID.done+'/member'],'one group read and the member read for links');
    await receipts([ID.expired,TOKEN.expired,1000]);await tab.go();
    assert.deepEqual(await view(),{...START,resume:g.previous_closed});
    assert.deepEqual(await stored(),[ID.expired],'historical receipts are kept');

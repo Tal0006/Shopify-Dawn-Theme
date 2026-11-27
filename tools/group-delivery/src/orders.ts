@@ -20,6 +20,7 @@ export const PAYMENT_METHODS=['CASH','BANK_TRANSFER','BIT','PAYBOX','CARD_EXTERN
 export const SPLIT_REASONS=['PAID_ORDERS_DELIVERED','ORDER_OVERWRITE_RECONCILIATION'] as const;
 // Device receipts a linked order can get through its first order's receipt (one per device; a bound against abuse).
 const LINK_TOKEN_LIMIT=20;
+export const cartLines=(snapshot:unknown)=>(Array.isArray(snapshot)?snapshot:[]).map((l:any)=>({variantId:String(l.variantId).split('/').pop()!,quantity:Number(l.quantity),unitAgorot:Number(l.unitAgorot),lineAgorot:Number(l.quantity)*Number(l.unitAgorot)}));
 const lineInput=(snapshot:SnapshotLine[])=>snapshot.map(line=>({variantId:String(line.variantId),quantity:Number(line.quantity)}));
 const uuid=(value:unknown,code:'INVALID_INPUT'|'MEMBER_NOT_FOUND'='INVALID_INPUT')=>{
  if(typeof value!=='string'||!UUID.test(value))throw new ApiError(code==='MEMBER_NOT_FOUND'?404:400,code);
@@ -184,12 +185,14 @@ export class Orders {
      thresholdAgorot:Number(inspected.group.threshold_agorot),thresholdMet:keptTotal+restoredTotal>=Number(inspected.group.threshold_agorot)},
     target:{publicId:target?.public_id??null,created:!target,totalAgorot:(target?Number(target.pledged_total_agorot):0)+carriedTotal,
      orders:(target?Number((await this.db.query("SELECT count(*) AS n FROM group_members WHERE group_id=$1 AND status='PLEDGED'",[target.id])).rows[0].n):0)+prices.size}},
-   restore:inspected.restores.map((r:any)=>({memberId:r.member.id,currentAgorot:Number(r.member.pledged_total_agorot),restoredAgorot:Number(r.confirmation.confirmed_amount_agorot),
-    restoredLines:r.confirmation.confirmed_snapshot.length,restoredFingerprint:r.confirmation.fingerprint,newOrderAgorot:prices.get(r.member.id)!.total})),
-   transfer:inspected.transfers.map((m:any)=>({memberId:m.id,amountAgorot:prices.get(m.id)!.total})),
+   restore:inspected.restores.map((r:any)=>({memberId:r.member.id,email:r.member.email,phone:r.member.phone,currentAgorot:Number(r.member.pledged_total_agorot),restoredAgorot:Number(r.confirmation.confirmed_amount_agorot),
+    restoredLines:r.confirmation.confirmed_snapshot.length,restoredFingerprint:r.confirmation.fingerprint,restoredCart:cartLines(r.confirmation.confirmed_snapshot),
+    newOrderAgorot:prices.get(r.member.id)!.total,newOrderCart:cartLines(prices.get(r.member.id)!.snapshot),newOrderFingerprint:r.member.fingerprint})),
+   transfer:inspected.transfers.map((m:any)=>({memberId:m.id,email:m.email,phone:m.phone,amountAgorot:prices.get(m.id)!.total,cart:cartLines(prices.get(m.id)!.snapshot),fingerprint:m.fingerprint})),
    priceChanges:[...prices.entries()].filter(([,v])=>v.changed).map(([memberId,v])=>({memberId,todayAgorot:v.total,accepted:v.accepted})),
    historical:inspected.historical.map((m:any)=>{const r=inspected.restores.find((x:any)=>x.member.id===m.id);
-    return {memberId:m.id,amountAgorot:r?Number(r.confirmation.confirmed_amount_agorot):Number(m.pledged_total_agorot),paidRecorded:m.paid};})};
+    return {memberId:m.id,email:m.email,phone:m.phone,restored:!!r,locked:m.order_state==='LOCKED',amountAgorot:r?Number(r.confirmation.confirmed_amount_agorot):Number(m.pledged_total_agorot),
+     cart:cartLines(r?r.confirmation.confirmed_snapshot:m.cart_snapshot),paidRecorded:m.paid};})};
  }
  async split(id:string,body:any,actor:string){
   const plan=this.plan(body);
@@ -269,6 +272,38 @@ export class Orders {
   });
  }
 
+ // Admin form: the cycle's active orders, and for each one the verified original cart a restore can bring back
+ // (a used reconfirmation whose cart differs from the current one). Read-only.
+ async candidates(id:string){
+  await this.groups.expire();
+  const group=(await this.db.query('SELECT * FROM delivery_groups WHERE public_id=$1',[publicId(id)])).rows[0];
+  if(!group)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
+  const rows=(await this.db.query(`SELECT m.id,m.email,m.phone,m.pledged_total_agorot,m.cart_snapshot,m.order_state,m.locked_reason,m.created_at,m.updated_at,
+   EXISTS(SELECT 1 FROM member_payment_records p WHERE p.member_id=m.id AND p.voided_at IS NULL) AS paid,
+   (SELECT row_to_json(r) FROM (SELECT x.id,x.confirmed_amount_agorot,x.confirmed_snapshot FROM member_reconfirmations x WHERE x.member_id=m.id AND x.group_id=m.group_id AND x.used_at IS NOT NULL
+     AND md5(x.confirmed_snapshot::text)<>md5(m.cart_snapshot::text) ORDER BY x.used_at DESC LIMIT 1) r) AS original
+   FROM group_members m WHERE m.group_id=$1 AND m.status='${ACTIVE_MEMBER_STATUS}' ORDER BY m.created_at,m.id`,[group.id])).rows;
+  const target=group.area_id?await this.currentOther(this.db,group):null;
+  return {group:{publicId:group.public_id as string,areaName:group.area_name as string,status:group.status as string,operationalStatus:group.operational_status as string,paymentMode:group.payment_mode as string,
+    totalAgorot:Number(group.pledged_total_agorot),thresholdAgorot:Number(group.threshold_agorot)},
+   target:target?{publicId:target.public_id as string,totalAgorot:Number(target.pledged_total_agorot)}:null,
+   orders:rows.map((m:any)=>({id:m.id,email:m.email,phone:m.phone,amountAgorot:Number(m.pledged_total_agorot),cart:cartLines(m.cart_snapshot),locked:m.order_state==='LOCKED',lockedReason:m.locked_reason,paid:m.paid,
+    createdAt:new Date(m.created_at).toISOString(),updatedAt:new Date(m.updated_at).toISOString(),
+    original:m.original?{reconfirmationId:m.original.id as string,amountAgorot:Number(m.original.confirmed_amount_agorot),cart:cartLines(m.original.confirmed_snapshot)}:null}))};
+ }
+ // Admin payment reconciliation: every active order of the cycle, its delivery state and its external payment record.
+ async payments(id:string){
+  const group=(await this.db.query('SELECT id,payment_mode,operational_status FROM delivery_groups WHERE public_id=$1',[publicId(id)])).rows[0];
+  if(!group)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
+  const rows=(await this.db.query(`SELECT m.id,m.email,m.phone,m.pledged_total_agorot,m.order_state,m.locked_reason,
+   p.amount_agorot AS paid_agorot,p.method,to_char(p.received_on,'YYYY-MM-DD') AS received_on,p.reference,p.recorded_at
+   FROM group_members m LEFT JOIN member_payment_records p ON p.member_id=m.id AND p.voided_at IS NULL
+   WHERE m.group_id=$1 AND m.status='${ACTIVE_MEMBER_STATUS}' ORDER BY m.created_at,m.id`,[group.id])).rows;
+  return {paymentMode:group.payment_mode as string,orders:rows.map((m:any)=>({id:m.id,email:m.email,phone:m.phone,amountAgorot:Number(m.pledged_total_agorot),
+   // Delivery and payment are separate: an order is delivered when it was locked as delivered or its cycle completed.
+   delivery:m.locked_reason==='DELIVERED'||group.operational_status==='COMPLETED'?'DELIVERED':'OPEN',
+   payment:m.paid_agorot===null?null:{amountAgorot:Number(m.paid_agorot),method:m.method,receivedOn:m.received_on,reference:m.reference,recordedAt:new Date(m.recorded_at).toISOString()}}))};
+ }
  // Admin: every cart version and payment record of one order (no contact details).
  async history(memberId:string){
   uuid(memberId,'MEMBER_NOT_FOUND');

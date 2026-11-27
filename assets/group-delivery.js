@@ -466,6 +466,11 @@
      try{member=await this.loadMember(id);}catch(error){if(error?.name==='AbortError')throw error;if(RECEIPT_INVALIDATING_CODES.has(error?.code))rejected??=error;}
      if(!this.receiptFor(id))continue;
      if(!member)failed=true;
+    }else if(group){
+     // A closed cycle's order may link to an order in the next cycle (owner split): read it only to find the link;
+     // its state never changes what the page shows for that closed cycle.
+     try{member=await this.loadMember(id);}catch(error){if(error?.name==='AbortError')throw error;}
+     if(!this.receiptFor(id))continue;
     }
     // Orders linked to this one (split off it, placed from it, or carried to the next cycle): their receipts are
     // fetched once through this receipt and kept like any other, so this device opens both orders.

@@ -13,6 +13,7 @@ import {AdminData,csv} from './admin-data.js';
 import {Renewals} from './renewals.js';
 import {groupExtras,RENEWAL_ERRORS} from './renewals-page.js';
 import {Orders} from './orders.js';
+import {paymentsSection,splitLink,cycleSplitForm,cycleSplitPreview,ORDER_ERRORS,ORDER_NOTICES} from './orders-page.js';
 import {audit,actorOf,auditPage} from './audit.js';
 import {safeNext} from './auth.js';
 import {ApiError,type ErrorCode} from './domain.js';
@@ -155,13 +156,16 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   res.type('html').send(dashboardPage({metrics,list,areas:areaList,csrf:csrfOf(res)}));
  });
  app.get('/admin/groups/:publicId',async(req,res)=>{
-  const [data,timeline,products,renewal]=await Promise.all([admin.members(req.params.publicId,req.query),admin.timeline(req.params.publicId),admin.products(req.params.publicId,req.query.products==='names'),renewals.state(req.params.publicId)]);
+  const [data,timeline,products,renewal,payments]=await Promise.all([admin.members(req.params.publicId,req.query),admin.timeline(req.params.publicId),admin.products(req.params.publicId,req.query.products==='names'),renewals.state(req.params.publicId),lifecycle.payments(req.params.publicId)]);
   const error=typeof req.query.error==='string'&&GROUP_PAGE_ERRORS.includes(req.query.error)?req.query.error:noticeOf(req.query.error);
   // Renewal messages belong to the renewal section; the price-change step reopens the form of that one member.
   const renewalError=typeof req.query.renewalError==='string'&&RENEWAL_ERRORS[req.query.renewalError]?req.query.renewalError:undefined;
   const priceMember=typeof req.query.member==='string'&&/^[a-f0-9-]{36}$/.test(req.query.member)?req.query.member:undefined;
   const priceTotal=typeof req.query.total==='string'&&/^\d{1,10}$/.test(req.query.total)?Number(req.query.total):undefined;
-  const extras=groupExtras({group:data.group,products,renewal,csrf:csrfOf(res),error:renewalError,notice:noticeOf(req.query.renewalNotice),priceMember,priceTotal});
+  const orderError=typeof req.query.orderError==='string'&&ORDER_ERRORS[req.query.orderError]?req.query.orderError:undefined;
+  const orderNotice=typeof req.query.orderNotice==='string'&&ORDER_NOTICES[req.query.orderNotice]?req.query.orderNotice:undefined;
+  const extras=groupExtras({group:data.group,products,renewal,csrf:csrfOf(res),error:renewalError,notice:noticeOf(req.query.renewalNotice),priceMember,priceTotal})+
+   paymentsSection({groupPublicId:data.group.publicId,overview:payments,csrf:csrfOf(res),notice:orderNotice,error:orderError})+splitLink({groupPublicId:data.group.publicId,group:data.group});
   res.type('html').send(groupPage({...data,timeline,extras,csrf:csrfOf(res),notice:noticeOf(req.query.notice),error,confirming:req.query.confirm==='complete'}));
  });
  app.get('/admin/groups/:publicId/members/:memberId',async(req,res)=>{
@@ -409,6 +413,54 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
  app.post('/admin/api/groups/:publicId/members/:memberId/external-payment',async(req,res)=>{
   const {publicId:id,memberId}=req.params;
   res.json(await orderAction(res,id,'member.payment_attest',memberId,()=>lifecycle.attestPayment(id,memberId,req.body,res.locals.actor)));
+ });
+ // Owner forms: external payment, and the cycle split (choose, preview, execute). Messages go back to the group page.
+ const amountOf=(value:unknown)=>{const text=typeof value==='string'?value.trim():'';if(!/^\d{1,7}(\.\d{1,2})?$/.test(text))return NaN;const [whole,frac='']=text.split('.');return Number(whole)*100+Number(frac.padEnd(2,'0'));};
+ app.post('/admin/groups/:publicId/members/:memberId/external-payment',async(req,res)=>{
+  const {publicId:id,memberId}=req.params,back=(q:Record<string,string>)=>'/admin/groups/'+encodeURIComponent(id)+'?'+new URLSearchParams(q).toString()+'#payments';
+  try{
+   const out=await orderAction(res,id,'member.payment_attest',memberId,()=>lifecycle.attestPayment(id,memberId,{attest:req.body?.attest==='yes',amountAgorot:amountOf(req.body?.amount),method:req.body?.method,receivedOn:req.body?.receivedOn,reference:req.body?.reference},res.locals.actor));
+   res.redirect(303,back({orderNotice:out.recorded?'payment_recorded':'payment_unchanged'}));
+  }catch(error){if(error instanceof ApiError&&ORDER_ERRORS[error.code]){res.redirect(303,back({orderError:error.code}));return;}throw error;}
+ });
+ // Roles chosen per order: KEEP (history), TRANSFER (next cycle), RESTORE (original back, current cart as a new order).
+ const splitPlan=async(id:string,body:any)=>{
+  const candidates=await lifecycle.candidates(id),roles:Record<string,string>={},restore:any[]=[],transfer:string[]=[],acceptTotals:Record<string,number>={};
+  for(const o of candidates.orders){
+   const role=body?.['role_'+o.id];
+   if(role==='TRANSFER'){roles[o.id]=role;transfer.push(o.id);}
+   else if(role==='RESTORE'&&o.original){roles[o.id]=role;restore.push({memberId:o.id,reconfirmationId:o.original.reconfirmationId});}
+   else roles[o.id]='KEEP';
+   const accepted=Number(body?.['accept_'+o.id]);if(Number.isSafeInteger(accepted)&&accepted>0)acceptTotals[o.id]=accepted;
+  }
+  return {candidates,roles,restore,transfer,acceptTotals};
+ };
+ app.get('/admin/groups/:publicId/cycle-split',async(req,res)=>{
+  const error=typeof req.query.error==='string'&&ORDER_ERRORS[req.query.error]?req.query.error:undefined;
+  res.type('html').send(cycleSplitForm({candidates:await lifecycle.candidates(req.params.publicId),csrf:csrfOf(res),error}));
+ });
+ app.post('/admin/groups/:publicId/cycle-split/review',async(req,res)=>{
+  const id=req.params.publicId,plan=await splitPlan(id,req.body);
+  try{
+   const preview=await lifecycle.splitPreview(id,plan);
+   res.type('html').send(cycleSplitPreview({group:plan.candidates.group,preview,plan,csrf:csrfOf(res)}));
+  }catch(error){
+   if(error instanceof ApiError&&ORDER_ERRORS[error.code]){res.status(409).type('html').send(cycleSplitForm({candidates:plan.candidates,csrf:csrfOf(res),error:error.code,selected:plan.roles}));return;}
+   throw error;
+  }
+ });
+ app.post('/admin/groups/:publicId/cycle-split/execute',async(req,res)=>{
+  const id=req.params.publicId;
+  let plan:any={};try{plan=JSON.parse(typeof req.body?.plan==='string'?req.body.plan:'{}');}catch{}
+  try{
+   const out=await orderAction(res,id,'group.cycle_split',null,()=>lifecycle.split(id,{...plan,confirm:req.body?.confirm==='yes',deliveredAttested:req.body?.deliveredAttested==='yes',
+    reason:req.body?.reason,idempotencyKey:req.body?.idempotencyKey,expectedState:req.body?.expectedState},res.locals.actor));
+   res.redirect(303,'/admin/groups/'+encodeURIComponent(out.source.publicId)+'?orderNotice=cycle_split#payments');
+  }catch(error){
+   // Nothing was changed: back to the choice, with the reason (stale preview, prices, confirmations...).
+   if(error instanceof ApiError&&ORDER_ERRORS[error.code]){res.redirect(303,'/admin/groups/'+encodeURIComponent(id)+'/cycle-split?error='+encodeURIComponent(error.code));return;}
+   throw error;
+  }
  });
  app.get('/admin/api/groups/:publicId/members/:memberId/history',async(req,res)=>res.json(await lifecycle.history(req.params.memberId)));
  // Read-only preview (POST only because the plan is a body); the split itself needs the preview's state.
