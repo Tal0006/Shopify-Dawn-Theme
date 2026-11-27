@@ -14,7 +14,7 @@ export const RENEWAL_ERRORS:Record<string,string>={INVALID_RECONFIRMATION:'פר�
  PRICE_CHANGED:'מחירי המוצרים השתנו. יש לאשר עם הלקוח את הסכום החדש ולסמן זאת. לא בוצע שינוי.',RENEWAL_NOT_ALLOWED:'לא ניתן לחדש את הקבוצה הזו כרגע. לא בוצע שינוי.',
  ALREADY_ACTIVE_ELSEWHERE:'הלקוח כבר רשום במשלוח קבוצתי פעיל אחר, ולכן לא ייספר פעמיים. לא בוצע שינוי.',CURRENT_GROUP_EXISTS:'כבר קיימת קבוצה פעילה באזור הזה. לא בוצע שינוי.',
  CARD_GROUP_REQUIRES_CUSTOMER:'בקבוצה עם שריון כרטיס, כל לקוח צריך לשריין כרטיס מחדש בעצמו. לא בוצע שינוי.',RECONFIRMATION_REQUIRED:'אף לקוח עדיין לא אישר מחדש. יש לרשום אישור של לקוח אחד לפחות. לא בוצע שינוי.',
- REOPEN_CONFIRMATION_REQUIRED:'יש לסמן את תיבת האישור לפני הפתיחה מחדש. לא בוצע שינוי.',INVALID_INPUT:'מספר הימים אינו תקין. לא בוצע שינוי.',SHOPIFY_UNAVAILABLE:'לא ניתן לבדוק כרגע מלאי ומחירים מול החנות. לא בוצע שינוי; נסו שוב מאוחר יותר.',
+ REOPEN_CONFIRMATION_REQUIRED:'יש לסמן את תיבת האישור לפני הפתיחה מחדש. לא בוצע שינוי.',RENEWAL_CHANGED:'אישור של לקוח עודכן בזמן הבדיקה. לא בוצע שינוי; יש לנסות שוב.',INVALID_INPUT:'מספר הימים אינו תקין. לא בוצע שינוי.',SHOPIFY_UNAVAILABLE:'לא ניתן לבדוק כרגע מלאי ומחירים מול החנות. לא בוצע שינוי; נסו שוב מאוחר יותר.',
  CART_UNAVAILABLE:'חלק מהמוצרים בסל אינם זמינים כרגע, ולכן לא ניתן לחדש את ההתחייבות כפי שהיא. לא בוצע שינוי.',INVALID_CART:'הסל השמור כבר אינו תקין מול החנות. לא בוצע שינוי.'};
 // Extra sections for the group page. renewal is null for groups that are not expired.
 export function groupExtras(data:{group:any;products:any;renewal:any;csrf:string;error?:string;notice?:string;priceMember?:string;priceTotal?:number}){

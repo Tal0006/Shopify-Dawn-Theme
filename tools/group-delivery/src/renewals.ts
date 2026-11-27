@@ -146,6 +146,10 @@ export class Renewals {
     if(c&&confirmed0.some(x=>x.id===c.id)){
      if(await this.activeElsewhere(db,m.id))throw new ApiError(409,'ALREADY_ACTIVE_ELSEWHERE','לקוח שאישר מחדש כבר רשום במשלוח קבוצתי פעיל אחר. לא בוצע שינוי.');
      counted.push({member:m,c});
+    }else if(c){
+     // A confirmation recorded after the Shopify check above (another tab): it was not checked, and treating the
+     // customer as unconfirmed would wrongly expire a reconfirmed pledge. Refuse; a retry checks the current one.
+     throw new ApiError(409,'RENEWAL_CHANGED','אישור של לקוח עודכן בזמן הבדיקה. לא בוצע שינוי; יש לנסות שוב.');
     }else unconfirmed.push(m);
    }
    if(!counted.length)throw new ApiError(409,'RECONFIRMATION_REQUIRED','אף לקוח עדיין לא אישר מחדש את ההתחייבות. יש לרשום אישור של לקוח אחד לפחות. לא בוצע שינוי.');
