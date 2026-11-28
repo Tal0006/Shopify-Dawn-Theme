@@ -39,8 +39,13 @@ CREATE TABLE IF NOT EXISTS member_payment_records (
  cart_fingerprint text NOT NULL CHECK(char_length(cart_fingerprint)=32),
  attested_by text NOT NULL CHECK(char_length(attested_by) BETWEEN 3 AND 40),
  recorded_at timestamptz NOT NULL DEFAULT NOW(),
+ -- A mistaken record is voided, never deleted or edited: when, by whom (admin session reference) and why. A
+ -- correction is a new record that names the one it replaces.
  voided_at timestamptz,
- void_reason text CHECK(void_reason IS NULL OR char_length(void_reason)<=60)
+ voided_by text CHECK(voided_by IS NULL OR char_length(voided_by) BETWEEN 3 AND 40),
+ void_reason text CHECK(void_reason IS NULL OR char_length(void_reason) BETWEEN 3 AND 60),
+ replaces_id uuid REFERENCES member_payment_records(id),
+ CHECK((voided_at IS NULL AND voided_by IS NULL AND void_reason IS NULL) OR (voided_at IS NOT NULL AND voided_by IS NOT NULL AND void_reason IS NOT NULL))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS member_payment_records_active ON member_payment_records(member_id) WHERE voided_at IS NULL;
 

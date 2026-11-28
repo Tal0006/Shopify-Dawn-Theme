@@ -11,7 +11,9 @@ const money=(agorot:number)=>new Intl.NumberFormat('he-IL',{style:'currency',cur
 export const PAYMENT_METHOD_LABELS:Record<string,string>={CASH:'מזומן',BANK_TRANSFER:'העברה בנקאית',BIT:'ביט',PAYBOX:'פייבוקס',CARD_EXTERNAL:'כרטיס אשראי (מחוץ למערכת)',OTHER:'אחר'};
 export const ORDER_ERRORS:Record<string,string>={
  INVALID_PAYMENT_RECORD:'פרטי התשלום אינם תקינים: יש לבחור אמצעי תשלום ותאריך, להקליד סכום זהה לסכום ההזמנה ולאשר שהתשלום התקבל. לא נשמר דבר.',
- PAYMENT_ALREADY_RECORDED:'כבר נרשם תשלום להזמנה הזו. לא נשמר דבר.',
+ PAYMENT_ALREADY_RECORDED:'כבר נרשם תשלום להזמנה הזו. כדי לשנות אותו, יש לתקן את הרישום. לא נשמר דבר.',
+ NO_PAYMENT_RECORD:'אין תשלום רשום להזמנה הזו. לא בוצע שינוי.',
+ RELEASE_NOT_ALLOWED:'לא ניתן לשחרר את ההזמנה לעריכה: יש לה תשלום פעיל, היא נמסרה או שהמחזור הושלם. לא בוצע שינוי.',
  SPLIT_NOT_ALLOWED:'לא ניתן לבצע את הפעולה בקבוצה הזו. לא בוצע שינוי.',
  SPLIT_STATE_CHANGED:'הנתונים השתנו מאז התצוגה המקדימה (למשל לקוח עדכן הזמנה או הצטרף). לא בוצע שינוי. יש להציג תצוגה מקדימה חדשה.',
  SPLIT_CONFIRMATION_REQUIRED:'יש לסמן את שתי תיבות האישור ולבחור את סיבת הפעולה. לא בוצע שינוי.',
@@ -23,6 +25,9 @@ export const ORDER_ERRORS:Record<string,string>={
  CART_UNAVAILABLE:'חלק מהמוצרים בהזמנה שעוברת אינם זמינים כרגע. לא בוצע שינוי.',INVALID_CART:'סל של הזמנה שעוברת אינו תקין מול החנות. לא בוצע שינוי.',
  INVALID_INPUT:'יש לבחור לפחות הזמנה אחת שעוברת למחזור החדש. לא בוצע שינוי.'};
 export const ORDER_NOTICES:Record<string,string>={payment_recorded:'התשלום נרשם וההזמנה ננעלה לשינויים. לא נוצרה עסקה בשופיפיי או בקארדקום.',
+ payment_voided:'רישום התשלום בוטל ונשמר בהיסטוריה. ההזמנה נשארת נעולה לשינויי הלקוח עד שהתשלום יוסדר. לא בוצע זיכוי.',
+ payment_corrected:'רישום התשלום תוקן: הרישום הקודם נשמר כמבוטל והרישום החדש פעיל. ההזמנה נעולה.',
+ order_released:'ההזמנה שוחררה לעריכה. הלקוח יכול שוב לעדכן אותה.',
  payment_unchanged:'התשלום כבר היה רשום בדיוק כך. לא בוצע שינוי.',cycle_split:'המחזור הקודם הושלם והמחזור החדש פתוח. ההזמנות שנבחרו הועברו.'};
 const BLOCKERS:Record<string,string>={CARD_GROUP:'זו קבוצה עם תשלום בכרטיס אשראי.',ALREADY_COMPLETED:'המשלוח של הקבוצה כבר הושלם.',NO_AREA:'לקבוצה אין אזור מוגדר.',
  PAYMENT_RECORDED:'נרשם תשלום מקוון בקבוצה.',CHARGES_OR_RESERVATIONS:'קיימים חיובים או שריוני כרטיס בקבוצה.',CARD_MODE_ACTIVE:'תשלום בכרטיס אשראי פעיל כרגע בחנות.'};
@@ -35,14 +40,28 @@ const cartTable=(cart:{variantId:string;quantity:number;unitAgorot:number;lineAg
 const who=(o:{email:string;phone:string})=>'<span dir="ltr">'+escape(o.email)+'</span> · <span dir="ltr">'+escape(o.phone)+'</span>';
 
 // ---------- Group page: payment reconciliation ----------
-export function paymentsSection(data:{groupPublicId:string;overview:{paymentMode:string;orders:any[]};csrf:string;notice?:string;error?:string}){
+export function paymentsSection(data:{groupPublicId:string;overview:{paymentMode:string;completed?:boolean;orders:any[]};csrf:string;notice?:string;error?:string}){
  const {overview}=data;
  if(overview.paymentMode!=='NONE'||!overview.orders.length)return '';
  const base='/admin/groups/'+data.groupPublicId;
  const rows=overview.orders.map((o:any)=>{
   const delivery=o.delivery==='DELIVERED'?'<span class="chip chip--pledged">נמסר</span>':'<span class="chip">לא סומן כנמסר</span>';
   const paid=o.payment?'<span class="chip chip--pledged">שולם מחוץ למערכת</span><br><span class="muted">'+escape(money(o.payment.amountAgorot))+' · '+escape(PAYMENT_METHOD_LABELS[o.payment.method]||o.payment.method)+' · '+escape(o.payment.receivedOn)+(o.payment.reference?' · '+escape(o.payment.reference):'')+'</span>':'<span class="chip chip--expired">לא נרשם תשלום</span>';
-  const form=o.payment?'':'<details class="inline-details"><summary>רישום תשלום שהתקבל</summary><form method="post" action="'+escape(base+'/members/'+o.id+'/external-payment')+'" class="inline-form">'+csrfField(data.csrf)+
+  const fields=(prefix:string)=>'<label>סכום (₪) <input name="'+prefix+'amount" inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" placeholder="'+escape((o.amountAgorot/100).toFixed(2))+'"></label>'+
+   '<label>אמצעי תשלום <select name="'+prefix+'method"><option value="">בחירה</option>'+PAYMENT_METHODS.map(k=>'<option value="'+k+'">'+escape(PAYMENT_METHOD_LABELS[k])+'</option>').join('')+'</select></label>'+
+   '<label>תאריך קבלה <input type="date" name="'+prefix+'receivedOn"></label><label>אסמכתא (לא חובה) <input name="'+prefix+'reference" maxlength="60"></label>';
+  // A mistaken record: voided (kept, with the reason) and optionally replaced by a corrected one. Never a refund.
+  const correct=o.payment?'<details class="inline-details"><summary>תיקון או ביטול הרישום</summary><form method="post" action="'+escape(base+'/members/'+o.id+'/external-payment/correct')+'" class="inline-form">'+csrfField(data.csrf)+
+   '<label>סיבה (חובה) <input name="reason" required minlength="3" maxlength="60"></label>'+
+   '<p class="muted">להחלפה ברישום מתוקן יש למלא את הפרטים; בלי פרטים הרישום רק יבוטל. הרישום הקודם נשמר תמיד, וההזמנה נשארת נעולה.</p>'+fields('new_')+
+   '<label class="check renewal-confirm"><input type="checkbox" name="attest" value="yes" required> אני מאשר/ת את התיקון</label><button class="btn btn--quiet" data-once>שמירת התיקון</button></form></details>':'';
+  // Locked only by a voided payment, in a cycle that is not completed: an explicit release for customer edits.
+  const release=!o.payment&&o.locked&&o.lockedReason==='PAID_EXTERNAL'&&!overview.completed?'<details class="inline-details"><summary>שחרור ההזמנה לעריכה</summary><form method="post" action="'+escape(base+'/members/'+o.id+'/release')+'" class="inline-form">'+csrfField(data.csrf)+
+   '<label>סיבה (חובה) <input name="reason" required minlength="3" maxlength="60"></label><label class="check renewal-confirm"><input type="checkbox" name="attest" value="yes" required> ההזמנה לא שולמה ואפשר לאפשר ללקוח לערוך אותה</label>'+
+   '<button class="btn btn--quiet" data-once>שחרור לעריכה</button></form></details>':'';
+  const history=o.voidedRecords?'<br><span class="muted">'+o.voidedRecords+' רישומים קודמים בוטלו ונשמרו</span>':'';
+  const locked=o.locked&&!o.payment?'<br><span class="chip">נעולה לשינויי הלקוח</span>':'';
+  const form=o.payment?correct:locked+release+'<details class="inline-details"><summary>רישום תשלום שהתקבל</summary><form method="post" action="'+escape(base+'/members/'+o.id+'/external-payment')+'" class="inline-form">'+csrfField(data.csrf)+
    '<label>סכום שהתקבל (₪) <input name="amount" inputmode="decimal" required pattern="[0-9]+([.][0-9]{1,2})?" placeholder="'+escape((o.amountAgorot/100).toFixed(2))+'"></label>'+
    '<label>אמצעי תשלום <select name="method" required><option value="">בחירה</option>'+PAYMENT_METHODS.map(k=>'<option value="'+k+'">'+escape(PAYMENT_METHOD_LABELS[k])+'</option>').join('')+'</select></label>'+
    '<label>תאריך קבלה <input type="date" name="receivedOn" required></label>'+
@@ -50,7 +69,7 @@ export function paymentsSection(data:{groupPublicId:string;overview:{paymentMode
    '<label class="check renewal-confirm"><input type="checkbox" name="attest" value="yes" required> אני מאשר/ת שהתשלום הזה התקבל בפועל</label>'+
    '<button class="btn btn--quiet" data-once>רישום התשלום ונעילת ההזמנה</button></form></details>';
   return '<tr><td data-label="לקוח"><a href="'+escape(base+'/members/'+o.id)+'">'+who(o)+'</a></td><td data-label="סכום ההזמנה" class="num">'+escape(money(o.amountAgorot))+'</td>'+
-   '<td data-label="משלוח">'+delivery+'</td><td data-label="תשלום">'+paid+form+'</td></tr>';
+   '<td data-label="משלוח">'+delivery+'</td><td data-label="תשלום">'+paid+history+form+'</td></tr>';
  }).join('');
  return '<section class="card" aria-labelledby="payments-title" id="payments"><h2 id="payments-title">התאמת תשלומים שהתקבלו מחוץ למערכת</h2>'+
   (data.notice&&ORDER_NOTICES[data.notice]?notice('ok',ORDER_NOTICES[data.notice]):'')+(data.error&&ORDER_ERRORS[data.error]?notice('error',ORDER_ERRORS[data.error]):'')+

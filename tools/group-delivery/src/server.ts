@@ -406,7 +406,7 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
   res.json(await renewalAction(res,id,'group.reopen',null,()=>renewals.reopen(id,req.body,res.locals.actor)));
  });
  // Order lifecycle (src/orders.ts). Same session, Origin and CSRF checks as every /admin route; refusals are audited.
- const orderAction=async<T>(res:express.Response,id:string,action:'member.payment_attest'|'group.cycle_split',subject:string|null,run:()=>Promise<T>):Promise<T>=>{
+ const orderAction=async<T>(res:express.Response,id:string,action:'member.payment_attest'|'member.payment_void'|'member.order_release'|'group.cycle_split',subject:string|null,run:()=>Promise<T>):Promise<T>=>{
   try{return await run();}
   catch(error){await audit(db,{action,actor:res.locals.actor,target:id,subject,result:error instanceof ApiError&&error.status<500?'DENIED':'FAILED',detail:error instanceof ApiError?error.code:null});throw error;}
  };
@@ -422,6 +422,31 @@ export function createApp(db:Database,cfg:Config,validator:CartValidator=new Sho
    const out=await orderAction(res,id,'member.payment_attest',memberId,()=>lifecycle.attestPayment(id,memberId,{attest:req.body?.attest==='yes',amountAgorot:amountOf(req.body?.amount),method:req.body?.method,receivedOn:req.body?.receivedOn,reference:req.body?.reference},res.locals.actor));
    res.redirect(303,back({orderNotice:out.recorded?'payment_recorded':'payment_unchanged'}));
   }catch(error){if(error instanceof ApiError&&ORDER_ERRORS[error.code]){res.redirect(303,back({orderError:error.code}));return;}throw error;}
+ });
+ // A mistaken payment record: voided (kept) and optionally replaced by a corrected one; the order stays locked.
+ app.post('/admin/groups/:publicId/members/:memberId/external-payment/correct',async(req,res)=>{
+  const {publicId:id,memberId}=req.params,back=(q:Record<string,string>)=>'/admin/groups/'+encodeURIComponent(id)+'?'+new URLSearchParams(q).toString()+'#payments';
+  const b=req.body||{},any=[b.new_amount,b.new_method,b.new_receivedOn].some((v:unknown)=>typeof v==='string'&&v.trim()!=='');
+  const replacement=any?{amountAgorot:amountOf(b.new_amount),method:b.new_method,receivedOn:b.new_receivedOn,reference:b.new_reference}:null;
+  try{
+   const out=await orderAction(res,id,'member.payment_void',memberId,()=>lifecycle.correctPayment(id,memberId,{attest:b.attest==='yes',reason:b.reason,replacement},res.locals.actor));
+   res.redirect(303,back({orderNotice:out.corrected?'payment_corrected':'payment_voided'}));
+  }catch(error){if(error instanceof ApiError&&ORDER_ERRORS[error.code]){res.redirect(303,back({orderError:error.code}));return;}throw error;}
+ });
+ app.post('/admin/groups/:publicId/members/:memberId/release',async(req,res)=>{
+  const {publicId:id,memberId}=req.params,back=(q:Record<string,string>)=>'/admin/groups/'+encodeURIComponent(id)+'?'+new URLSearchParams(q).toString()+'#payments';
+  try{
+   await orderAction(res,id,'member.order_release',memberId,()=>lifecycle.releaseOrder(id,memberId,{attest:req.body?.attest==='yes',reason:req.body?.reason},res.locals.actor));
+   res.redirect(303,back({orderNotice:'order_released'}));
+  }catch(error){if(error instanceof ApiError&&ORDER_ERRORS[error.code]){res.redirect(303,back({orderError:error.code}));return;}throw error;}
+ });
+ app.post('/admin/api/groups/:publicId/members/:memberId/external-payment/correct',async(req,res)=>{
+  const {publicId:id,memberId}=req.params;
+  res.json(await orderAction(res,id,'member.payment_void',memberId,()=>lifecycle.correctPayment(id,memberId,req.body,res.locals.actor)));
+ });
+ app.post('/admin/api/groups/:publicId/members/:memberId/release',async(req,res)=>{
+  const {publicId:id,memberId}=req.params;
+  res.json(await orderAction(res,id,'member.order_release',memberId,()=>lifecycle.releaseOrder(id,memberId,req.body,res.locals.actor)));
  });
  // Roles chosen per order: KEEP (history), TRANSFER (next cycle), RESTORE (original back, current cart as a new order).
  const splitPlan=async(id:string,body:any)=>{

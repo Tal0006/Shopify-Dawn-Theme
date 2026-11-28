@@ -5,7 +5,7 @@ export type AuditAction='login'|'logout'|'group.approve'|'area.create'|'area.upd
  // Renewal of expired groups (src/renewals.ts): the customer's reconfirmation and the reopen.
  'member.reconfirm'|'group.reopen'|'member.expire_unconfirmed'|
  // Order lifecycle (src/orders.ts): owner-attested external payment, cycle split (restore, split, transfer).
- 'member.payment_attest'|'member.order_restore'|'member.order_split'|'member.transfer'|'group.cycle_split'|'cancellation.status_change'|'cancellation.note_update'|'cancellation.reveal_id'|'cancellation.retention_purge';
+ 'member.payment_attest'|'member.payment_void'|'member.order_release'|'member.order_restore'|'member.order_split'|'member.transfer'|'group.cycle_split'|'cancellation.status_change'|'cancellation.note_update'|'cancellation.reveal_id'|'cancellation.retention_purge';
 export type AuditResult='OK'|'DENIED'|'FAILED';
 export type AuditEntry={action:AuditAction;actor:string;target?:string|null;result:AuditResult;detail?:string|null;subject?:string|null;previousStatus?:string|null;newStatus?:string|null;amountAgorot?:number|null};
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/,STATUS=/^[A-Z_]{3,30}$/;

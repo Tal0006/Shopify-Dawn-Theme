@@ -67,6 +67,69 @@ export class Orders {
   });
  }
 
+ // Owner: a mistaken payment record is voided (kept, with when, who and why) and optionally replaced by a corrected
+ // one in the same transaction. The order stays LOCKED either way: a voided payment never reopens it to the customer.
+ // Never a refund and never a Shopify or Cardcom change.
+ async correctPayment(id:string,memberId:string,body:any,actor:string){
+  const target=publicId(id);uuid(memberId,'MEMBER_NOT_FOUND');
+  if(body?.attest!==true)throw new ApiError(400,'INVALID_PAYMENT_RECORD','יש לאשר במפורש את התיקון.');
+  const why=typeof body?.reason==='string'?body.reason.trim().replace(/\s+/g,' '):'';
+  if(why.length<3||why.length>60||/@/.test(why)||/\d[\d\s-]{6,}\d/.test(why)||/[<>]/.test(why))throw new ApiError(400,'INVALID_PAYMENT_RECORD','יש לכתוב סיבה קצרה (3 עד 60 תווים, בלי פרטי קשר).');
+  const replacement=body?.replacement?this.paymentInput(body.replacement):null;
+  return this.groups.locked(async db=>{
+   const group=(await db.query('SELECT * FROM delivery_groups WHERE public_id=$1',[target])).rows[0];
+   if(!group)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
+   const member=(await db.query('SELECT id,status,pledged_total_agorot,order_state,md5(cart_snapshot::text) AS fingerprint FROM group_members WHERE id=$1 AND group_id=$2 FOR UPDATE',[memberId,group.id])).rows[0];
+   if(!member)throw new ApiError(404,'MEMBER_NOT_FOUND','הלקוח לא נמצא בקבוצה הזאת.');
+   const active=(await db.query('SELECT id,amount_agorot FROM member_payment_records WHERE member_id=$1 AND voided_at IS NULL FOR UPDATE',[member.id])).rows[0];
+   if(!active)throw new ApiError(409,'NO_PAYMENT_RECORD','אין תשלום רשום להזמנה הזו.');
+   if(replacement&&Number(member.pledged_total_agorot)!==replacement.amount)throw new ApiError(409,'INVALID_PAYMENT_RECORD','הסכום המתוקן חייב להיות זהה לסכום ההזמנה ('+(Number(member.pledged_total_agorot)/100).toFixed(2)+' ₪).');
+   await db.query('UPDATE member_payment_records SET voided_at=NOW(),voided_by=$2,void_reason=$3 WHERE id=$1',[active.id,actor,why]);
+   await auditStrict(db,{action:'member.payment_void',actor,target,subject:member.id,result:'OK',amountAgorot:Number(active.amount_agorot),detail:replacement?'CORRECTED':'VOIDED'});
+   let corrected=null;
+   if(replacement){
+    corrected=randomUUID();
+    await db.query(`INSERT INTO member_payment_records(id,member_id,group_id,amount_agorot,method,received_on,reference,cart_fingerprint,attested_by,replaces_id)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[corrected,member.id,group.id,replacement.amount,replacement.method,replacement.day,replacement.note,member.fingerprint,actor,active.id]);
+    await auditStrict(db,{action:'member.payment_attest',actor,target,subject:member.id,result:'OK',detail:replacement.method,amountAgorot:replacement.amount,newStatus:'LOCKED'});
+   }
+   // Never unlocked here: the order stays protected until the owner reconciles it (a new record, or an explicit release).
+   return {memberId:member.id,voided:true,corrected:corrected!==null,locked:member.order_state==='LOCKED'};
+  });
+ }
+ // Owner: releases an order locked only by a payment record that was voided (never a delivered order, never a
+ // completed cycle), so the customer can edit it again. Explicit, with a reason, audited.
+ async releaseOrder(id:string,memberId:string,body:any,actor:string){
+  const target=publicId(id);uuid(memberId,'MEMBER_NOT_FOUND');
+  if(body?.attest!==true)throw new ApiError(400,'INVALID_PAYMENT_RECORD','יש לאשר במפורש את השחרור.');
+  const why=typeof body?.reason==='string'?body.reason.trim().replace(/\s+/g,' '):'';
+  if(why.length<3||why.length>60||/@/.test(why)||/\d[\d\s-]{6,}\d/.test(why)||/[<>]/.test(why))throw new ApiError(400,'INVALID_PAYMENT_RECORD','יש לכתוב סיבה קצרה (3 עד 60 תווים, בלי פרטי קשר).');
+  return this.groups.locked(async db=>{
+   const group=(await db.query('SELECT * FROM delivery_groups WHERE public_id=$1',[target])).rows[0];
+   if(!group)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
+   const member=(await db.query('SELECT id,order_state,locked_reason FROM group_members WHERE id=$1 AND group_id=$2 FOR UPDATE',[memberId,group.id])).rows[0];
+   if(!member)throw new ApiError(404,'MEMBER_NOT_FOUND','הלקוח לא נמצא בקבוצה הזאת.');
+   if(member.order_state!=='LOCKED'||member.locked_reason!=='PAID_EXTERNAL'||group.operational_status==='COMPLETED')
+    throw new ApiError(409,'RELEASE_NOT_ALLOWED','רק הזמנה שננעלה בגלל תשלום שבוטל, במחזור שעוד לא הושלם, יכולה להשתחרר לעריכה.');
+   if((await db.query('SELECT 1 FROM member_payment_records WHERE member_id=$1 AND voided_at IS NULL',[member.id])).rows.length)
+    throw new ApiError(409,'RELEASE_NOT_ALLOWED','להזמנה יש תשלום רשום ופעיל. יש לבטל אותו קודם.');
+   // Same row, open again; the cart, its versions and every payment record stay as they were.
+   await db.query("UPDATE group_members SET order_state='OPEN',locked_at=NULL,locked_reason=NULL,updated_at=NOW() WHERE id=$1",[member.id]);
+   await auditStrict(db,{action:'member.order_release',actor,target,subject:member.id,result:'OK',previousStatus:'LOCKED',newStatus:'OPEN',detail:'PAYMENT_VOIDED'});
+   return {memberId:member.id,released:true};
+  });
+ }
+ private paymentInput(body:any){
+  const amount=Number(body?.amountAgorot);
+  if(!Number.isSafeInteger(amount)||amount<=0)throw new ApiError(400,'INVALID_PAYMENT_RECORD','סכום התשלום אינו תקין.');
+  if(!(PAYMENT_METHODS as readonly string[]).includes(body?.method))throw new ApiError(400,'INVALID_PAYMENT_RECORD','יש לבחור אמצעי תשלום.');
+  const day=typeof body?.receivedOn==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(body.receivedOn)?body.receivedOn:null;
+  if(!day||Number.isNaN(Date.parse(day+'T00:00:00Z'))||Date.parse(day+'T00:00:00Z')>Date.now()+86400000)throw new ApiError(400,'INVALID_PAYMENT_RECORD','תאריך קבלת התשלום אינו תקין.');
+  let note:string|null;
+  try{note=reference(body?.reference);}catch{throw new ApiError(400,'INVALID_PAYMENT_RECORD','ההערה יכולה להכיל עד 60 תווים, בלי פרטי קשר או כרטיס.');}
+  return {amount,method:body.method as string,day,note};
+ }
+
  // ---------- Customer: another, separate order from an existing receipt ----------
  async anotherOrder(id:string,token:string,body:any){
   const proof=await this.groups.member(id,token);
@@ -296,10 +359,12 @@ export class Orders {
   const group=(await this.db.query('SELECT id,payment_mode,operational_status FROM delivery_groups WHERE public_id=$1',[publicId(id)])).rows[0];
   if(!group)throw new ApiError(404,'GROUP_NOT_FOUND','הקבוצה לא נמצאה.');
   const rows=(await this.db.query(`SELECT m.id,m.email,m.phone,m.pledged_total_agorot,m.order_state,m.locked_reason,
-   p.amount_agorot AS paid_agorot,p.method,to_char(p.received_on,'YYYY-MM-DD') AS received_on,p.reference,p.recorded_at
+   p.amount_agorot AS paid_agorot,p.method,to_char(p.received_on,'YYYY-MM-DD') AS received_on,p.reference,p.recorded_at,
+   (SELECT count(*) FROM member_payment_records v WHERE v.member_id=m.id AND v.voided_at IS NOT NULL)::int AS voided
    FROM group_members m LEFT JOIN member_payment_records p ON p.member_id=m.id AND p.voided_at IS NULL
    WHERE m.group_id=$1 AND m.status='${ACTIVE_MEMBER_STATUS}' ORDER BY m.created_at,m.id`,[group.id])).rows;
-  return {paymentMode:group.payment_mode as string,orders:rows.map((m:any)=>({id:m.id,email:m.email,phone:m.phone,amountAgorot:Number(m.pledged_total_agorot),
+  return {paymentMode:group.payment_mode as string,completed:group.operational_status==='COMPLETED',orders:rows.map((m:any)=>({id:m.id,email:m.email,phone:m.phone,amountAgorot:Number(m.pledged_total_agorot),
+   locked:m.order_state==='LOCKED',lockedReason:m.locked_reason as string|null,voidedRecords:Number(m.voided),
    // Delivery and payment are separate: an order is delivered when it was locked as delivered or its cycle completed.
    delivery:m.locked_reason==='DELIVERED'||group.operational_status==='COMPLETED'?'DELIVERED':'OPEN',
    payment:m.paid_agorot===null?null:{amountAgorot:Number(m.paid_agorot),method:m.method,receivedOn:m.received_on,reference:m.reference,recordedAt:new Date(m.recorded_at).toISOString()}}))};
@@ -308,9 +373,10 @@ export class Orders {
  async history(memberId:string){
   uuid(memberId,'MEMBER_NOT_FOUND');
   const versions=(await this.db.query('SELECT amount_agorot,source,recorded_at,jsonb_array_length(cart_snapshot) AS lines,md5(cart_snapshot::text) AS fingerprint FROM member_cart_versions WHERE member_id=$1 ORDER BY recorded_at,id',[memberId])).rows;
-  const payments=(await this.db.query('SELECT amount_agorot,method,received_on,reference,recorded_at,voided_at FROM member_payment_records WHERE member_id=$1 ORDER BY recorded_at',[memberId])).rows;
+  const payments=(await this.db.query('SELECT amount_agorot,method,received_on,reference,recorded_at,voided_at,voided_by,void_reason,replaces_id FROM member_payment_records WHERE member_id=$1 ORDER BY recorded_at',[memberId])).rows;
   return {versions:versions.map((v:any)=>({amountAgorot:Number(v.amount_agorot),source:v.source,lines:Number(v.lines),fingerprint:v.fingerprint,recordedAt:new Date(v.recorded_at).toISOString()})),
-   payments:payments.map((p:any)=>({amountAgorot:Number(p.amount_agorot),method:p.method,receivedOn:String(p.received_on instanceof Date?p.received_on.toISOString().slice(0,10):p.received_on),reference:p.reference,recordedAt:new Date(p.recorded_at).toISOString(),voided:p.voided_at!==null}))};
+   payments:payments.map((p:any)=>({amountAgorot:Number(p.amount_agorot),method:p.method,receivedOn:String(p.received_on instanceof Date?p.received_on.toISOString().slice(0,10):p.received_on),reference:p.reference,recordedAt:new Date(p.recorded_at).toISOString(),voided:p.voided_at!==null,
+   voidReason:p.void_reason??null,voidedBy:p.voided_by??null,correction:p.replaces_id!==null}))};
  }
 }
 export {LOCKED_MESSAGE};
